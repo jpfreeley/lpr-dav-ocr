@@ -76,7 +76,7 @@ def main(argv=None):
             if not (r.get("plate") and lb):
                 continue
             rows.append(dict(image=r["image"], day=day.name, verdict=lb["verdict"], truth=lb.get("truth"), state=lb.get("state"),
-                             p1=r["plate"], c1=float(r["conf"]), p2=s.get("plate2") or "", c2=float(s["conf2"]) if s.get("conf2") else 0.0,
+                             p1=r["plate"], c1=float(r["conf"]), p3=s.get("plate3") or "", p2=s.get("plate2") or "", c2=float(s["conf2"]) if s.get("conf2") else 0.0,
                              shape=s.get("shape") or "", aspect=s.get("aspect") or "",
                              hour=_hour(r["image"])))
     known = [r for r in rows if r["verdict"] in ("ok", "fix") and r["truth"]]
@@ -104,6 +104,10 @@ def main(argv=None):
     P(f"  - take the higher-confidence read: {pct(hi, len(withs))}")
     P(f"  - best case, either pass right (upper bound): {pct(either, len(withs))}")
     P(f"- When the passes AGREE ({len(agree)}): right {pct(sum(r['p1'] == r['truth'] for r in agree), len(agree))}")
+    d3 = [r for r in dis if r["p3"]]
+    if d3:
+        tb = lambda r: r["p3"] if r["p3"] in (r["p1"], r["p2"]) else (r["p1"] if r["c1"] >= r["c2"] else r["p2"])
+        P(f"- Crop read as tie-breaker, on the {len(d3)} disagreements that have one: higher-confidence {pct(sum((r['p1'] if r['c1'] >= r['c2'] else r['p2']) == r['truth'] for r in d3), len(d3))}, with crop tie-break {pct(sum(tb(r) == r['truth'] for r in d3), len(d3))}")
     P(f"- When they DISAGREE ({len(dis)}): first right {pct(sum(r['p1'] == r['truth'] for r in dis), len(dis))}, second right {pct(sum(r['p2'] == r['truth'] for r in dis), len(dis))}, neither {pct(sum(r['p1'] != r['truth'] and r['p2'] != r['truth'] for r in dis), len(dis))}\n")
 
     # 2. calibration

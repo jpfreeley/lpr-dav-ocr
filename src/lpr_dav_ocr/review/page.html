@@ -250,6 +250,7 @@ function render() {
     alt.hidden = false; alt.className = "alt" + (agree ? " agree" : "");
     alt.innerHTML = agree ? `2nd pass agrees <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(2)}`
                           : `2nd pass says <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(2)} &middot; use`;
+    if (it.crop && !agree) alt.innerHTML += ` &middot; <span title="Third read of a tight crop">crop read <span class="a">${it.crop}</span>${it.crop === it.plate ? " (backs 1st)" : it.crop === it.alt.plate ? " (backs 2nd)" : ""}</span>`;
     alt.onclick = agree ? null : () => { buildCells(it.alt.plate.split("")); focusCell(cells().length - 1); };
   }
   orig = it.plate.split("");
@@ -347,6 +348,7 @@ function diffOps(a, b) {
 
 /* one input per character; editing any box means the read was wrong */
 function buildCells(chars) {
+  sel = -1;
   const wrap = $("cells"); wrap.innerHTML = "";
   chars.forEach((ch, i) => {
     const col = document.createElement("div"); col.className = "cell";
@@ -414,8 +416,11 @@ $("stText").addEventListener("focus", () => { $("stOther").checked = true; });
 $("stText").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); submit(); } e.stopPropagation(); });
 $("btnOk").onclick = () => decide("ok"); $("save").onclick = submit;
 $("btnNot").onclick = () => decide("notplate"); $("btnObs").onclick = () => decide("obstructed"); $("btnSkip").onclick = () => decide("skip");
-$("addc").onclick = () => { const i = Math.max(0, cells().indexOf(document.activeElement)); mutate(v => v.splice(i + 1, 0, "")); focusCell(i + 1); };
-$("delc").onclick = () => { const i = Math.max(0, cells().indexOf(document.activeElement)); mutate(v => v.splice(i, 1)); focusCell(i); };
+/* clicking a button blurs the box, so remember which box was selected last */
+let sel = -1;
+$("cells").addEventListener("focusin", e => { sel = cells().indexOf(e.target); });
+$("addc").onclick = () => { const n = cells().length, i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i + 1, 0, "")); focusCell(i + 1); };
+$("delc").onclick = () => { const n = cells().length; if (n < 2) return; const i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i, 1)); focusCell(Math.min(i, n - 2)); };
 $("reset").onclick = () => { buildCells(orig.slice()); focusCell(0); };
 $("last").onclick = () => D.last_reviewed && go(D.last_reviewed); $("nextun").onclick = () => D.next_unreviewed && go(D.next_unreviewed);
 $("prev").onclick = () => D.prev && go(D.prev); $("next").onclick = () => D.next && go(D.next);

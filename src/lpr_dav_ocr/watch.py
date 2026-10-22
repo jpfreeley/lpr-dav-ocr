@@ -73,6 +73,8 @@ def check_matches(frames, clips, send, label=""):
         cands = [r["plate"]] + [v for v in (r.get("variants") or "").split("|") if v]
         if sp.get(r["image"], {}).get("plate2"):
             cands.append(sp[r["image"]]["plate2"])
+        if sp.get(r["image"], {}).get("plate3"):
+            cands.append(sp[r["image"]]["plate3"])
         for e, level, read in W.match(cands, entries):
             key = e["plate"]
             if key not in hits or RANK[level] > RANK[hits[key][1]]:

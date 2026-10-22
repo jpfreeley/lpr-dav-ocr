@@ -129,10 +129,13 @@ by hand if a command complains.
 It binds the loopback interface only and relies on that. See [privacy.md](privacy.md#who-can-see-the-review-page).
 
 <a id="ki-19"></a>
-### KI-19: Some plates have no outline on the review page
+### KI-19: Some plates have no outline on the review page (mostly fixed)
 
-When the second pass finds no plate-shaped read in a frame (the first pass found one only with rotation), the page
-says so and shows no crop. Judge it from the full frame.
+The second pass now tries three ways in order: un-rotated at 960 px, rotated at 960 px, then rotated at 640 px (the
+first pass's own settings) for an outline only. The outline-only result leaves `plate2` blank, so it can never count
+as an agreeing second read or trigger auto-accept. A frame can still end with no outline. The page then says the
+second pass ran and found nothing, and you judge from the full frame. `lpr second-pass <day> --retry-empty` re-runs
+such rows after an upgrade.
 
 <a id="ki-20"></a>
 ### KI-20: The review page's alignment logic is not unit tested

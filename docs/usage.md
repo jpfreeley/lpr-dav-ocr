@@ -32,7 +32,7 @@ lpr score                                       # 4. how accurate was it?
 
 `lpr second-pass` re-reads each saved frame **without** the rotation and at a larger detector size, and records
 where the plate is. It never decodes video, so it is quick (about 2 seconds per frame). A plate only enters the
-review queue once it has a second pass. It is incremental and safe to run repeatedly. Only one copy runs per
+review queue once it has a second pass. When the two passes disagree it also adds a third read of a tight crop (`plate3`) as a tie-breaker. `--retry-empty` re-runs rows with no read and no outline; `--fill-crop` adds the crop read to older rows. It is incremental and safe to run repeatedly. Only one copy runs per
 folder at a time.
 
 ### Pausing and stopping

@@ -2,6 +2,20 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Second pass ladder (un-rotated 960 px, rotated 960 px, rotated 640 px outline-only) and `--retry-empty`.
+- Crop read: when the two passes disagree, a third read of a tight, enlarged crop around the outline breaks the tie.
+  Stored as `plate3` and `conf3`; it never changes `plate2` or auto-accept. `--fill-crop` adds it to existing rows.
+  On the author's labels it picked the right read 53% of the time against 48% for "take the higher confidence".
+- The review page shows the crop read, and the watcher also matches it against the watchlist.
+
+### Fixed
+
+- The "+ box" and "- box" buttons act on the box you last clicked in (a button click used to lose the selection).
+
 ## [0.1.0] - 2026-10-22
 
 First packaged release. Developed against one camera and one site; see [docs/known-issues.md](docs/known-issues.md).

@@ -124,7 +124,7 @@ class Store:
             auto = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok"
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
-                alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), box=box,
+                alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
                 shape=shape, aspect=s.get("aspect") or None, second_pass=img in sp, ready=img in sp,
                 variants=[v for v in (r.get("variants") or "").split("|") if v and v != r["plate"]],
                 label=labels.get(img),
