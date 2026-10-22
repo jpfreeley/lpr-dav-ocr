@@ -1,0 +1,101 @@
+# The review page
+
+`lpr review` starts a small web server on `127.0.0.1` (default port 8770). Nothing is sent anywhere. The
+page is for labelling what the pipeline found, which gives you accuracy numbers and training data.
+
+![Review page](images/review-ui-demo.png)
+
+## What is on the page
+
+- **Left:** the saved frame with the plate outlined, the clip and approximate time, and navigation: Previous,
+  Next, **Last reviewed** (the furthest plate you have reached in time order) and **Next unreviewed**.
+- **Top right:** a leveled crop of the plate. The letters of the current text are drawn under it, one per plate
+  position, so you can compare read against plate. Letters you changed turn amber.
+- **OCR read:** the read and its confidence, a plate-shape warning when the text region is not plate-shaped,
+  an *auto-accepted* badge when the rule applies, and **2nd pass says X**: the second read. Click it to copy
+  that read into the boxes.
+- **Character boxes:** one input per character. Typing replaces the character and moves on. Arrow keys move
+  between boxes. `+ box` and `- box` insert and delete a box. A changed box shows what it was ("was H"), an
+  inserted one shows "new". The comparison is an alignment, so adding a character at the front does not mark
+  every later box.
+- **State:** `UNKN` (default), common states, and a free-text two-letter box. It is stored with the verdict.
+  Nothing resolves it automatically.
+- **Buttons:** see below.
+- **Watch:** adds the plate (the corrected text if you edited the boxes) to the watchlist. See
+  [watcher-and-alerts.md](watcher-and-alerts.md).
+
+## Verdicts
+
+| Button | Meaning | Training use |
+|---|---|---|
+| **Correct** (Enter) | The read is right. Enabled only while the boxes are unchanged. | positive example |
+| **Save fix** (Enter) | You changed at least one box. The boxes are the truth. | corrected example |
+| **Not a plate** (Alt+N) | There is no plate in the outlined area (a sign, a model name, a dealer frame). | false-positive example |
+| **Obstructed** (Alt+O) | A plate is there but cannot be read (blocked, glare, blur, cut off). | excluded from accuracy, useful for quality filtering |
+| **Can't tell** (Alt+S) | You are unsure what it is. | excluded |
+
+Enter does the right thing for the state of the boxes: no change means Correct, a change means Save fix.
+After each verdict the page moves to the next plate that needs review.
+
+## Which plates are queued
+
+The header menu chooses the view. Counts are per day. A **day** menu lists every processed day.
+
+| View | Shows |
+|---|---|
+| **Needs review** (default) | Plates with a second pass, no verdict yet, and not auto-accepted. |
+| **Auto-accepted: spot check** | Plates that met the auto-accept rule. Look at some to audit it. |
+| **All unreviewed** | The first view plus the auto-accepted ones. |
+| **Everything** | Every plate, including ones still waiting for a second pass. |
+
+A plate enters a review queue only after the second pass has run on it, even when that pass found no read.
+Plates still waiting are counted in the header ("waiting for 2nd pass") and join the queue on their own.
+
+**Auto-accept rule:** confidence at or above `review.auto_accept_conf` (0.99), both passes agree, and the
+text region has a plate-like shape. Auto-accepted plates get **no** human label, so treat them as weak labels.
+Validate the rule on your own data before trusting it: `lpr score` prints its precision.
+
+## Keyboard
+
+| Key | Action |
+|---|---|
+| Enter | Correct, or Save fix when a box was changed |
+| Alt+N / Alt+O / Alt+S | Not a plate / Obstructed / Can't tell |
+| Alt+Left, Alt+Right | Previous, next |
+| Alt+L, Alt+U | Last reviewed, next unreviewed |
+| Left, Right, Backspace | Move between character boxes |
+
+Plain letters are not shortcuts because they would clash with typing into the boxes.
+
+## Where your labels go
+
+`<data_root>/labels/labels.jsonl`, one JSON object per line, appended and flushed immediately. The latest line
+for an image wins, so you can revisit and relabel. Fields:
+
+| Field | Meaning |
+|---|---|
+| `ts` | when you saved it (ISO 8601 with offset) |
+| `image`, `clip`, `day` | which plate |
+| `plate_ocr`, `conf` | the first-pass read and its confidence |
+| `plate_second`, `shape` | the second-pass read, the shape class at that time |
+| `verdict` | `ok`, `fix`, `notplate`, `obstructed` or `skip` |
+| `truth` | the true plate for `ok` and `fix`, else null |
+| `state` | `UNKN` or a state code |
+
+For `ok` and `fix`, a leveled crop is saved to `<data_root>/crops/<image name>__<truth>.png`.
+
+Labels are keyed by the image file name. Do not rename saved frames.
+
+## Safety
+
+- The server binds `127.0.0.1` only.
+- State-changing requests need an `X-Requested-With` header, which a web page on another site cannot add
+  to a cross-origin request.
+- Image requests are restricted to the day's frames folder.
+- There is no login. Anyone with access to your account on the machine can open the page.
+
+## Notes for slow shares
+
+Reads of the index files over a busy network share can take seconds. The server answers from its last good
+read and refreshes in the background, and it keeps a local copy of frames it has served in
+`<home>/imgcache`. See [ADR 0009](adr/0009-data-layout-and-share-caching.md).
