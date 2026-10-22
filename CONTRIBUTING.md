@@ -30,7 +30,8 @@ The OCR extras are only needed to run the real pipeline. Most tests run with jus
 
 ## Making a change
 
-1. Branch from `main`. Do not commit directly to `main`.
+1. Branch from `main`. Do not commit directly to `main`. Commit with a no-reply email address, not your real one
+   ([docs/privacy.md](docs/privacy.md)).
 2. Keep the change focused. Add or update tests. The server, watcher, scoring and helpers have tests in `tests/`.
 3. If it changes behaviour a user relies on, update the docs and the [changelog](CHANGELOG.md).
 4. If it changes a design decision, add an [ADR](docs/adr/) (copy `0000-template.md`) rather than editing an accepted one.

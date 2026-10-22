@@ -53,6 +53,8 @@ ln -s ../../scripts/check-private-data.sh .git/hooks/pre-commit
 - Never paste real plates, camera identifiers, host names, user names or file paths from your own setup into
   code, tests, issues or pull requests. Use placeholders such as `<camera-id>` and `/Volumes/camera-share`.
 - Screenshots of the review page must come from demo data.
+- Commit with a no-reply email address, not your real one (`git config user.email <id>+<name>@users.noreply.github.com`,
+  or the address GitHub shows under Settings, Emails). Author and committer addresses are part of every commit.
 - Git history is permanent. If something private is committed, rewriting history is required, not a later
   commit that deletes it. Check before you push.
 
