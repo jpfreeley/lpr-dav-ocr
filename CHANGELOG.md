@@ -10,7 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 - Crop read: when the two passes disagree, a third read of a tight, enlarged crop around the outline breaks the tie.
   Stored as `plate3` and `conf3`; it never changes `plate2` or auto-accept. `--fill-crop` adds it to existing rows.
   On the author's labels it picked the right read 53% of the time against 48% for "take the higher confidence".
-- The review page shows the crop read, and the watcher also matches it against the watchlist.
+- The review page shows the crop read and lets you click it to copy it into the boxes, and the watcher also matches it against the watchlist.
 
 - Plate history: `lpr seen <plate>` and a History page (`/history`) list every sighting of a plate across all days, exact
   match, from plates you confirmed or corrected or that passed auto-accept (an option includes unreviewed reads). The
