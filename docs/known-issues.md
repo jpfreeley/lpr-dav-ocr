@@ -146,3 +146,13 @@ against insertions, substitutions and deletions.
 The review page keeps a local copy of each frame it serves in `<home>/imgcache` (see
 [ADR 0009](adr/0009-data-layout-and-share-caching.md)). If you reprocess a day with `--redo` and a frame is written again under
 the same name, the page keeps showing the old copy. **Workaround:** `rm -rf <home>/imgcache` after reprocessing.
+
+<a id="ki-22"></a>
+### KI-22: A background job cannot read a network share until macOS permits it
+
+A `launchd` agent runs outside your terminal, so macOS asks separately whether Python may use network volumes. If the
+prompt is dismissed or denied, every watcher cycle fails with `PermissionError: Operation not permitted`
+(see `<home>/logs/watch.log`), while commands run from your own terminal keep working. The permission is tied to the Python
+executable, so a Python upgrade that moves it (for example a Homebrew version bump) can ask again.
+**Workaround:** [installation.md](installation.md#troubleshooting). Until it is fixed, `lpr watch` can be run from a terminal
+or editor session, which has the access.

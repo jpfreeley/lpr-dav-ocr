@@ -74,7 +74,8 @@ The agent runs under `caffeinate -i` so the machine does not idle-sleep while it
 mounted and you logged in. If either is missing it waits, and catches up later because processing is resumable.
 The log is `<home>/logs/watch.log`.
 
-On first use under `launchd`, macOS may ask whether the Python executable may access a network volume. Approve it.
+On first use under `launchd`, macOS asks whether the Python executable may access a network volume. **Approve it.** A
+denial sticks and the log fills with `PermissionError: Operation not permitted`; see [KI-22](known-issues.md#ki-22) for the fix.
 
 Set `LPR_LABEL` to name the agent something of your own, and `LPR_BIN` if `lpr` is not on the PATH.
 

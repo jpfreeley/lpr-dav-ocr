@@ -102,7 +102,7 @@ subscribe to it in the ntfy app, add plates with `lpr watchlist add`, then
 | `ModuleNotFoundError: lpr_dav_ocr` in a script | You used `python -I` (isolated mode) outside the virtual environment, or the environment is not active. Use `lpr ...`. |
 | Python "quit unexpectedly" reports after a run | A known exit crash in PaddlePaddle's thread pool. The program already ends the process directly to avoid it. See [known-issues.md](known-issues.md#ki-3). |
 | Reads appear but the review page is empty or stale | You are pointing at a different data root than `lpr process` wrote to. `lpr where <day-folder>` prints the folder `lpr process` uses. |
-| The watcher cannot read the share when started by `launchd` | macOS may ask once whether Python can access a network volume. Approve it, or grant access in System Settings, Privacy and Security. |
+| The watcher logs `PermissionError: Operation not permitted` every cycle | macOS blocked Python from the network volume. It asks once, and a denial sticks. Open System Settings, Privacy & Security, Files & Folders, find Python, and turn on **Network Volumes** (a denied app is listed with its switch off). Then restart the agent with `scripts/install-watcher.sh install`. If Python is not listed, granting Full Disk Access to the Python executable also works. |
 
 ## Uninstall
 
