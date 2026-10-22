@@ -216,7 +216,6 @@ class Store:
         return its
 
     def add_label(self, rec):
-        self._reads_cache = None
         with self.write_lock, self.labels_path.open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
             fh.flush()
@@ -224,6 +223,7 @@ class Store:
         c = self._cache.get(self.labels_path)
         if c:                                  # keep the cached read consistent with what was just written
             c[1].append(rec)
+        self._reads_cache = None               # plate history rebuilds from the new label
 
     def save_crop(self, item, truth):
         """Leveled plate crop beside the label, for later training. Best effort."""
