@@ -55,6 +55,7 @@ DEFAULTS = {
         # A plate with confidence at or above this, both passes agreeing, and an OK shape skips the
         # review queue. Validate on your own labels before relying on it (docs/accuracy.md).
         "auto_accept_conf": 0.99,
+        "recent_days": 30,
     },
     "watch": {
         "poll_seconds": 60,

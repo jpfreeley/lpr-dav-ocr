@@ -86,6 +86,7 @@ Every one of these is also a `lpr process` flag (`lpr process -h`).
 | Key | Default | Meaning |
 |---|---|---|
 | `port` | 8770 | The review page listens on `127.0.0.1` at this port. Pick a free one. |
+| `recent_days` | 30 | A read identical to a plate you verified (Correct or Save fix) within this many days of the sighting is auto-approved. Plates one character away from such a plate get a one-click correction instead. Set 0 to switch it off. |
 | `auto_accept_conf` | 0.99 | A plate at or above this confidence, with both passes agreeing and a plate-like shape, skips the review queue. **Validate this on your own labels first**: `lpr score` prints the rule's precision. Set it above 1.0 to switch auto-accept off. |
 
 ## `[watch]`

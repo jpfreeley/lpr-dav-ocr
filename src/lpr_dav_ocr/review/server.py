@@ -10,7 +10,7 @@ Pages: /  (first unreviewed)   /i/<image-file>   ?f=need|auto|unrev|flag|all fil
 All days under <root>/frames/ are available from the day selector; labels are shared.
 """
 import argparse, csv, json, os, re, threading, time
-from datetime import datetime
+from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -27,6 +27,7 @@ VERDICTS = {"ok", "fix", "notplate", "obstructed", "skip"}
 # both passes agree, plate-shaped). Validate on your own labels before trusting it (docs/accuracy.md),
 # and audit it with the "auto" filter.
 AUTO_CONF = CFG["review"]["auto_accept_conf"]
+RECENT_DAYS = CFG["review"]["recent_days"]
 
 
 
@@ -76,6 +77,21 @@ def pick_read(p1, c1, p2, c2, p3):
         return p3, "the crop read backs it"
     best = max(pool, key=lambda x: (c1 if x == p1 else c2 if x == p2 else 0))
     return best, "more confident"
+
+
+def one_off(a, b):
+    """True when a and b differ by exactly one substituted, inserted or deleted character."""
+    if a == b or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    s, t = (a, b) if len(a) < len(b) else (b, a)
+    return any(t[:i] + t[i + 1:] == s for i in range(len(t)))
+
+
+def _variants(p):
+    """The plate and each plate with one character removed. Two plates one edit apart share a variant."""
+    return {p} | {p[:i] + p[i + 1:] for i in range(len(p))}
 
 
 class Store:
@@ -170,12 +186,14 @@ class Store:
             box = [int(s[k]) for k in ("x0", "y0", "x1", "y1")] if s.get("x0") not in (None, "") else None
             alt = s.get("plate2") or None
             shape = s.get("shape") or None
-            auto = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok"
+            rec = self.recent(r["plate"], img)
+            by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok"
+            auto = by_conf or bool(rec and rec["exact"])
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
-                fits=fits(r["plate"]),
+                fits=fits(r["plate"]), recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
                 pick=dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None,
                 shape=shape, aspect=s.get("aspect") or None, second_pass=img in sp, ready=img in sp,
                 variants=[v for v in (r.get("variants") or "").split("|") if v and v != r["plate"]],
@@ -194,6 +212,49 @@ class Store:
             if f:
                 return dict(plate=f, shaped=False)
         return None
+
+    # --- recently verified plates: auto-approve an exact match, offer a one-character correction ----------
+    def vindex(self):
+        """Human-verified plates (verdict ok or fix) only, so auto-approved plates never vouch for each other."""
+        rows = self._read(self.labels_path, "jsonl")
+        key = (id(rows), len(rows))
+        if getattr(self, "_vi", (None,))[0] != key:
+            by, near = {}, {}
+            for r in {r["image"]: r for r in rows}.values():
+                d = self._ordinal(r["image"])
+                if r.get("verdict") in ("ok", "fix") and r.get("truth") and d:
+                    by.setdefault(r["truth"].upper(), []).append((d, r["image"]))
+            for t in by:
+                for v in _variants(t):
+                    near.setdefault(v, set()).add(t)
+            self._vi = (key, by, near)
+        return self._vi[1], self._vi[2]
+
+    @staticmethod
+    def _ordinal(image):
+        m = re.match(r"(\d{4})-(\d\d)-(\d\d)_", image or "")
+        return date(int(m[1]), int(m[2]), int(m[3])).toordinal() if m else None
+
+    def recent(self, plate, image):
+        """Was this plate (or a plate one character away) verified by you within RECENT_DAYS of this sighting?
+        {plate, n, exact} or None. Other sightings only; the image itself never counts."""
+        d0 = self._ordinal(image)
+        if not plate or not d0 or RECENT_DAYS <= 0:
+            return None
+        by, near = self.vindex()
+        hits = lambda t: [x for x in by.get(t, []) if x[1] != image and abs(x[0] - d0) <= RECENT_DAYS]
+        h = hits(plate)
+        if h:
+            return dict(plate=plate, n=len(h), exact=True)
+        if len(plate) < 5:
+            return None
+        best = None
+        for t in sorted({t for v in _variants(plate) for t in near.get(v, ())}):
+            if len(t) >= 5 and one_off(plate, t):
+                h = hits(t)
+                if h and (best is None or len(h) > best[1]):
+                    best = (t, len(h))
+        return dict(plate=best[0], n=best[1], exact=False) if best else None
 
     @staticmethod
     def _time(img, frame):

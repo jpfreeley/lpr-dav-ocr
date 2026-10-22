@@ -304,3 +304,83 @@ class PickReadTests(unittest.TestCase):
         self.assertEqual(S.fits("T123456C"), "TLC")
         self.assertIsNone(S.fits("DEMO001"))
         self.assertIsNone(S.fits(None))
+
+
+class RecentTests(unittest.TestCase):
+    """Auto-approve a read equal to a plate you verified within recent_days; offer a one-character correction."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        plan = {"2026-01-01": [("01.00.00", "DEMO001")],            # will be verified
+                "2026-01-10": [("02.00.00", "DEMO001"), ("03.00.00", "DEM0001"), ("04.00.00", "ZZZZ999")],
+                "2026-03-01": [("05.00.00", "DEMO001")]}            # too far away
+        cls.img = {}
+        for day, items in plan.items():
+            d = cls.root / "frames" / day
+            d.mkdir(parents=True)
+            with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+                w, v = csv.writer(f), csv.writer(g)
+                w.writerow(hdr_i)
+                v.writerow(hdr_s)
+                for t, p in items:
+                    img = f"{day}_{t}-{t}-{p}_0.80.png"
+                    cls.img[(day, p)] = img
+                    w.writerow([f"{t}-{t}[M].dav", p, 0.80, 30, "", img, 500, 1, 3, 5])
+                    v.writerow([img, p, 0.80, p, 0.70, 1, 100, 100, 340, 220, "2.1", "ok", 2])    # low confidence: no auto by conf
+        cls.store = S.Store(cls.root)
+        cls.store.add_label({"image": cls.img[("2026-01-01", "DEMO001")], "verdict": "ok", "truth": "DEMO001", "state": "NY"})
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def item(self, day, plate):
+        return next(i for i in self.store.items(day) if i["plate"] == plate)
+
+    def test_exact_match_within_window_is_auto_approved(self):
+        i = self.item("2026-01-10", "DEMO001")
+        self.assertTrue(i["auto"])
+        self.assertEqual(i["auto_why"], "recent")
+        self.assertEqual(i["recent"], {"plate": "DEMO001", "n": 1, "exact": True})
+
+    def test_outside_the_window_is_not(self):
+        i = self.item("2026-03-01", "DEMO001")
+        self.assertFalse(i["auto"])
+        self.assertIsNone(i["recent"])
+
+    def test_one_character_off_is_offered_not_approved(self):
+        i = self.item("2026-01-10", "DEM0001")
+        self.assertFalse(i["auto"])
+        self.assertEqual(i["recent"], {"plate": "DEMO001", "n": 1, "exact": False})
+
+    def test_unrelated_plate_gets_nothing(self):
+        i = self.item("2026-01-10", "ZZZZ999")
+        self.assertFalse(i["auto"])
+        self.assertIsNone(i["recent"])
+
+    def test_a_plate_never_vouches_for_itself(self):
+        self.assertIsNone(self.item("2026-01-01", "DEMO001")["recent"])       # its only verified sighting is itself
+
+    def test_auto_approved_plates_do_not_vouch_for_others(self):
+        # the Jan 10 read is auto-approved; Mar 1 is within 30 days of it but must not count
+        self.assertFalse(self.item("2026-03-01", "DEMO001")["auto"])
+
+    def test_one_off(self):
+        self.assertTrue(S.one_off("DEMO001", "DEM0001"))
+        self.assertTrue(S.one_off("DEMO001", "DEMO01"))
+        self.assertTrue(S.one_off("DEMO01", "DEMO001"))
+        self.assertFalse(S.one_off("DEMO001", "DEMO001"))
+        self.assertFalse(S.one_off("DEMO001", "DEM0O01"))
+        self.assertFalse(S.one_off("ABC", "ABCDE"))
+
+    def test_switched_off_by_zero_days(self):
+        old = S.RECENT_DAYS
+        S.RECENT_DAYS = 0
+        try:
+            self.assertIsNone(self.store.recent("DEMO001", self.img[("2026-01-10", "DEMO001")]))
+        finally:
+            S.RECENT_DAYS = old

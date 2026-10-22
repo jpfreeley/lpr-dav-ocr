@@ -56,6 +56,7 @@ pad = 2                   # frames added around each moving frame
 [review]
 port = 8770               # the page binds 127.0.0.1 only
 auto_accept_conf = 0.99   # confidence at which agreeing, plate-shaped reads skip the review queue
+recent_days = 30          # a read that equals a plate YOU verified within this many days is auto-approved
 
 [watch]
 poll_seconds = 60         # how often to look for new clips

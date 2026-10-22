@@ -168,6 +168,7 @@
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
         </span>
         <span class="badge" id="autob" hidden style="border-color:var(--ok);color:var(--ok)" title="Confidence 0.99 or higher, both passes agree, plate-shaped. 99.6% right on your labels.">auto-accepted</span>
+        <button class="alt" id="near" hidden title="This read is one character away from a plate you verified recently"></button>
         <button class="alt" id="pick" hidden></button>
         <button class="alt tlc" id="tlc" hidden></button>
         <button class="alt" id="alt" hidden title="Click to copy this read into the boxes"></button>
@@ -258,6 +259,13 @@ function render() {
   $("meter").style.width = it.conf * 100 + "%";
   $("meter").style.background = it.conf >= 0.97 ? "var(--ok)" : it.conf >= 0.9 ? "var(--warn)" : "var(--bad)";
   $("autob").hidden = !(it.auto && !it.label);
+  $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : "auto-accepted";
+  const nr = $("near");
+  if (it.recent && !it.recent.exact && !it.label) {
+    nr.hidden = false; nr.className = "alt";
+    nr.innerHTML = `one character from <span class="a">${it.recent.plate}</span> (verified ${it.recent.n}&times; within a month) &middot; use`;
+    nr.onclick = () => { buildCells(it.recent.plate.split("")); focusCell(cells().length - 1); };
+  } else nr.hidden = true;
   renderWatch();
   const sh = $("shape");
   sh.hidden = !(it.shape && it.shape !== "ok");

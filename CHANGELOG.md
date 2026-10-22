@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N times in the last 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- Recently verified plates: a read equal to a plate you verified within `review.recent_days` (30) is auto-approved; a
+  read one character away gets a one-click correction. `lpr score` reports the precision of both.
 - "Best guess" on the review page when the passes disagree: prefers a read that fits AAANNNN or the TLC pattern, then a
   crop read that backs a pass, then the more confident pass (81 of 144 right against 76 and 69 for the alternatives).
 - NYC TLC pattern hint on the review page: offers `T123456C` when a read looks like `11234560`. A hint, not a filter.

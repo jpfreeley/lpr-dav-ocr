@@ -9,6 +9,7 @@ so this measures how often reads are right (precision), not how many real plates
 Writes <root>/reports/accuracy.md and <root>/reports/confusions.csv.
 """
 import argparse, collections, csv, re
+from datetime import date
 from pathlib import Path
 
 from . import config as _config
@@ -48,6 +49,16 @@ def align(a, b):
 
 def pct(n, d):
     return f"{n}/{d} = {n / d:.1%}" if d else "n/a"
+
+
+def one_off(a, b):
+    """Exactly one substituted, inserted or deleted character apart."""
+    if a == b or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    s, t = (a, b) if len(a) < len(b) else (b, a)
+    return any(t[:i] + t[i + 1:] == s for i in range(len(t)))
 
 
 def main(argv=None):
@@ -165,6 +176,27 @@ def main(argv=None):
     P(f"- Covers {auto_all} of {items_all} plates found so far ({auto_all / max(items_all, 1):.0%}), including ones nobody has reviewed")
     P(f"- Among the {len(au)} you labeled that match the rule: real plate right {pct(sum(r['p1'] == r['truth'] for r in auk), len(auk))}; "
       f"{len(au) - len(auk)} were not plates or unreadable ({', '.join(f'{v} {k}' for k, v in collections.Counter(r['verdict'] for r in au if r['verdict'] not in ('ok', 'fix')).most_common())})\n")
+    # 6. recently verified plates: how good is "equals a plate you verified within N days"?
+    days = int(_config.load()["review"]["recent_days"])
+    ver = [(r["image"], r["truth"], date.fromisoformat(r["image"][:10])) for r in rows if r["verdict"] in ("ok", "fix") and r["truth"] and re.match(r"\d{4}-\d\d-\d\d_", r["image"])]
+    ex, nr = [], []
+    for r in rows:
+        if days <= 0 or not re.match(r"\d{4}-\d\d-\d\d_", r["image"]):
+            continue
+        d0 = date.fromisoformat(r["image"][:10])
+        pool = {t for i, t, d in ver if i != r["image"] and abs((d - d0).days) <= days}
+        if r["p1"] in pool:
+            ex.append(r)
+        elif len(r["p1"]) >= 5:
+            near = [t for t in pool if len(t) >= 5 and one_off(r["p1"], t)]
+            if near:
+                nr.append((r, near))
+    P("\n## Recently verified plates (last %d days either side)\n" % days)
+    P(f"- Read equals a plate you verified: {len(ex)}. Right {pct(sum(r['verdict'] == 'ok' for r in ex), len(ex))}; "
+      f"{sum(r['verdict'] == 'fix' for r in ex)} needed a fix, {sum(r['verdict'] not in ('ok', 'fix') for r in ex)} were not plates or unreadable")
+    P(f"- Read is one character from a verified plate: {len(nr)}. That plate was the truth {pct(sum(r['truth'] in n for r, n in nr), len(nr))}; "
+      f"the read was already right {sum(r['verdict'] == 'ok' for r, n in nr)} times")
+
     sc = collections.Counter(r["state"] for r in rows if r["state"] and r["state"] != "UNKN")
     if sc:
         P("- State labels: " + ", ".join(f"{k} {v}" for k, v in sc.most_common()))

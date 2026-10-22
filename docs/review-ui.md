@@ -97,6 +97,22 @@ It is a hint only. It never filters plates, never changes a stored read and neve
 labels the rule would have fixed 16 of the 24 wrong TLC reads and made 3 wrong suggestions out of 19, so check it
 against the frame. The pattern is local to one city's regulations: change `tlc_fix` in `review/server.py` for your own area.
 
+## Recently verified plates
+
+Once you have verified a plate (Correct, or Save fix with your corrected text), later sightings of it need less work:
+
+- **Same plate:** a read that is identical to a plate you verified within `review.recent_days` (default 30, either side
+  of the sighting) is **auto-approved**. It leaves the queue like any auto-accepted plate and gets no label. The badge
+  says which plate vouched for it, and the `auto` view lists it so you can spot-check.
+- **One character off:** a read that differs by one wrong, missing or extra character (5 or more characters) from such a
+  plate gets a one-click offer: "one character from ABC1234 (verified 3x within a month) - use". Nothing changes until you
+  click.
+
+Only plates you verified by hand count. Auto-approved plates never vouch for other plates, so an error cannot spread.
+On the author's labels (two days) an exact match was right 165 of 168 times (98.2%), and the one-character offers were
+the right plate 42 of 65 times (65%) while 16 of those reads were already right, which is why that one is an offer and
+not automatic. `lpr score` prints both numbers for your own data. Set `review.recent_days = 0` to switch this off.
+
 ## Pattern fit and "best guess"
 
 Many New York plates are three letters then four digits (`ABC1234`), and TLC plates follow the pattern above. When the
