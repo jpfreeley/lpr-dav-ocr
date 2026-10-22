@@ -12,6 +12,7 @@ COMMANDS = {
     "process": ("lpr_dav_ocr.pipeline", "find plates in a folder of .dav clips (resumable)"),
     "second-pass": ("lpr_dav_ocr.second_pass", "re-read saved frames un-rotated for a second opinion"),
     "review": ("lpr_dav_ocr.review.server", "start the local review page"),
+    "seen": ("lpr_dav_ocr.seen", "every time one plate was seen (exact match)"),
     "score": ("lpr_dav_ocr.score", "score the OCR passes against your review labels"),
     "watch": ("lpr_dav_ocr.watch", "process new clips as they appear and alert on watchlist plates"),
     "watchlist": ("lpr_dav_ocr.watchlist", "add, remove or list watched plates"),

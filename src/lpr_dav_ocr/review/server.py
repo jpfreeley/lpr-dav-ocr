@@ -140,6 +140,69 @@ class Store:
         t = int(m[1]) * 3600 + int(m[2]) * 60 + int(m[3]) + (int(frame) // FPS if frame and frame.isdigit() else 0)
         return f"{t // 3600:02d}:{t % 3600 // 60:02d}:{t % 60:02d}"
 
+    # --- plate history: every sighting of one plate, across all days ---------------------------------------
+    BASES = ("verified", "fixed", "auto", "unverified")
+
+    @staticmethod
+    def basis(i):
+        """(how sure, the plate text) for one saved plate. None when the verdict says there is no plate to speak of."""
+        lb = i["label"]
+        if lb:
+            if lb["verdict"] == "ok":
+                return "verified", i["plate"]
+            if lb["verdict"] == "fix":
+                return "fixed", (lb.get("truth") or "").upper()
+            return None, None                    # not a plate / obstructed / can't tell
+        return ("auto", i["plate"]) if i["auto"] else ("unverified", i["plate"])
+
+    def _day_names(self):
+        if not self.base.is_dir():
+            return []
+        return sorted(p.name for p in self.base.iterdir() if re.fullmatch(r"\d{4}-\d\d-\d\d", p.name) and (p / "index.csv").exists())
+
+    def reads(self, unverified=False):
+        """(plate, basis, item) for every plate that is human verified or auto-accepted (plus unreviewed ones on request)."""
+        c = getattr(self, "_reads_cache", None)
+        if c is None or time.time() - c[0] > 20:          # a few seconds of staleness is fine; labels clear it
+            allr = []
+            for d in self._day_names():
+                for i in self.items(d):
+                    bs, t = self.basis(i)
+                    if bs and t:
+                        allr.append((t, bs, i))
+            c = self._reads_cache = (time.time(), allr)
+        return [r for r in c[1] if unverified or r[1] != "unverified"]
+
+    def sightings(self, plate, unverified=False):
+        """Exact-match history of one plate, newest first."""
+        plate = re.sub(r"[^A-Z0-9]", "", (plate or "").upper())
+        rows = [dict(image=i["image"], day=i["day"], time=i["time"], clip=i["clip"], conf=i["conf"], basis=b, box=i["box"],
+                     state=(i["label"] or {}).get("state"))
+                for t, b, i in self.reads(unverified) if t == plate]
+        rows.sort(key=lambda r: (r["day"], r["time"]), reverse=True)
+        hours = [0] * 24
+        for r in rows:
+            hours[int(r["time"][:2]) if r["time"] else 0] += 1
+        states = {}
+        for r in rows:
+            if r["state"] and r["state"] != "UNKN":
+                states[r["state"]] = states.get(r["state"], 0) + 1
+        return dict(plate=plate, count=len(rows), days=len({r["day"] for r in rows}),
+                    first=(rows[-1]["day"] + " " + rows[-1]["time"]) if rows else None,
+                    last=(rows[0]["day"] + " " + rows[0]["time"]) if rows else None,
+                    by_hour=hours, states=states, sightings=rows)
+
+    def plate_search(self, q, unverified=False, limit=20):
+        """Plates containing q, with sighting counts, most seen first (for the search box)."""
+        q = re.sub(r"[^A-Z0-9]", "", (q or "").upper())
+        found = {}
+        for t, b, i in self.reads(unverified):
+            if q in t:
+                e = found.setdefault(t, dict(plate=t, count=0, last=""))
+                e["count"] += 1
+                e["last"] = max(e["last"], i["day"] + " " + i["time"])
+        return sorted(found.values(), key=lambda e: (-e["count"], e["plate"]))[:limit]
+
     def view(self, day, f):
         its = self.items(day)
         if f == "need":          # default queue: second pass done, no verdict yet, not auto-accepted
@@ -153,6 +216,7 @@ class Store:
         return its
 
     def add_label(self, rec):
+        self._reads_cache = None
         with self.write_lock, self.labels_path.open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
             fh.flush()
@@ -234,6 +298,12 @@ def make_handler(store):
                 return self._send(200, data, "image/png")
             if u.path == "/api/config":
                 return self._send(200, {"tilt": TILT, "w": FRAME_W, "h": FRAME_H})
+            if u.path == "/history":
+                return self._send(200, (HERE / "history.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/history":
+                return self._send(200, store.sightings((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1"))
+            if u.path == "/api/plates":
+                return self._send(200, store.plate_search((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1"))
             if u.path == "/api/watch":
                 return self._send(200, WL.load())
             if u.path == "/api/item":

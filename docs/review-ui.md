@@ -86,6 +86,24 @@ For `ok` and `fix`, a leveled crop is saved to `<data_root>/crops/<image name>__
 
 Labels are keyed by the image file name. Do not rename saved frames.
 
+## Plate history
+
+Next to the Watch button the review page shows **seen N times in the last [7 days | 30 days | 90 days | all time]**.
+The window counts back from the plate on screen, and only earlier sightings are counted. Click the number to open a
+montage of those sightings, oldest first; click one to open it. The **History** link opens `/history?q=<plate>`, a
+search page with a summary (first and last seen, days, state, sightings by hour of day) and a table of every sighting.
+
+Matching is exact. A plate counts when you confirmed it ("Correct"), corrected it ("Save fix", using your corrected
+text), or the auto-accept rule passed it. Plates marked not a plate, obstructed or can't tell never count. Tick
+"include unreviewed reads" to also search plates nobody has looked at yet; each row shows its basis
+(`verified`, `fixed`, `auto` or `unverified`) so you can tell them apart. The search box suggests plates that contain
+what you typed, with counts.
+
+From the command line: `lpr seen ABC1234 --days 30 [--unverified]`.
+
+Sightings are read from the same files as the queue, so a plate appears as soon as it is processed. The first
+search after a start can take a few seconds on a slow share.
+
 ## Safety
 
 - The server binds `127.0.0.1` only.

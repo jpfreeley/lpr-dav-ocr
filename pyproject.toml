@@ -23,7 +23,7 @@ lpr = "lpr_dav_ocr.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"lpr_dav_ocr.review" = ["page.html"]
+"lpr_dav_ocr.review" = ["page.html", "history.html"]
 
 [tool.ruff]
 line-length = 140

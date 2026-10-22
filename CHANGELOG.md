@@ -12,6 +12,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   On the author's labels it picked the right read 53% of the time against 48% for "take the higher confidence".
 - The review page shows the crop read, and the watcher also matches it against the watchlist.
 
+- Plate history: `lpr seen <plate>` and a History page (`/history`) list every sighting of a plate across all days, exact
+  match, from plates you confirmed or corrected or that passed auto-accept (an option includes unreviewed reads). The
+  review page shows "seen N times in the last 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
+  sightings. Search suggestions show how often each plate was seen.
+
 ### Fixed
 
 - The "+ box" and "- box" buttons act on the box you last clicked in (a button click used to lose the selection).

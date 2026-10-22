@@ -76,6 +76,17 @@ class ServerTests(unittest.TestCase):
     def item(self, f="need", image=""):
         return self.call("GET", f"/api/item?f={f}&image={image}")[1]
 
+    # -- plate history routes
+    def test_history_routes(self):
+        st, body = self.call("GET", "/api/history?q=DEMO001")
+        self.assertEqual((st, body["plate"], body["count"]), (200, "DEMO001", 1))      # the auto-accepted one
+        st, body = self.call("GET", "/api/plates?q=DEMO")
+        self.assertEqual(st, 200)
+        self.assertTrue(body)
+        st, page = self.call("GET", "/history")
+        self.assertEqual(st, 200)
+        self.assertIn(b"Plate history", page)
+
     # -- queue rules
     def test_default_queue_excludes_auto_accepted_and_unready(self):
         d = self.item("need")
@@ -184,3 +195,62 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HistoryTests(unittest.TestCase):
+    """Plate history: exact match, verified or auto-accepted reads only unless asked."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        cls.images = write_day(cls.root)
+        # a second day with a repeat of DEMO001 (auto-accepted) and one unreviewed read of it
+        day2 = cls.root / "frames" / "2026-01-02"
+        day2.mkdir(parents=True)
+        rows = [("09.00.00", "DEMO001", 0.999, "DEMO001"), ("10.00.00", "DEMO001", 0.90, "DEMO001")]
+        with (day2 / "index.csv").open("w", newline="") as f, (day2 / "second_pass.csv").open("w", newline="") as g:
+            w, v = csv.writer(f), csv.writer(g)
+            w.writerow(["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"])
+            v.writerow(["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"])
+            for t, p, c, p2 in rows:
+                img = f"2026-01-02_{t}-{t}-{p}_{c:.2f}.png"
+                w.writerow([f"{t}-{t}[M].dav", p, c, 30, "", img, 500, 1, 3, 5])
+                v.writerow([img, p, c, p2, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2])
+        cls.store = S.Store(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_default_counts_only_confirmed_or_auto(self):
+        r = self.store.sightings("demo001")                # case and punctuation are ignored
+        self.assertEqual(r["plate"], "DEMO001")
+        self.assertEqual(r["count"], 2)                    # day-1 auto + day-2 auto; the 0.90 read is unreviewed
+        self.assertEqual({s["basis"] for s in r["sightings"]}, {"auto"})
+        self.assertEqual(r["days"], 2)
+        self.assertEqual(r["sightings"][0]["day"], "2026-01-02")      # newest first
+
+    def test_unverified_widens_the_search(self):
+        r = self.store.sightings("DEMO001", unverified=True)
+        self.assertEqual(r["count"], 3)
+        self.assertIn("unverified", {s["basis"] for s in r["sightings"]})
+
+    def test_exact_match_only(self):
+        self.assertEqual(self.store.sightings("DEMO00")["count"], 0)
+        self.assertEqual(self.store.sightings("DEM0001")["count"], 0)
+
+    def test_human_verdicts_decide_the_plate(self):
+        img = self.images[1]                                # DEMO002 needs review
+        self.store.add_label({"image": img, "verdict": "fix", "truth": "XYZ789", "state": "NY"})
+        self.assertEqual(self.store.sightings("XYZ789")["count"], 1)
+        self.assertEqual(self.store.sightings("XYZ789")["states"], {"NY": 1})
+        self.assertEqual(self.store.sightings("DEMO002", unverified=True)["count"], 0)     # the wrong read is gone
+        self.store.add_label({"image": self.images[2], "verdict": "notplate", "state": "UNKN"})
+        self.assertEqual(self.store.sightings("DEMO003", unverified=True)["count"], 0)     # not a plate: never listed
+
+    def test_search_suggestions(self):
+        s = self.store.plate_search("DEMO0")
+        self.assertEqual(s[0]["plate"], "DEMO001")          # most seen first
+        self.assertEqual(s[0]["count"], 2)
+        self.assertNotIn("DEMO004", [e["plate"] for e in s])   # waiting for a second pass: not confirmed

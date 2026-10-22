@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate History</title>
+<style>
+  :root {
+    --bg: #101216; --panel: #181b21; --panel2: #1f232b; --line: #2b303a;
+    --text: #e8eaee; --muted: #8b93a1; --accent: #4c9eff;
+    --ok: #3ecf8e; --warn: #f5b942; --bad: #ff6b6b;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f3f4f7; --panel:#fff; --panel2:#f0f2f6; --line:#d9dde5; --text:#1b1f27; --muted:#667085; --accent:#1f6feb; --ok:#13a36a; --warn:#b9770e; --bad:#d63b3b; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; gap:10px 18px; align-items:center; flex-wrap:wrap; padding:8px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:14px; margin:0; font-weight:600; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  main { max-width:1100px; margin:0 auto; padding:14px 16px 40px; }
+  .search { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .search input[type=text] { flex:1; min-width:200px; max-width:340px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font:600 18px var(--mono); letter-spacing:.08em; text-transform:uppercase; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 16px; font:inherit; font-weight:600; cursor:pointer; }
+  label.opt { color:var(--muted); font-size:13px; display:flex; gap:6px; align-items:center; }
+  .hint { color:var(--muted); font-size:12.5px; margin:6px 0 0; }
+  .sugg { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 0; }
+  .sugg a { font:600 13px var(--mono); background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:3px 9px; color:var(--text); }
+  .sugg a small { color:var(--muted); font-weight:400; margin-left:6px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:14px; }
+  .sum { display:flex; flex-wrap:wrap; gap:6px 28px; align-items:baseline; }
+  .sum .plate { font:700 26px var(--mono); letter-spacing:.1em; }
+  .sum span { color:var(--muted); font-size:13px; } .sum b { color:var(--text); }
+  .hours { display:flex; align-items:flex-end; gap:2px; height:44px; margin-top:12px; }
+  .hours i { flex:1; background:var(--accent); opacity:.75; min-height:2px; border-radius:2px 2px 0 0; }
+  .hlab { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; margin-top:4px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; font-size:12px; }
+  td.mono { font-family:var(--mono); }
+  .badge { font-size:11px; border-radius:99px; padding:1px 8px; border:1px solid var(--line); color:var(--muted); }
+  .badge.verified, .badge.fixed { color:var(--ok); border-color:var(--ok); }
+  .badge.auto { color:var(--accent); border-color:var(--accent); }
+  .badge.unverified { color:var(--warn); border-color:var(--warn); }
+  .thumb { width:150px; height:56px; background:#000 no-repeat; border-radius:5px; display:block; }
+  .more { margin-top:10px; background:var(--panel2); color:var(--text); border:1px solid var(--line); }
+  .empty { color:var(--muted); padding:14px 0; }
+</style>
+</head>
+<body>
+<header><h1>Plate history</h1><a href="/">&larr; Review queue</a></header>
+<main>
+  <form class="search" id="f" autocomplete="off">
+    <input type="text" id="q" placeholder="Plate, e.g. ABC1234" maxlength="10" spellcheck="false" autofocus>
+    <button>Search</button>
+    <label class="opt"><input type="checkbox" id="unv"> include unreviewed reads</label>
+  </form>
+  <p class="hint">Exact match only. By default only plates you confirmed, corrected, or that the auto-accept rule passed.</p>
+  <div class="sugg" id="sugg"></div>
+  <div id="out"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const W = 1920, H = 1080, PAGE = 100;
+const clean = s => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const unv = () => $("unv").checked ? "&unverified=1" : "";
+const api = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status); return r.json(); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let data = null, shown = 0;
+
+function thumb(r) {
+  if (!r.box) return `<span class="thumb"></span>`;
+  const [x0, y0, x1, y1] = r.box, bw = x1 - x0, bh = y1 - y0, px = bw * 0.15, py = bh * 0.4;
+  const cx = Math.max(0, x0 - px), cy = Math.max(0, y0 - py), cw = Math.min(W, x1 + px) - cx, ch = Math.min(H, y1 + py) - cy;
+  const k = Math.min(150 / cw, 56 / ch);
+  return `<span class="thumb" style="background-image:url('/img/${encodeURIComponent(r.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px"></span>`;
+}
+function rows(from, to) {
+  return data.sightings.slice(from, to).map(r => `<tr>
+    <td>${esc(r.day)}</td><td class="mono">${esc(r.time)}</td>
+    <td><a href="/i/${encodeURIComponent(r.image)}" title="Open in the review page">${thumb(r)}</a></td>
+    <td><span class="badge ${r.basis}">${r.basis}</span></td><td>${r.conf.toFixed(2)}</td><td>${esc(r.state && r.state !== "UNKN" ? r.state : "")}</td></tr>`).join("");
+}
+function render() {
+  const d = data, out = $("out");
+  if (!d.count) { out.innerHTML = `<div class="card empty">No ${$("unv").checked ? "" : "confirmed "}sightings of <b>${esc(d.plate)}</b>.${$("unv").checked ? "" : " Tick &ldquo;include unreviewed reads&rdquo; to widen the search."}</div>`; return; }
+  const mx = Math.max(...d.by_hour, 1);
+  const st = Object.entries(d.states).map(([k, v]) => `${k} ${v}`).join(", ");
+  out.innerHTML = `<div class="card"><div class="sum"><span class="plate">${esc(d.plate)}</span>
+    <span><b>${d.count}</b> sighting${d.count === 1 ? "" : "s"} on <b>${d.days}</b> day${d.days === 1 ? "" : "s"}</span>
+    <span>first <b>${esc(d.first)}</b></span><span>last <b>${esc(d.last)}</b></span>${st ? `<span>state <b>${esc(st)}</b></span>` : ""}</div>
+    <div class="hours" title="Sightings by hour of day">${d.by_hour.map((n, h) => `<i style="height:${Math.max(4, n / mx * 100)}%" title="${String(h).padStart(2, "0")}:00  ${n}"></i>`).join("")}</div>
+    <div class="hlab"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>
+    <div class="card"><table><thead><tr><th>Day</th><th>Time</th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th></tr></thead>
+    <tbody id="tb">${rows(0, PAGE)}</tbody></table><button class="more" id="more" ${d.count <= PAGE ? "hidden" : ""}>Show more</button>
+    <p class="hint">Camera clocks may run behind the computer clock; times come from the clip file names.</p></div>`;
+  shown = PAGE;
+  $("more").onclick = () => { $("tb").insertAdjacentHTML("beforeend", rows(shown, shown + PAGE)); shown += PAGE; if (shown >= d.count) $("more").hidden = true; };
+}
+async function search(p) {
+  p = clean(p); $("q").value = p;
+  history.replaceState(null, "", p ? "/history?q=" + p + (unv() ? "&unverified=1" : "") : "/history");
+  if (!p) { $("out").innerHTML = ""; return; }
+  $("out").innerHTML = `<div class="card empty">Searching&hellip;</div>`;
+  try { data = await api("/api/history?q=" + p + unv()); render(); } catch (e) { $("out").innerHTML = `<div class="card empty">Search failed. Is the review server running?</div>`; }
+}
+let t = null;
+$("q").addEventListener("input", () => {
+  $("q").value = clean($("q").value); clearTimeout(t);
+  t = setTimeout(async () => {
+    const v = $("q").value;
+    if (v.length < 2) { $("sugg").innerHTML = ""; return; }
+    try {
+      const s = await api("/api/plates?q=" + v + unv());
+      $("sugg").innerHTML = s.map(e => `<a href="#" data-p="${esc(e.plate)}">${esc(e.plate)}<small>${e.count}</small></a>`).join("");
+    } catch (e) { /* suggestions are optional */ }
+  }, 250);
+});
+$("sugg").addEventListener("click", e => { const a = e.target.closest("a"); if (a) { e.preventDefault(); search(a.dataset.p); } });
+$("f").addEventListener("submit", e => { e.preventDefault(); search($("q").value); });
+$("unv").addEventListener("change", () => { if ($("q").value) search($("q").value); });
+const u = new URLSearchParams(location.search);
+if (u.get("unverified") === "1") $("unv").checked = true;
+if (u.get("q")) search(u.get("q"));
+</script>
+</body>
+</html>
