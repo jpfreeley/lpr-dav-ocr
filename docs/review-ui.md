@@ -97,6 +97,20 @@ It is a hint only. It never filters plates, never changes a stored read and neve
 labels the rule would have fixed 16 of the 24 wrong TLC reads and made 3 wrong suggestions out of 19, so check it
 against the frame. The pattern is local to one city's regulations: change `tlc_fix` in `review/server.py` for your own area.
 
+## Pattern fit and "best guess"
+
+Many New York plates are three letters then four digits (`ABC1234`), and TLC plates follow the pattern above. When the
+two passes disagree, the page offers a **best guess** chosen from the first pass, the second pass and the crop read:
+a read that fits one of those patterns wins over one that does not, then a crop read that backs a pass, then the more
+confident pass. On the author's 144 labeled disagreements this was right 81 times, against 76 for the crop read alone and
+69 for "higher confidence". A plate that already fits the standard pattern shows a small "fits" badge.
+
+Like the TLC hint this is a tie-breaker, not a filter: plates that fit neither pattern (vanity plates, older styles,
+other states, 20% of the author's labels) are never rejected or changed. Fixing the characters themselves was tried and
+dropped: forcing a read into AAANNNN (for example a `0` in a letter position becomes `D`) was right for 15 of 30
+suggestions and rewrote 3 reads that were already right. The common errors (H read as M, N as M) are letter-for-letter,
+which a pattern cannot see.
+
 ## Plate history
 
 Next to the Watch button the review page shows **seen N times in the last [7 days | 30 days | 90 days | all time]**.

@@ -275,3 +275,32 @@ class TlcHintTests(unittest.TestCase):
         self.assertEqual(S.Store._tlc("11234560", None, None), {"plate": "T123456C", "shaped": False})
         self.assertEqual(S.Store._tlc("DEMO001", "DEMO002", None), None)
         self.assertEqual(S.Store._tlc("DEMO0012", "11234560", None)["plate"], "T123456C")   # second pass can supply it
+
+
+class PickReadTests(unittest.TestCase):
+    def test_pattern_fit_beats_confidence(self):
+        # the second pass is more confident but only the first read fits AAANNNN
+        self.assertEqual(S.pick_read("ABC1234", 0.80, "AB01234", 0.95, None), ("ABC1234", "fits the pattern"))
+
+    def test_tlc_pattern_counts(self):
+        self.assertEqual(S.pick_read("11234560", 0.9, "T123456C", 0.8, None)[0], "T123456C")
+
+    def test_crop_read_breaks_a_tie_when_nothing_fits(self):
+        self.assertEqual(S.pick_read("DEMOX01", 0.9, "DEMO001", 0.8, "DEMO001"), ("DEMO001", "the crop read backs it"))
+
+    def test_falls_back_to_confidence(self):
+        self.assertEqual(S.pick_read("DEMOX01", 0.7, "DEMO001", 0.9, None), ("DEMO001", "more confident"))
+
+    def test_both_fit_uses_crop_then_confidence(self):
+        self.assertEqual(S.pick_read("ABC1234", 0.7, "ABD1234", 0.9, "ABC1234")[0], "ABC1234")
+        self.assertEqual(S.pick_read("ABC1234", 0.7, "ABD1234", 0.9, None)[0], "ABD1234")
+
+    def test_no_pick_when_passes_agree_or_second_missing(self):
+        self.assertIsNone(S.pick_read("ABC1234", 0.9, "ABC1234", 0.9, None))
+        self.assertIsNone(S.pick_read("ABC1234", 0.9, None, 0.0, None))
+
+    def test_fits(self):
+        self.assertEqual(S.fits("ABC1234"), "NYS")
+        self.assertEqual(S.fits("T123456C"), "TLC")
+        self.assertIsNone(S.fits("DEMO001"))
+        self.assertIsNone(S.fits(None))
