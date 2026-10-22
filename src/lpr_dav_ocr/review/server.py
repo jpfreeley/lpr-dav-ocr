@@ -29,6 +29,23 @@ VERDICTS = {"ok", "fix", "notplate", "obstructed", "skip"}
 AUTO_CONF = CFG["review"]["auto_accept_conf"]
 
 
+
+# NYC TLC (taxi / for-hire) plates are a letter T or Y, six digits, then a letter, e.g. T123456C. The first-pass reader
+# most often gets this wrong by reading the T as 1 and the final C as 0. That is a hint offered with one-click "use",
+# never a filter and never applied automatically (see docs/review-ui.md).
+TLC_RX = re.compile(r"[TY]\d{6}[A-Z]")
+_TLC_FIRST, _TLC_LAST = {"1": "T", "I": "T", "L": "T"}, {"0": "C", "O": "C", "D": "C", "Q": "C", "G": "C"}
+_TLC_MID = {"O": "0", "I": "1", "S": "5", "B": "8", "Z": "2"}
+
+
+def tlc_fix(p):
+    """The TLC-pattern plate this read most likely is, or None (wrong length or it cannot fit the pattern)."""
+    if not p or len(p) != 8:
+        return None
+    c = _TLC_FIRST.get(p[0], p[0]) + "".join(_TLC_MID.get(x, x) for x in p[1:7]) + _TLC_LAST.get(p[7], p[7])
+    return c if TLC_RX.fullmatch(c) else None
+
+
 class Store:
     def __init__(self, root, default_day=None):
         self.root = root
@@ -125,12 +142,24 @@ class Store:
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
+                tlc=self._tlc(r["plate"], alt, s.get("plate3")),
                 shape=shape, aspect=s.get("aspect") or None, second_pass=img in sp, ready=img in sp,
                 variants=[v for v in (r.get("variants") or "").split("|") if v and v != r["plate"]],
                 label=labels.get(img),
                 flagged=conf < 0.9 or bool(alt and alt != r["plate"]) or bool(shape and shape != "ok"),
             ))
         return out
+
+    @staticmethod
+    def _tlc(p1, p2, p3):
+        """Hint for the review page: {plate, shaped} when a read fits the TLC pattern. shaped = the first-pass read already does."""
+        if p1 and TLC_RX.fullmatch(p1):
+            return dict(plate=p1, shaped=True)
+        for p in (p1, p2, p3):
+            f = tlc_fix(p)
+            if f:
+                return dict(plate=f, shaped=False)
+        return None
 
     @staticmethod
     def _time(img, frame):

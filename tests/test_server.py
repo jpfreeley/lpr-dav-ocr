@@ -254,3 +254,24 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(s[0]["plate"], "DEMO001")          # most seen first
         self.assertEqual(s[0]["count"], 2)
         self.assertNotIn("DEMO004", [e["plate"] for e in s])   # waiting for a second pass: not confirmed
+
+
+class TlcHintTests(unittest.TestCase):
+    def test_common_misreads_are_fixed(self):
+        self.assertEqual(S.tlc_fix("11234560"), "T123456C")      # T read as 1, C read as 0
+        self.assertEqual(S.tlc_fix("Y1234560"), "Y123456C")
+        self.assertEqual(S.tlc_fix("TI2345O0"), "T123450C")      # I and O in the digit positions
+        self.assertEqual(S.tlc_fix("T123456C"), "T123456C")      # already fits
+
+    def test_does_not_force_other_plates(self):
+        self.assertIsNone(S.tlc_fix("ABC1234"))                  # wrong length
+        self.assertIsNone(S.tlc_fix("ABCD1234"))                 # eight characters but not the pattern
+        self.assertIsNone(S.tlc_fix("T12345C"))                  # seven characters
+        self.assertIsNone(S.tlc_fix(""))
+        self.assertIsNone(S.tlc_fix(None))
+
+    def test_hint_for_the_page(self):
+        self.assertEqual(S.Store._tlc("T123456C", None, None), {"plate": "T123456C", "shaped": True})
+        self.assertEqual(S.Store._tlc("11234560", None, None), {"plate": "T123456C", "shaped": False})
+        self.assertEqual(S.Store._tlc("DEMO001", "DEMO002", None), None)
+        self.assertEqual(S.Store._tlc("DEMO0012", "11234560", None)["plate"], "T123456C")   # second pass can supply it

@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N times in the last 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- NYC TLC pattern hint on the review page: offers `T123456C` when a read looks like `11234560`. A hint, not a filter.
+
 ### Fixed
 
 - The "+ box" and "- box" buttons act on the box you last clicked in (a button click used to lose the selection).

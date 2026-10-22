@@ -86,6 +86,17 @@ For `ok` and `fix`, a leveled crop is saved to `<data_root>/crops/<image name>__
 
 Labels are keyed by the image file name. Do not rename saved frames.
 
+## NYC TLC pattern hint
+
+Taxi and for-hire plates in New York City are a T or Y, six digits and a letter (for example `T123456C`). On the
+author's labels the reader got 24 of 71 such plates wrong, almost always reading the T as `1` or the final C as `0`.
+When a read can be made to fit the pattern, the page offers **NYC TLC pattern T123456C - use** and one click copies it
+into the boxes. If the read already fits, a small "fits the NYC TLC pattern" badge appears instead.
+
+It is a hint only. It never filters plates, never changes a stored read and never feeds auto-accept. On the author's
+labels the rule would have fixed 16 of the 24 wrong TLC reads and made 3 wrong suggestions out of 19, so check it
+against the frame. The pattern is local to one city's regulations: change `tlc_fix` in `review/server.py` for your own area.
+
 ## Plate history
 
 Next to the Watch button the review page shows **seen N times in the last [7 days | 30 days | 90 days | all time]**.

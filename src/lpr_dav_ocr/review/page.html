@@ -168,6 +168,7 @@
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
         </span>
         <span class="badge" id="autob" hidden style="border-color:var(--ok);color:var(--ok)" title="Confidence 0.99 or higher, both passes agree, plate-shaped. 99.6% right on your labels.">auto-accepted</span>
+        <button class="alt tlc" id="tlc" hidden></button>
         <button class="alt" id="alt" hidden title="Click to copy this read into the boxes"></button>
       </div>
       <div class="meter"><i id="meter"></i></div>
@@ -262,6 +263,13 @@ function render() {
   sh.textContent = `shape ${it.shape} (${it.aspect})`; sh.title = "US plates are 2:1. This text region is not plate-shaped, so it may not be a plate.";
   updateSeen();
   $("histlink").href = "/history?q=" + encodeURIComponent((it.label && it.label.truth) || it.plate);
+  const tl = $("tlc");
+  if (it.tlc) {
+    tl.hidden = false; tl.className = "alt tlc" + (it.tlc.shaped ? " agree" : "");
+    tl.innerHTML = it.tlc.shaped ? `fits the NYC TLC pattern` : `NYC TLC pattern <span class="a">${it.tlc.plate}</span> &middot; use`;
+    tl.title = "TLC plates are T or Y, six digits, a letter. The reader often gives 1 for T and 0 for C.";
+    tl.onclick = it.tlc.shaped ? null : () => { buildCells(it.tlc.plate.split("")); focusCell(cells().length - 1); };
+  } else tl.hidden = true;
   const alt = $("alt");
   if (!it.alt) { alt.hidden = !it.second_pass; alt.className = "alt"; alt.textContent = "2nd pass: no read"; alt.onclick = null; }
   else {
