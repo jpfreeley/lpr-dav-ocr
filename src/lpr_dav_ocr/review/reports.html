@@ -96,6 +96,8 @@
     <div class="chips" id="days" role="group" aria-label="Days"></div>
     <label class="opt"><input type="checkbox" id="unv"> include unreviewed reads</label>
     <label class="opt"><input type="checkbox" id="plates"> show plate text</label>
+    <button class="chip" id="refresh" title="Reload the numbers now">&#8635; Refresh</button>
+    <label class="opt" title="Reload every 60 seconds while this tab is visible"><input type="checkbox" id="auto"> auto-refresh (60 s)</label>
     <span class="note" id="scope"></span>
   </div>
   <div class="kpis" id="kpis"></div>
@@ -373,17 +375,28 @@ function chips() {
   const all = html("button", { class: "chip", "aria-pressed": String(SEL.size === 0) }, host, "All days"); all.onclick = () => { SEL.clear(); load(); };
   DATA.all_days.forEach(d => { const b = html("button", { class: "chip", "aria-pressed": String(SEL.has(d)) }, host, d.slice(5)); b.onclick = () => { SEL.has(d) ? SEL.delete(d) : SEL.add(d); if (SEL.size === DATA.all_days.length) SEL.clear(); load(); }; });
 }
-let loadSeq = 0;
-async function load() {
-  const seq = ++loadSeq; $("grid").classList.add("loading");
+let loadSeq = 0, lastLoad = 0, autoT = null;
+const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+async function load(quiet) {      // quiet: a background refresh keeps the charts as they are until the new numbers arrive
+  const seq = ++loadSeq; if (!quiet) $("grid").classList.add("loading");
   const q = new URLSearchParams(); if (SEL.size) q.set("days", [...SEL].join(",")); if ($("unv").checked) q.set("unverified", "1");
   history.replaceState(null, "", "/reports" + (q.toString() ? "?" + q : ""));
   try { const d = await api("/api/report?" + q); if (seq !== loadSeq) return; DATA = d; }
-  catch (e) { $("scope").textContent = "Could not load the report. Is the review server running?"; $("grid").classList.remove("loading"); return; }
-  $("scope").textContent = DATA.kpi.sightings.toLocaleString() + " sightings" + (DATA.unverified ? " including unreviewed reads" : "") + ", times in CamTime";
+  catch (e) { $("scope").textContent = DATA ? "Refresh failed; showing the numbers from " + clock() + " or earlier." : "Could not load the report. Is the review server running?"; $("grid").classList.remove("loading"); return; }
+  lastLoad = Date.now();
+  $("scope").textContent = DATA.kpi.sightings.toLocaleString() + " sightings" + (DATA.unverified ? " including unreviewed reads" : "") + ", times in CamTime. Updated " + clock() + " (your computer's clock).";
   chips(); kpis(); paintAll(); $("grid").classList.remove("loading");
 }
-$("unv").onchange = load;
+$("unv").onchange = () => load();
+$("refresh").onclick = () => load();
+function setAuto(on) {
+  clearInterval(autoT); autoT = null;
+  if (on) autoT = setInterval(() => { if (!document.hidden) load(true); }, 60000);
+  try { localStorage.setItem("lprReportsAuto", on ? "1" : "0"); } catch (e) { /* storage is optional */ }
+}
+$("auto").onchange = () => setAuto($("auto").checked);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && $("auto").checked && Date.now() - lastLoad > 60000) load(true); });
+try { if (localStorage.getItem("lprReportsAuto") === "1") { $("auto").checked = true; setAuto(true); } } catch (e) { /* storage is optional */ }
 $("plates").onchange = () => { PLATES = $("plates").checked; paint("regulars"); };
 let rz = null; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => DATA && paintAll(), 150); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => DATA && paintAll());

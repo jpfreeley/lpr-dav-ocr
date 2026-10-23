@@ -28,6 +28,15 @@ All hours and times are **CamTime**: the camera's clock, taken from the clip fil
 
 Every chart has a **Table** button that shows the same numbers as a table. Hover or tab to a bar, cell or dot for a tooltip.
 
+## Keeping it current
+
+The numbers are recomputed from the data each time the page asks, so nothing goes stale on the server (it caches the list
+of sightings for 20 seconds, and a label you save clears that cache). The page asks when it opens, when you change a day
+chip or **include unreviewed reads**, and when you press **Refresh**. Tick **auto-refresh (60 s)** and it asks again every
+minute while the tab is visible, keeping your filters and table views and leaving the charts in place until the new
+numbers arrive. A hidden tab does not refresh and catches up when you return to it. The choice is remembered in the
+browser. The line beside the filters shows when the numbers were last updated, by your computer's clock.
+
 ## Privacy
 
 A table of regular plates with their usual times is a record of people's routines. Plate text in the Regulars table is

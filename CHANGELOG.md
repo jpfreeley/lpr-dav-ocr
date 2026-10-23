@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- Reports: a Refresh button and an optional 60-second auto-refresh that pauses in a hidden tab.
 - Reports page (`/reports`): traffic heatmap and hourly profile, new versus returning plates, regulars and their usual
   arrival times, repeat-visit gaps, day-to-day overlap, plate type and state mix, watched-plate timeline, review effort
   per day and first-pass accuracy by hour. Local, with day filters, a table view for every chart and light and dark themes.
