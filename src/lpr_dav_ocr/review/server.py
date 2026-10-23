@@ -28,6 +28,7 @@ VERDICTS = {"ok", "fix", "notplate", "obstructed", "skip"}
 # and audit it with the "auto" filter.
 AUTO_CONF = CFG["review"]["auto_accept_conf"]
 RECENT_DAYS = CFG["review"]["recent_days"]
+REJECT_ASPECT = CFG["review"]["reject_aspect"]
 
 
 
@@ -152,8 +153,9 @@ class Store:
         out = []
         for d in names:
             its = self.items(d)
-            out.append(dict(day=d, total=len(its), left=sum(1 for i in its if i["ready"] and not i["label"] and not i["auto"]),
+            out.append(dict(day=d, total=len(its), left=sum(1 for i in its if i["ready"] and not i["label"] and not i["auto"] and not i["rejected"]),
                             auto=sum(1 for i in its if i["auto"] and not i["label"]),
+                            rejected=sum(1 for i in its if i["rejected"] and not i["label"]),
                             waiting=sum(1 for i in its if not i["ready"] and not i["label"])))
         return out
 
@@ -189,11 +191,13 @@ class Store:
             rec = self.recent(r["plate"], img)
             by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok"
             auto = by_conf or bool(rec and rec["exact"])
+            asp = float(s["aspect"]) if s.get("aspect") else None
+            rejected = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT and not auto)
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
-                fits=fits(r["plate"]), recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
+                fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
                 pick=dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None,
                 shape=shape, aspect=s.get("aspect") or None, second_pass=img in sp, ready=img in sp,
                 variants=[v for v in (r.get("variants") or "").split("|") if v and v != r["plate"]],
@@ -304,6 +308,8 @@ class Store:
             if lb["verdict"] == "fix":
                 return "fixed", (lb.get("truth") or "").upper()
             return None, None                    # not a plate / obstructed / can't tell
+        if i["rejected"]:
+            return None, None                    # auto-rejected: not plate-shaped
         return ("auto", i["plate"]) if i["auto"] else ("unverified", i["plate"])
 
     def _day_names(self):
@@ -357,11 +363,13 @@ class Store:
     def view(self, day, f):
         its = self.items(day)
         if f == "need":          # default queue: second pass done, no verdict yet, not auto-accepted
-            its = [i for i in its if i["ready"] and not i["label"] and not i["auto"]]
+            its = [i for i in its if i["ready"] and not i["label"] and not i["auto"] and not i["rejected"]]
+        elif f == "rejected":    # spot-check the auto-rejected (not plate-shaped) reads
+            its = [i for i in its if i["rejected"] and not i["label"]]
         elif f == "auto":        # spot-check the auto-accepted plates
             its = [i for i in its if i["auto"]]
         elif f == "unrev":       # all unreviewed, but only plates that already have a second pass
-            its = [i for i in its if i["ready"] and not i["label"]]
+            its = [i for i in its if i["ready"] and not i["label"] and not i["rejected"]]
         elif f == "flag":
             its = [i for i in its if i["flagged"]]
         return its

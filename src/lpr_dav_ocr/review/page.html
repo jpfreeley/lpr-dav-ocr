@@ -128,6 +128,7 @@
   <select id="filter" aria-label="Queue">
     <option value="need">Needs review (default)</option>
     <option value="auto">Auto-accepted: spot check</option>
+    <option value="rejected">Auto-rejected: spot check</option>
     <option value="unrev">All unreviewed, incl. auto-accepted</option>
     <option value="all">Everything, time order</option>
     <option value="flag">Flagged: low confidence, passes disagree, odd shape</option>
@@ -167,6 +168,7 @@
           <button id="watchbtn" class="ghost" style="padding:3px 10px;font-size:12px" title="Alert me when this plate is seen again">&#9734; Watch</button>
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
         </span>
+        <span class="badge" id="rejb" hidden style="border-color:var(--bad);color:var(--bad)" title="The text region is much wider than a plate. 120 of 120 such reads were not usable on the author's labels. Mark it Correct if it is a plate."></span>
         <span class="badge" id="autob" hidden style="border-color:var(--ok);color:var(--ok)" title="Confidence 0.99 or higher, both passes agree, plate-shaped. 99.6% right on your labels.">auto-accepted</span>
         <div id="like" hidden style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"></div>
         <button class="alt" id="near" hidden title="This read is one character away from a plate you verified recently"></button>
@@ -230,7 +232,7 @@ async function go(name, push) {
 
 function statsLine() {
   const c = D.counts, dd = D.days.find(x => x.day === D.day) || { left: 0, auto: 0, waiting: 0 }, done = D.all - (c.none || 0);
-  $("stats").innerHTML = `To review <b>${dd.left}</b> &middot; reviewed <b>${done}</b> (correct <b>${c.ok || 0}</b>, fixed <b>${c.fix || 0}</b>) &middot; auto-accepted <b>${dd.auto}</b>${dd.waiting ? ` &middot; <span title="Held out of the queue until the second pass has run on them">waiting for 2nd pass <b>${dd.waiting}</b></span>` : ""}`;
+  $("stats").innerHTML = `To review <b>${dd.left}</b> &middot; reviewed <b>${done}</b> (correct <b>${c.ok || 0}</b>, fixed <b>${c.fix || 0}</b>) &middot; auto-accepted <b>${dd.auto}</b>${dd.rejected ? ` &middot; auto-rejected <b>${dd.rejected}</b>` : ""}${dd.waiting ? ` &middot; <span title="Held out of the queue until the second pass has run on them">waiting for 2nd pass <b>${dd.waiting}</b></span>` : ""}`;
   const need = dd.left + done;
   $("prog").style.width = (D.all ? Math.min(100, done / Math.max(1, need) * 100) : 0) + "%";
 }
@@ -260,6 +262,7 @@ function render() {
   $("meter").style.width = it.conf * 100 + "%";
   $("meter").style.background = it.conf >= 0.97 ? "var(--ok)" : it.conf >= 0.9 ? "var(--warn)" : "var(--bad)";
   $("autob").hidden = !(it.auto && !it.label);
+  $("rejb").hidden = !(it.rejected && !it.label); $("rejb").textContent = `auto-rejected: not plate-shaped (aspect ${it.aspect})`;
   $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : "auto-accepted";
   const lk = $("like");
   lk.innerHTML = "";

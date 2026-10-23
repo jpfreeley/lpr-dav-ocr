@@ -70,6 +70,9 @@ def check_matches(frames, clips, send, label=""):
         sp = {r["image"]: r for r in read_csv(frames / "second_pass.csv")}
     hits = {}
     for r in idx:
+        asp = sp.get(r["image"], {}).get("aspect")
+        if REJECT_ASPECT and asp and float(asp) > REJECT_ASPECT:
+            continue                       # auto-rejected: not plate-shaped, never alert on it
         cands = [r["plate"]] + [v for v in (r.get("variants") or "").split("|") if v]
         if sp.get(r["image"], {}).get("plate2"):
             cands.append(sp[r["image"]]["plate2"])
@@ -137,6 +140,9 @@ def cycle(cam, a, state):
         names = {c.name for c in batch}
         check_matches(frames, names, send=not a.dry_run)
         state["last_ok"] = time.time()
+
+
+REJECT_ASPECT = CFG["review"]["reject_aspect"]
 
 
 def main(argv=None):

@@ -197,6 +197,16 @@ def main(argv=None):
     P(f"- Read is one character from a verified plate: {len(nr)}. That plate was the truth {pct(sum(r['truth'] in n for r, n in nr), len(nr))}; "
       f"the read was already right {sum(r['verdict'] == 'ok' for r, n in nr)} times")
 
+    # 7. the auto-reject rule: how many reads wider than reject_aspect were really not plates?
+    thr = float(_config.load()["review"]["reject_aspect"])
+    if thr:
+        wide = [r for r in rows if r["aspect"] and float(r["aspect"]) > thr]
+        P("\n## Auto-reject rule (aspect above %.1f)\n" % thr)
+        P(f"- Labeled reads above the threshold: {len(wide)}. Not a plate {sum(r['verdict'] == 'notplate' for r in wide)}, "
+          f"obstructed or can't tell {sum(r['verdict'] in ('obstructed', 'skip') for r in wide)}, "
+          f"**real plates {sum(r['verdict'] in ('ok', 'fix') for r in wide)}** (these would have been hidden from review)")
+        P(f"- Share of all your 'not a plate' labels it catches: {pct(sum(r['verdict'] == 'notplate' for r in wide), sum(r['verdict'] == 'notplate' for r in rows))}")
+
     sc = collections.Counter(r["state"] for r in rows if r["state"] and r["state"] != "UNKN")
     if sc:
         P("- State labels: " + ", ".join(f"{k} {v}" for k, v in sc.most_common()))

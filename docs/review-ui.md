@@ -97,6 +97,22 @@ It is a hint only. It never filters plates, never changes a stored read and neve
 labels the rule would have fixed 16 of the 24 wrong TLC reads and made 3 wrong suggestions out of 19, so check it
 against the frame. The pattern is local to one city's regulations: change `tlc_fix` in `review/server.py` for your own area.
 
+## Auto-reject: reads that are not plate-shaped
+
+A read whose text region is much wider than a plate (length over `review.reject_aspect` times the height, default 3.5) is
+auto-rejected. US plates are about 2:1 and real plate reads cluster at 1.8 to 2.4; wide regions are usually a bumper
+sticker, a dealer frame or a model name. On the author's labels 120 of 120 reads above 3.5 were not usable plates (118
+"not a plate", 2 obstructed) and none was a real plate. The rule catches about 38% of all "not a plate" labels; the rest
+have normal shapes.
+
+- The plate leaves the **Needs review** queue and the unreviewed view. The **Auto-rejected: spot check** view lists
+  them, and a red badge says why. Label one **Correct** or **Save fix** and it is a real plate again.
+- No label is written (a weak label, like auto-accept). Rejected reads are left out of plate history and never trigger
+  a watchlist alert.
+- A plate that equals one you verified recently is auto-approved instead, so a vouched plate is never rejected.
+- `lpr score` prints how many labeled reads were above the threshold and how many were real plates. A threshold of 3.0
+  also removes 3 real plates in 162, so the default stays at 3.5. Set `review.reject_aspect = 0` to switch it off.
+
 ## "Same last four" hints
 
 For a seven-character read whose last four characters are digits (the AAANNNN shape), the page lists known plates that

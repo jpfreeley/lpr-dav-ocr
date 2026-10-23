@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- Auto-reject: reads with an aspect ratio above `review.reject_aspect` (3.5) leave the queue, plate history and watchlist
+  alerts, with an "Auto-rejected: spot check" view. 120 of 120 such reads were not usable plates on the author's labels.
 - "Same last four" hints: for an AAANNNN read, known plates with the same four digits and one or two different leading
   letters are offered as one-click buttons (right 107 of 113 times on the author's labels, when one existed).
 - Recently verified plates: a read equal to a plate you verified within `review.recent_days` (30) is auto-approved; a

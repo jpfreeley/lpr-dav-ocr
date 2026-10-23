@@ -36,7 +36,7 @@ def write_day(root):
             image = f"{DAY}_{t}-{t}-{p}_{c:.2f}.png"
             w.writerow([f"{t}-{t}[M].dav", p, c, 30, "", image, 500, 1, 3, 5])
             if has:
-                v.writerow([image, p, c, p2, c2, int(p == p2), 100, 100, 340, 220, "4.2" if shape == "wide" else "2.1", shape, 2])
+                v.writerow([image, p, c, p2, c2, int(p == p2), 100, 100, 340, 220, "3.2" if shape == "wide" else "2.1", shape, 2])
             # frames themselves are not needed for the API tests
     return [f"{DAY}_{t}-{t}-{p}_{c:.2f}.png" for t, p, c, *_ in plates]
 
@@ -433,3 +433,62 @@ class LikeTests(unittest.TestCase):
 
     def test_a_plate_seen_only_here_is_not_offered_to_itself(self):
         self.assertEqual(self.like("2026-01-01", "03.00.00"), [])       # QRS1234 appears once (this image only)
+
+
+class RejectTests(unittest.TestCase):
+    """Reads whose text region is much wider than a plate are auto-rejected: out of the queue, history and alerts."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        d = cls.root / "frames" / "2026-01-01"
+        d.mkdir(parents=True)
+        cls.img = {}
+        with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+            w, v = csv.writer(f), csv.writer(g)
+            w.writerow(hdr_i)
+            v.writerow(hdr_s)
+            for t, p, asp in (("01.00.00", "DEMO001", "2.1"), ("02.00.00", "SIGNTXT", "4.2"), ("03.00.00", "WIDEBUT", "3.2"), ("04.00.00", "SIGNTWO", "4.5")):
+                img = f"2026-01-01_{t}-{t}-{p}_0.80.png"
+                cls.img[p] = img
+                shape = "ok" if float(asp) <= 3.0 else "wide"
+                w.writerow([f"{t}-{t}[M].dav", p, 0.80, 30, "", img, 500, 1, 3, 5])
+                v.writerow([img, p, 0.80, p, 0.70, 1, 100, 100, 340, 220, asp, shape, 2])
+        cls.store = S.Store(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_wide_reads_are_rejected_at_the_threshold(self):
+        got = {i["plate"]: i["rejected"] for i in self.store.items("2026-01-01")}
+        self.assertEqual(got, {"DEMO001": False, "SIGNTXT": True, "WIDEBUT": False, "SIGNTWO": True})   # 3.2 is wide but under 3.5
+
+    def test_rejected_reads_leave_the_queue_but_have_their_own_view(self):
+        need = [i["plate"] for i in self.store.view("2026-01-01", "need")]
+        self.assertEqual(need, ["DEMO001", "WIDEBUT"])
+        self.assertEqual([i["plate"] for i in self.store.view("2026-01-01", "rejected")], ["SIGNTXT", "SIGNTWO"])
+        day = self.store.days()[0]
+        self.assertEqual((day["left"], day["rejected"]), (2, 2))
+
+    def test_rejected_reads_are_not_plate_history(self):
+        self.assertEqual(self.store.sightings("SIGNTXT", unverified=True)["count"], 0)
+        self.assertEqual(self.store.sightings("WIDEBUT", unverified=True)["count"], 1)
+
+    def test_a_human_label_overrides(self):
+        store = S.Store(self.root)                       # its own store, so the label does not leak into other tests
+        store.labels_path = self.root / "labels" / "override.jsonl"
+        store.add_label({"image": self.img["SIGNTWO"], "verdict": "ok", "truth": "SIGNTWO", "state": "UNKN"})
+        self.assertEqual([i["plate"] for i in store.view("2026-01-01", "rejected")], ["SIGNTXT"])
+        self.assertEqual(store.sightings("SIGNTWO")["count"], 1)          # you said it is a plate
+
+    def test_switched_off_by_zero(self):
+        old = S.REJECT_ASPECT
+        S.REJECT_ASPECT = 0
+        try:
+            self.assertFalse(any(i["rejected"] for i in self.store.items("2026-01-01")))
+        finally:
+            S.REJECT_ASPECT = old
