@@ -98,6 +98,8 @@ Every one of these is also a `lpr process` flag (`lpr process -h`).
 | `lookback_minutes` | 90 | Only clips that ended this recently are picked up. Older unprocessed clips are left to `lpr process`. |
 | `settle_seconds` | 45 | A clip must have ended this long ago and stopped growing. |
 | `cooldown_seconds` | 600 | Minimum time between alerts for the same watched plate. |
+| `dedupe` | true | After each batch the watcher merges duplicate sightings of one plate ([`lpr dedupe`](usage.md#duplicate-sightings)): the frame you verified, or else the complete, sharper one, is kept and the others move to `<data_root>/trash`. Nothing is deleted until you run `lpr dedupe --purge`. |
+| `dedupe_window` | 30 | Seconds. Reads of one plate this close together are one sighting. |
 | `workers` | 1 | Workers for the watcher's batches. Keep it low. |
 
 ## `[ntfy]`

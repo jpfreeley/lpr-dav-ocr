@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- The watcher runs the duplicate merge after each batch (`watch.dedupe`, `watch.dedupe_window`).
 - `lpr dedupe`: merges duplicate sightings (same plate within 30 s, or a misread of it in the same clip), keeping the frame you verified, then the complete, sharper one. Extra frames go to a trash folder; `--purge` deletes them.
 - Reports: a Refresh button and an optional 60-second auto-refresh that pauses in a hidden tab.
 - Reports page (`/reports`): traffic heatmap and hourly profile, new versus returning plates, regulars and their usual

@@ -94,3 +94,28 @@ class AlertTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MergeDuplicatesTests(unittest.TestCase):
+    """The watcher merges duplicates after a batch and never lets a failure stop it."""
+
+    def test_merge_moves_the_extra_frame_and_survives_errors(self):
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frames = root / "frames" / "2026-01-01"
+            frames.mkdir(parents=True)
+            with (frames / "index.csv").open("w", newline="") as f, (frames / "second_pass.csv").open("w", newline="") as g:
+                w, v = csv.writer(f), csv.writer(g)
+                w.writerow(hdr_i)
+                v.writerow(hdr_s)
+                for frame, conf in ((51, 0.98), (53, 0.91)):
+                    name = f"2026-01-01_00.02.11-00.02.31-ABC1234_{conf:.2f}.png"
+                    (frames / name).write_bytes(b"png")
+                    w.writerow(["00.02.11-00.02.31[M].dav", "ABC1234", conf, frame, "", name, 500, 1, 3, 5])
+                    v.writerow([name, "ABC1234", conf, "ABC1234", 0.9, 1, 1, 1, 9, 9, "2.0", "ok", 1])
+            WT.merge_duplicates(frames, date(2026, 1, 1), 30)
+            self.assertEqual(len(list((root / "trash" / "2026-01-01").glob("*.png"))), 1)
+            self.assertEqual(len(list(frames.glob("*.png"))), 1)
+            WT.merge_duplicates(root / "no" / "such" / "day", date(2026, 1, 1), 30)      # must not raise

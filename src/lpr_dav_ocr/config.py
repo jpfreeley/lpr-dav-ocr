@@ -66,6 +66,10 @@ DEFAULTS = {
         "settle_seconds": 45,
         "cooldown_seconds": 600,
         "workers": 1,
+        # After each batch, merge duplicate sightings of one plate (same plate within dedupe_window seconds, or a
+        # misread of it in the same clip): the clearer frame is kept, the others go to <data_root>/trash. See `lpr dedupe`.
+        "dedupe": True,
+        "dedupe_window": 30,
     },
     "ntfy": {
         "enabled": True,

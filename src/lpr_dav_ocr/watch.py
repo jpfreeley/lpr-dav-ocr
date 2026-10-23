@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import config as _config
+from . import dedupe as DD
 from . import watchlist as W
 from .util import read_csv
 
@@ -109,6 +110,18 @@ def check_matches(frames, clips, send, label=""):
     return sent
 
 
+def merge_duplicates(frames, day, window):
+    """After a batch: merge frames of the same vehicle seen more than once (see dedupe.py). Never stops the watcher."""
+    try:
+        root = frames.parent.parent
+        decisions = DD.plan(root, [day.isoformat()], window)
+        if decisions:
+            moved, _, _ = DD.apply(root, decisions)
+            log(f"{day}: merged {moved} duplicate frame(s) into {len(decisions)} sighting(s); extra frames are in {root / 'trash'}")
+    except Exception as ex:          # a share hiccup or a bad file: skip this round, the next batch tries again
+        log(f"duplicate merge skipped: {ex}")
+
+
 def cycle(cam, a, state):
     now = datetime.now()
     for day in (now.date(), now.date() - timedelta(days=1)):
@@ -139,6 +152,8 @@ def cycle(cam, a, state):
         run("-m", "lpr_dav_ocr.second_pass", frames)
         names = {c.name for c in batch}
         check_matches(frames, names, send=not a.dry_run)
+        if WCFG["dedupe"] and not a.dry_run:
+            merge_duplicates(frames, day, WCFG["dedupe_window"])
         state["last_ok"] = time.time()
 
 

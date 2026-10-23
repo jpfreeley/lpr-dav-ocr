@@ -64,6 +64,8 @@ poll_seconds = 60         # how often to look for new clips
 lookback_minutes = 90     # only clips that ended this recently are picked up
 settle_seconds = 45       # a clip must have ended this long ago and stopped growing
 cooldown_seconds = 600    # minimum time between alerts for the same watched plate
+dedupe = true             # after each batch, merge duplicate sightings (keeps the clearer frame; extras go to <data_root>/trash)
+dedupe_window = 30        # seconds: reads of one plate this close are one sighting
 workers = 1               # keep low: the watcher runs next to everything else
 
 [ntfy]
