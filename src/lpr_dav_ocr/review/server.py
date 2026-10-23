@@ -156,6 +156,7 @@ class Store:
             out.append(dict(day=d, total=len(its), left=sum(1 for i in its if i["ready"] and not i["label"] and not i["auto"] and not i["rejected"]),
                             auto=sum(1 for i in its if i["auto"] and not i["label"]),
                             rejected=sum(1 for i in its if i["rejected"] and not i["label"]),
+                            recheck=sum(1 for i in its if self.needs_recheck(i)),
                             waiting=sum(1 for i in its if not i["ready"] and not i["label"])))
         return out
 
@@ -360,10 +361,21 @@ class Store:
                 e["last"] = max(e["last"], i["day"] + " " + i["time"])
         return sorted(found.values(), key=lambda e: (-e["count"], e["plate"]))[:limit]
 
+    @staticmethod
+    def needs_recheck(i):
+        """A 'not a plate' label that may be wrong: the second pass found different, plate-shaped text, so a real
+        plate may be in the frame (for example the first pass read a model badge). Cleared by relabeling it or by
+        confirming 'not a plate' again from the re-check view."""
+        lb = i["label"]
+        return bool(lb and lb["verdict"] == "notplate" and not lb.get("rechecked")
+                    and i["alt"] and i["alt"]["plate"] != i["plate"] and i["shape"] == "ok")
+
     def view(self, day, f):
         its = self.items(day)
         if f == "need":          # default queue: second pass done, no verdict yet, not auto-accepted
             its = [i for i in its if i["ready"] and not i["label"] and not i["auto"] and not i["rejected"]]
+        elif f == "recheck":     # earlier 'not a plate' labels that may hide a real plate
+            its = [i for i in its if self.needs_recheck(i)]
         elif f == "rejected":    # spot-check the auto-rejected (not plate-shaped) reads
             its = [i for i in its if i["rejected"] and not i["label"]]
         elif f == "auto":        # spot-check the auto-accepted plates
@@ -545,7 +557,8 @@ def make_handler(store):
             store.add_label(dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), image=it["image"],
                                  clip=it["clip"], day=it["day"], plate_ocr=it["plate"], conf=it["conf"],
                                  plate_second=(it["alt"] or {}).get("plate"), shape=it["shape"],
-                                 verdict=verdict, truth=truth, state=state))
+                                 verdict=verdict, truth=truth, state=state,
+                                 **({"rechecked": True} if d.get("recheck") and verdict == "notplate" else {})))
             if truth:
                 store.save_crop(it, truth)
             self._send(200, {"ok": True})

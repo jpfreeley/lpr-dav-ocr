@@ -76,6 +76,17 @@ class ServerTests(unittest.TestCase):
     def item(self, f="need", image=""):
         return self.call("GET", f"/api/item?f={f}&image={image}")[1]
 
+    # -- the re-check flag is stored only for a repeated "not a plate"
+    def test_recheck_flag_is_saved_for_not_a_plate(self):
+        img = self.images[1]
+        st, _ = self.call("POST", "/api/label", {"image": img, "verdict": "notplate", "state": "UNKN", "recheck": True}, HDR)
+        self.assertEqual(st, 200)
+        last = [json.loads(x) for x in (self.root / "labels" / "labels.jsonl").read_text().splitlines()][-1]
+        self.assertTrue(last.get("rechecked"))
+        st, _ = self.call("POST", "/api/label", {"image": img, "verdict": "ok", "state": "UNKN", "recheck": True}, HDR)
+        last = [json.loads(x) for x in (self.root / "labels" / "labels.jsonl").read_text().splitlines()][-1]
+        self.assertNotIn("rechecked", last)
+
     # -- plate history routes
     def test_history_routes(self):
         st, body = self.call("GET", "/api/history?q=DEMO001")
@@ -500,3 +511,37 @@ class RejectTests(unittest.TestCase):
             self.assertFalse(any(i["rejected"] for i in self.store.items("2026-01-01")))
         finally:
             S.REJECT_ASPECT = old
+
+
+class RecheckTests(unittest.TestCase):
+    """Earlier 'not a plate' labels the second pass disagrees with (plate-shaped, different text) get a second look."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.images = write_day(self.root)            # DEMO002 has a differing second read and an ok shape; SIGNTXT is wide
+        self.store = S.Store(self.root)
+        for i in (1, 2, 4):                           # DEMO002, DEMO003 (passes agree), SIGNTXT (wide shape)
+            self.store.add_label({"image": self.images[i], "verdict": "notplate", "state": "UNKN"})
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def plates(self):
+        return [i["plate"] for i in self.store.view(DAY, "recheck")]
+
+    def test_only_disagreeing_plate_shaped_reads_are_listed(self):
+        self.assertEqual(self.plates(), ["DEMO002"])
+        self.assertEqual(self.store.days()[0]["recheck"], 1)
+
+    def test_confirming_not_a_plate_again_clears_it(self):
+        self.store.add_label({"image": self.images[1], "verdict": "notplate", "state": "UNKN", "rechecked": True})
+        self.assertEqual(self.plates(), [])
+
+    def test_relabeling_it_clears_it(self):
+        self.store.add_label({"image": self.images[1], "verdict": "fix", "truth": "DEMO0O2", "state": "NY"})
+        self.assertEqual(self.plates(), [])
+
+    def test_unlabeled_and_correct_plates_are_never_listed(self):
+        self.assertNotIn("DEMO001", self.plates())
+        self.assertNotIn("DEMO006", self.plates())

@@ -157,6 +157,16 @@ dropped: forcing a read into AAANNNN (for example a `0` in a letter position bec
 suggestions and rewrote 3 reads that were already right. The common errors (H read as M, N as M) are letter-for-letter,
 which a pattern cannot see.
 
+## Re-checking "not a plate" labels
+
+The **Re-check** view lists plates you marked **Not a plate** where the second pass found different, plate-shaped text
+(aspect 1.5 to 3.0). The usual cause is a first read of a model badge, a decal or a sign while a real plate sits
+elsewhere in the frame. On the author's data 59 of 335 "not a plate" labels qualified, about 18%. Each shows an amber
+note with the text the second pass found. The "best guess" and "2nd pass" buttons offer it; use **Save fix** to
+record the real plate, or **Obstructed** or **Can't tell** if it cannot be read. **Not a plate** again confirms the
+label and takes it off the list (it is saved with `rechecked: true`). **Correct** is disabled here because the
+first read is the non-plate text. A relabeled plate becomes a normal sighting in history, alerts and scoring.
+
 ## Editing updates the checks
 
 As soon as you change a box (after a short pause, once every box is filled) the page re-checks the text you typed: the
