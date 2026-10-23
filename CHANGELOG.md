@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- "Same last four" hints: for an AAANNNN read, known plates with the same four digits and one or two different leading
+  letters are offered as one-click buttons (right 107 of 113 times on the author's labels, when one existed).
 - Recently verified plates: a read equal to a plate you verified within `review.recent_days` (30) is auto-approved; a
   read one character away gets a one-click correction. `lpr score` reports the precision of both.
 - "Best guess" on the review page when the passes disagree: prefers a read that fits AAANNNN or the TLC pattern, then a

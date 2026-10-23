@@ -384,3 +384,52 @@ class RecentTests(unittest.TestCase):
             self.assertIsNone(self.store.recent("DEMO001", self.img[("2026-01-10", "DEMO001")]))
         finally:
             S.RECENT_DAYS = old
+
+
+class LikeTests(unittest.TestCase):
+    """Hints for AAANNNN plates whose leading letters were misread: known plates with the same last four digits."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        plan = {"2026-01-01": [("01.00.00", "ABC1234", 0.999), ("02.00.00", "ABC1234", 0.999), ("03.00.00", "QRS1234", 0.999)],
+                "2026-01-02": [("04.00.00", "A8C1234", 0.80), ("05.00.00", "XYZ9999", 0.80), ("06.00.00", "ABC9999", 0.80)]}
+        cls.img = {}
+        for day, items in plan.items():
+            d = cls.root / "frames" / day
+            d.mkdir(parents=True)
+            with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+                w, v = csv.writer(f), csv.writer(g)
+                w.writerow(hdr_i)
+                v.writerow(hdr_s)
+                for t, p, c in items:
+                    img = f"{day}_{t}-{t}-{p}_{c:.2f}.png"
+                    cls.img[(day, t)] = img
+                    w.writerow([f"{t}-{t}[M].dav", p, c, 30, "", img, 500, 1, 3, 5])
+                    v.writerow([img, p, c, p, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2])
+        cls.store = S.Store(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def like(self, day, t):
+        it = next(i for i in self.store.items(day) if i["image"] == self.img[(day, t)])
+        return self.store.like(it)
+
+    def test_offers_known_plates_with_the_same_tail(self):
+        got = self.like("2026-01-02", "04.00.00")                 # A8C1234 read: letters misread
+        self.assertEqual([e["plate"] for e in got], ["ABC1234"])          # QRS1234 differs in all 3 letters
+        self.assertEqual(got[0], {"plate": "ABC1234", "n": 2, "d": 1})
+
+    def test_needs_the_same_last_four_digits(self):
+        self.assertEqual(self.like("2026-01-02", "05.00.00"), [])        # XYZ9999: nothing known with 9999 except ABC9999 (unreviewed)
+
+    def test_unreviewed_plates_are_not_suggested(self):
+        self.assertNotIn("ABC9999", [e["plate"] for e in self.like("2026-01-02", "05.00.00")])
+
+    def test_a_plate_seen_only_here_is_not_offered_to_itself(self):
+        self.assertEqual(self.like("2026-01-01", "03.00.00"), [])       # QRS1234 appears once (this image only)

@@ -168,6 +168,7 @@
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
         </span>
         <span class="badge" id="autob" hidden style="border-color:var(--ok);color:var(--ok)" title="Confidence 0.99 or higher, both passes agree, plate-shaped. 99.6% right on your labels.">auto-accepted</span>
+        <div id="like" hidden style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"></div>
         <button class="alt" id="near" hidden title="This read is one character away from a plate you verified recently"></button>
         <button class="alt" id="pick" hidden></button>
         <button class="alt tlc" id="tlc" hidden></button>
@@ -260,6 +261,19 @@ function render() {
   $("meter").style.background = it.conf >= 0.97 ? "var(--ok)" : it.conf >= 0.9 ? "var(--warn)" : "var(--bad)";
   $("autob").hidden = !(it.auto && !it.label);
   $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : "auto-accepted";
+  const lk = $("like");
+  lk.innerHTML = "";
+  if (it.like && it.like.length && !it.label) {
+    lk.hidden = false;
+    const lead = document.createElement("span"); lead.className = "seen"; lead.textContent = "same last 4 as a plate seen before:"; lk.appendChild(lead);
+    for (const e of it.like) {
+      const b = document.createElement("button"); b.className = "alt";
+      b.title = `${e.d} leading letter${e.d === 1 ? "" : "s"} differ; seen ${e.n} other time${e.n === 1 ? "" : "s"}. Click to copy into the boxes.`;
+      b.innerHTML = `<span class="a">${e.plate}</span> ${e.n}&times;`;
+      b.onclick = () => { buildCells(e.plate.split("")); focusCell(cells().length - 1); };
+      lk.appendChild(b);
+    }
+  } else lk.hidden = true;
   const nr = $("near");
   if (it.recent && !it.recent.exact && !it.label) {
     nr.hidden = false; nr.className = "alt";

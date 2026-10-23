@@ -97,6 +97,20 @@ It is a hint only. It never filters plates, never changes a stored read and neve
 labels the rule would have fixed 16 of the 24 wrong TLC reads and made 3 wrong suggestions out of 19, so check it
 against the frame. The pattern is local to one city's regulations: change `tlc_fix` in `review/server.py` for your own area.
 
+## "Same last four" hints
+
+For a seven-character read whose last four characters are digits (the AAANNNN shape), the page lists known plates that
+share those four digits and differ in one or two of the leading letters: "same last 4 as a plate seen before: ABC1234 3x".
+Click one to copy it into the boxes. Known means plates you verified plus auto-accepted ones, and a plate only counts
+if it was seen at least once on another sighting, so a plate never suggests itself. They are ranked by fewest differing
+letters, then by how often the plate was seen, and at most three are shown. The motivation is a common error: the digits
+read well but one or two letters do not.
+
+On the author's labels, 165 corrected AAANNNN plates had the right last four and wrong letters. For 113 of them a known
+plate within two letters existed, and it was the right one 107 times (95%), usually the only candidate. It needs the
+vehicle to have been seen before, so it helps with repeat visitors and does nothing for a first sighting. About 6% of
+reads that were already right also get an offer, which is why it is a button and never automatic.
+
 ## Recently verified plates
 
 Once you have verified a plate (Correct, or Save fix with your corrected text), later sightings of it need less work:

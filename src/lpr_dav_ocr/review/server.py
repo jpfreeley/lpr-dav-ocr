@@ -256,6 +256,33 @@ class Store:
                     best = (t, len(h))
         return dict(plate=best[0], n=best[1], exact=False) if best else None
 
+    # --- "same last four digits" hints for AAANNNN plates whose letters were misread --------------------------
+    def known_by_tail(self):
+        """last four characters -> {plate: set of images}, from plates you verified or that were auto-accepted."""
+        self.reads()                                          # (re)builds the shared cache
+        c = self._reads_cache
+        if getattr(self, "_known", (None,))[0] is not c:
+            idx = {}
+            for t, b, i in c[1]:
+                if b != "unverified" and STD_RX.fullmatch(t):
+                    idx.setdefault(t[3:], {}).setdefault(t, set()).add(i["image"])
+            self._known = (c, idx)
+        return self._known[1]
+
+    def like(self, item, limit=3):
+        """Known plates with the same last four digits as this read and one or two different leading letters,
+        best first: [{plate, n, d}]. n = other sightings of that plate, d = letters that differ."""
+        out = {}
+        for p in (item["plate"], (item.get("alt") or {}).get("plate")):
+            if not p or len(p) != 7 or not p[3:].isdigit():
+                continue
+            for t, imgs in self.known_by_tail().get(p[3:], {}).items():
+                d = sum(a != b for a, b in zip(t[:3], p[:3]))
+                n = len(imgs - {item["image"]})
+                if t != item["plate"] and 1 <= d <= 2 and n:
+                    out[t] = dict(plate=t, n=n, d=min(d, out.get(t, {}).get("d", 9)))
+        return sorted(out.values(), key=lambda e: (e["d"], -e["n"], e["plate"]))[:limit]
+
     @staticmethod
     def _time(img, frame):
         m = re.search(r"_(\d\d)\.(\d\d)\.(\d\d)-", img)
@@ -454,6 +481,7 @@ def make_handler(store):
                     lb_ = it_["label"]
                     reads = ([lb_["truth"]] if lb_ and lb_.get("truth") else []) + [it_["plate"]] + ([it_["alt"]["plate"]] if it_["alt"] else [])
                     m_ = WL.match(reads)
+                    it_["like"] = store.like(it_)
                     it_["watch"] = dict(plate=m_[0][0]["plate"], nickname=m_[0][0]["nickname"], level=m_[0][1]) if m_ else None
                 resp = dict(last_reviewed=last, item=its[pos] if pos is not None else None, n=(pos or 0) + 1, total=len(its),
                             counts=counts, all=len(everything), day=day, days=store.days())
