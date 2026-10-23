@@ -364,7 +364,7 @@ class RecentTests(unittest.TestCase):
         i = self.item("2026-01-10", "DEMO001")
         self.assertTrue(i["auto"])
         self.assertEqual(i["auto_why"], "recent")
-        self.assertEqual(i["recent"], {"plate": "DEMO001", "n": 1, "exact": True})
+        self.assertEqual(i["recent"], {"plate": "DEMO001", "n": 1, "exact": True, "state": "NY"})
 
     def test_outside_the_window_is_not(self):
         i = self.item("2026-03-01", "DEMO001")
@@ -374,7 +374,7 @@ class RecentTests(unittest.TestCase):
     def test_one_character_off_is_offered_not_approved(self):
         i = self.item("2026-01-10", "DEM0001")
         self.assertFalse(i["auto"])
-        self.assertEqual(i["recent"], {"plate": "DEMO001", "n": 1, "exact": False})
+        self.assertEqual(i["recent"], {"plate": "DEMO001", "n": 1, "exact": False, "state": "NY"})
 
     def test_unrelated_plate_gets_nothing(self):
         i = self.item("2026-01-10", "ZZZZ999")
@@ -442,7 +442,18 @@ class LikeTests(unittest.TestCase):
     def test_offers_known_plates_with_the_same_tail(self):
         got = self.like("2026-01-02", "04.00.00")                 # A8C1234 read: letters misread
         self.assertEqual([e["plate"] for e in got], ["ABC1234"])          # QRS1234 differs in all 3 letters
-        self.assertEqual(got[0], {"plate": "ABC1234", "n": 2, "d": 1})
+        self.assertEqual(got[0], {"plate": "ABC1234", "n": 2, "d": 1, "state": None})        # auto-accepted only: no state known
+
+    def test_the_state_you_set_on_a_plate_comes_with_the_hint(self):
+        store = S.Store(self.root)
+        store.labels_path = self.root / "labels" / "state.jsonl"
+        store.add_label({"image": self.img[("2026-01-01", "01.00.00")], "verdict": "ok", "truth": "ABC1234", "state": "NJ"})
+        store.add_label({"image": self.img[("2026-01-01", "02.00.00")], "verdict": "ok", "truth": "ABC1234", "state": "NJ"})
+        it = next(i for i in store.items("2026-01-02") if i["image"] == self.img[("2026-01-02", "04.00.00")])
+        self.assertEqual([(e["plate"], e["state"]) for e in store.like(it)], [("ABC1234", "NJ")])
+        self.assertIsNone(store.state_of("QRS1234"))
+        store.add_label({"image": self.img[("2026-01-01", "03.00.00")], "verdict": "ok", "truth": "QRS1234", "state": "UNKN"})
+        self.assertIsNone(store.state_of("QRS1234"))                                 # UNKN is not a state
 
     def test_needs_the_same_last_four_digits(self):
         self.assertEqual(self.like("2026-01-02", "05.00.00"), [])        # XYZ9999: nothing known with 9999 except ABC9999 (unreviewed)

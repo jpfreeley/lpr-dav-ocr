@@ -331,6 +331,8 @@ function render() {
 
 /* "seen N times before" link and the montage of earlier sightings of this plate */
 /* hints under the OCR read; they follow the boxes while you edit (see liveRefresh) */
+/* picking a hint for a plate you already labeled with a state also sets that state */
+function applyState(s) { if (s && s !== "UNKN") { setState(s); toast("State set to " + s + " (from your earlier label)"); } }
 function renderLike(list) {
   const lk = $("like");
   lk.innerHTML = "";
@@ -341,7 +343,7 @@ function renderLike(list) {
       const b = document.createElement("button"); b.className = "alt";
       b.title = `${e.d} leading letter${e.d === 1 ? "" : "s"} differ; seen ${e.n} other time${e.n === 1 ? "" : "s"}. Click to copy into the boxes.`;
       b.innerHTML = `<span class="a">${e.plate}</span> ${e.n}&times;`;
-      b.onclick = () => { buildCells(e.plate.split("")); focusCell(cells().length - 1); };
+      b.onclick = () => { buildCells(e.plate.split("")); focusCell(cells().length - 1); applyState(e.state); };
       lk.appendChild(b);
     }
   } else lk.hidden = true;
@@ -351,7 +353,7 @@ function renderNear(rec) {
   if (rec && !rec.exact && !(it.label && !edited())) {
     nr.hidden = false; nr.className = "alt";
     nr.innerHTML = `one character from <span class="a">${rec.plate}</span> (verified ${rec.n}&times; within a month) &middot; use`;
-    nr.onclick = () => { buildCells(rec.plate.split("")); focusCell(cells().length - 1); };
+    nr.onclick = () => { buildCells(rec.plate.split("")); focusCell(cells().length - 1); applyState(rec.state); };
   } else nr.hidden = true;
 }
 /* true once every box is filled and the text differs from the OCR read */

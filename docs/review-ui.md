@@ -117,7 +117,7 @@ have normal shapes.
 
 For a seven-character read whose last four characters are digits (the AAANNNN shape), the page lists known plates that
 share those four digits and differ in one or two of the leading letters: "same last 4 as a plate seen before: ABC1234 3x".
-Click one to copy it into the boxes. Known means plates you verified plus auto-accepted ones, and a plate only counts
+Click one to copy it into the boxes; if you set a state on that plate before, the state chip is set too. Known means plates you verified plus auto-accepted ones, and a plate only counts
 if it was seen at least once on another sighting, so a plate never suggests itself. They are ranked by fewest differing
 letters, then by how often the plate was seen, and at most three are shown. The motivation is a common error: the digits
 read well but one or two letters do not.

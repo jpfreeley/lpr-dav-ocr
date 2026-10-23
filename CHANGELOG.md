@@ -28,6 +28,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   chips), and lists your watched plates when no search is active.
 - Auto-reject: reads with an aspect ratio above `review.reject_aspect` (3.5) leave the queue, plate history and watchlist
   alerts, with an "Auto-rejected: spot check" view. 120 of 120 such reads were not usable plates on the author's labels.
+- Picking a "same last 4" or "one character from a verified plate" hint also sets the state you gave that plate before.
 - "Same last four" hints: for an AAANNNN read, known plates with the same four digits and one or two different leading
   letters are offered as one-click buttons (right 107 of 113 times on the author's labels, when one existed).
 - Recently verified plates: a read equal to a plate you verified within `review.recent_days` (30) is auto-approved; a

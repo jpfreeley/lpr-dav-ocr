@@ -9,7 +9,7 @@ Default root: the data root from the configuration (paths.data_root, see docs/co
 Pages: /  (first unreviewed)   /i/<image-file>   ?f=need|auto|unrev|flag|all filters the queue   ?day=YYYY-MM-DD picks a day.
 All days under <root>/frames/ are available from the day selector; labels are shared.
 """
-import argparse, csv, json, os, re, threading, time
+import argparse, collections, csv, json, os, re, threading, time
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -225,16 +225,24 @@ class Store:
         rows = self._read(self.labels_path, "jsonl")
         key = (id(rows), len(rows))
         if getattr(self, "_vi", (None,))[0] != key:
-            by, near = {}, {}
+            by, near, st = {}, {}, {}
             for r in {r["image"]: r for r in rows}.values():
                 d = self._ordinal(r["image"])
                 if r.get("verdict") in ("ok", "fix") and r.get("truth") and d:
                     by.setdefault(r["truth"].upper(), []).append((d, r["image"]))
+                    if r.get("state") and r["state"] != "UNKN":
+                        st.setdefault(r["truth"].upper(), collections.Counter())[r["state"]] += 1
             for t in by:
                 for v in _variants(t):
                     near.setdefault(v, set()).add(t)
-            self._vi = (key, by, near)
+            self._vi = (key, by, near, st)
         return self._vi[1], self._vi[2]
+
+    def state_of(self, plate):
+        """The state you set most often on verified sightings of this plate, or None."""
+        self.vindex()
+        c = self._vi[3].get(plate)
+        return c.most_common(1)[0][0] if c else None
 
     @staticmethod
     def _ordinal(image):
@@ -251,7 +259,7 @@ class Store:
         hits = lambda t: [x for x in by.get(t, []) if x[1] != image and abs(x[0] - d0) <= RECENT_DAYS]
         h = hits(plate)
         if h:
-            return dict(plate=plate, n=len(h), exact=True)
+            return dict(plate=plate, n=len(h), exact=True, state=self.state_of(plate))
         if len(plate) < 5:
             return None
         best = None
@@ -260,7 +268,7 @@ class Store:
                 h = hits(t)
                 if h and (best is None or len(h) > best[1]):
                     best = (t, len(h))
-        return dict(plate=best[0], n=best[1], exact=False) if best else None
+        return dict(plate=best[0], n=best[1], exact=False, state=self.state_of(best[0])) if best else None
 
     # --- "same last four digits" hints for AAANNNN plates whose letters were misread --------------------------
     def known_by_tail(self):
@@ -286,7 +294,7 @@ class Store:
                 d = sum(a != b for a, b in zip(t[:3], p[:3]))
                 n = len(imgs - {item["image"]})
                 if t != item["plate"] and 1 <= d <= 2 and n:
-                    out[t] = dict(plate=t, n=n, d=min(d, out.get(t, {}).get("d", 9)))
+                    out[t] = dict(plate=t, n=n, d=min(d, out.get(t, {}).get("d", 9)), state=self.state_of(t))
         return sorted(out.values(), key=lambda e: (e["d"], -e["n"], e["plate"]))[:limit]
 
     @staticmethod
