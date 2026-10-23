@@ -104,6 +104,7 @@ class Store:
         (root / "labels").mkdir(parents=True, exist_ok=True)
         (root / "crops").mkdir(parents=True, exist_ok=True)
         self.labels_path = root / "labels" / "labels.jsonl"
+        self.dups_path = root / "labels" / "duplicates.jsonl"          # frames merged into another by `dedupe`
         self.states_path = root / "labels" / "plate_states.jsonl"      # one state per plate, applied to every sighting of it
         self.write_lock = threading.Lock()
         self._cache = {}
@@ -180,7 +181,8 @@ class Store:
     def items(self, day):
         fr = self.frames(day)
         sp = {r["image"]: r for r in self._read(fr / "second_pass.csv", "csv")}
-        labels, seen, out = self.labels(), set(), []
+        labels, out = self.labels(), []
+        seen = {r["image"] for r in self._read(self.dups_path, "jsonl")}      # merged duplicates are invisible everywhere
         for r in sorted(self._read(fr / "index.csv", "csv"), key=lambda r: r.get("image", "")):
             img = r.get("image")
             if not r.get("plate") or not img or img in seen:

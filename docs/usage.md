@@ -35,6 +35,26 @@ where the plate is. It never decodes video, so it is quick (about 2 seconds per 
 review queue once it has a second pass. When the two passes disagree it also adds a third read of a tight crop (`plate3`) as a tie-breaker. `--retry-empty` re-runs rows with no read and no outline; `--fill-crop` adds the crop read to older rows. It is incremental and safe to run repeatedly. Only one copy runs per
 folder at a time.
 
+### Duplicate sightings
+
+A vehicle can end up with two saved frames: two groups in one clip whose reads differ by a character or two (one frame
+clipped or misread the plate), or the same plate seen again within seconds. `lpr dedupe` merges them: reads of the same
+plate within 30 seconds of each other, chained, are one sighting, and inside one clip plate texts up to two characters
+apart count as the same plate. It keeps one frame, in this order: a frame you verified; a read that fits a common plate
+pattern, then the longer read (a clipped read can have the higher confidence); both passes agreeing; the sharper crop;
+the confidence. Reads you marked not a plate, obstructed or can't tell are never merged.
+
+```bash
+lpr dedupe                       # report what would be merged (changes nothing)
+lpr dedupe --apply               # merge: list the extra frames in labels/duplicates.jsonl and move them to <data_root>/trash/
+lpr dedupe --purge               # delete the trash for good
+lpr dedupe --day 2026-01-01 --window 45
+```
+
+The review page, history, reports and `lpr score` ignore merged frames. `index.csv` and `second_pass.csv` are never
+rewritten, so it is safe to run while the watcher is working. A frame you verified is never dropped in favor of one you
+did not.
+
 ### Pausing and stopping
 
 ```bash

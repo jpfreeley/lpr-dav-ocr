@@ -8,7 +8,7 @@ reported separately. Caveat: every image here is one where the pipeline found a 
 so this measures how often reads are right (precision), not how many real plates were missed.
 Writes <root>/reports/accuracy.md and <root>/reports/confusions.csv.
 """
-import argparse, collections, csv, re
+import argparse, collections, csv, json, re
 from datetime import date
 from pathlib import Path
 
@@ -75,10 +75,14 @@ def main(argv=None):
     for r in read_jsonl(root / "labels" / "labels.jsonl"):
         labels[r["image"]] = r                           # latest line per image wins
 
+    dp = root / "labels" / "duplicates.jsonl"
+    dups = {json.loads(l)["image"] for l in dp.open() if l.strip()} if dp.is_file() else set()
     rows, auto_all, items_all = [], 0, 0
     for day in sorted(p for p in base.iterdir() if (p / "index.csv").exists()):
         sp = {r["image"]: r for r in read_csv(day / "second_pass.csv")} if (day / "second_pass.csv").exists() else {}
         for r in read_csv(day / "index.csv"):
+            if r.get("image") in dups:
+                continue                                  # merged into another frame by `dedupe`
             lb = labels.get(r.get("image"))
             s = sp.get(r.get("image"), {})
             if r.get("plate"):
