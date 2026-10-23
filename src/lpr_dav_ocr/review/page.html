@@ -359,7 +359,7 @@ async function openMontage() {
   const p = seenPlate(), me = it.image;
   $("montp").textContent = p; $("montn").textContent = "loading..."; $("montg").innerHTML = ""; $("mont").hidden = false;
   $("montfull").href = "/history?q=" + encodeURIComponent(p);
-  const r = await api("/api/history?q=" + encodeURIComponent(p));
+  const r = await api("/api/history?unverified=1&q=" + encodeURIComponent(p));
   const list = earlier(r).reverse();      // oldest first
   $("montn").textContent = `${list.length} other sighting${list.length === 1 ? "" : "s"} within ${seenDays ? seenDays + " days" : "(all time)"}, oldest first. Click one to open it.`;
   $("montg").innerHTML = list.map(s => {
