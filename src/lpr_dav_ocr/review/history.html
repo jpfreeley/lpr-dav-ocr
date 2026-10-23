@@ -49,7 +49,9 @@
   .chip { display:inline-flex; align-items:center; gap:2px; background:var(--panel); border:1px solid var(--line); border-radius:7px; }
   .chip a { border:0; background:none; padding:3px 4px 3px 9px; }
   .chip .star { background:none; color:var(--muted); border:0; padding:2px 8px 2px 4px; font-size:14px; line-height:1; cursor:pointer; }
-  .chip .star.on, .watchbadge { color:var(--warn); }
+  .chip .star.on, .ystar { color:#f5c518; text-shadow:0 0 1px rgba(0,0,0,.45); }
+  .chip .star.on { font-size:16px; }
+  .watchbadge { color:var(--text); }
   .chip .star:hover { color:var(--accent); }
   .watchbadge { font-size:13px; font-weight:600; display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .watchbadge button, .wform button { padding:3px 10px; font-size:12px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; font-weight:500; }
@@ -92,7 +94,7 @@ async function unWatch(plate) {
 }
 function watchHtml(p) {
   const w = watchOf(p);
-  return w ? `<span class="watchbadge">&#9733; Watching${w.nickname ? " as " + esc(w.nickname) : ""} <button id="unwatch">Stop watching</button></span>`
+  return w ? `<span class="watchbadge"><span class="ystar">&#9733;</span> Watching${w.nickname ? " as " + esc(w.nickname) : ""} <button id="unwatch">Stop watching</button></span>`
            : `<span class="wform"><button id="dowatch">&#9734; Watch</button><input id="wnick" placeholder="nickname" maxlength="40" hidden><button id="wadd" hidden>Add</button></span>`;
 }
 function wireWatch(p) {

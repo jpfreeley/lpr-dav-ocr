@@ -62,6 +62,7 @@
   .alt .a { font:600 14px var(--mono); color:var(--warn); letter-spacing:.05em; }
   .alt.agree .a { color:var(--ok); }
   .alt.agree { cursor:default; }
+  #watchbtn.watching { color:#f5c518; border-color:#f5c518; font-weight:600; }
   .cropuse { cursor:pointer; text-decoration:underline dotted; }
   .cropuse:hover { color:var(--accent); }
 
@@ -385,6 +386,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("mont")
 function renderWatch() {
   const w = it.watch, b = $("watchbtn");
   $("watchform").hidden = true;
+  b.classList.toggle("watching", !!(w && w.level === "exact"));
   if (w && w.level === "exact") { b.textContent = "\u2605 Watching: " + w.nickname; b.dataset.mode = "remove"; b.title = "On the watchlist as " + w.plate + ". Click to remove."; }
   else if (w) { b.textContent = "\u2606 Watch (near " + w.nickname + ")"; b.dataset.mode = "add"; b.title = "One character from watched plate " + w.plate + " (" + w.nickname + "). Click to watch this exact plate too."; }
   else { b.textContent = "\u2606 Watch"; b.dataset.mode = "add"; b.title = "Alert me when this plate is seen again"; }
