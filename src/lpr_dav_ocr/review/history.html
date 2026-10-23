@@ -46,6 +46,15 @@
   .badge.auto { color:var(--accent); border-color:var(--accent); }
   .badge.unverified { color:var(--warn); border-color:var(--warn); }
   .thumb { width:150px; height:56px; background:#000 no-repeat; border-radius:5px; display:block; }
+  .chip { display:inline-flex; align-items:center; gap:2px; background:var(--panel); border:1px solid var(--line); border-radius:7px; }
+  .chip a { border:0; background:none; padding:3px 4px 3px 9px; }
+  .chip .star { background:none; color:var(--muted); border:0; padding:2px 8px 2px 4px; font-size:14px; line-height:1; cursor:pointer; }
+  .chip .star.on, .watchbadge { color:var(--warn); }
+  .chip .star:hover { color:var(--accent); }
+  .watchbadge { font-size:13px; font-weight:600; display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .watchbadge button, .wform button { padding:3px 10px; font-size:12px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; font-weight:500; }
+  .wform { display:inline-flex; gap:4px; align-items:center; }
+  .wform input { width:130px; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--panel2); color:var(--text); font:inherit; font-size:12px; }
   .more { margin-top:10px; background:var(--panel2); color:var(--text); border:1px solid var(--line); }
   .empty { color:var(--muted); padding:14px 0; }
 </style>
@@ -69,7 +78,33 @@ const clean = s => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const unv = () => $("unv").checked ? "&unverified=1" : "";
 const api = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status); return r.json(); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-let data = null, shown = 0;
+let data = null, shown = 0, watching = [];
+const HDR = { "Content-Type": "application/json", "X-Requested-With": "lpr-review" };
+const loadWatch = async () => { try { watching = await api("/api/watch"); } catch (e) { watching = []; } };
+const watchOf = p => watching.find(w => w.plate === p);
+async function setWatch(plate, nick) {
+  await fetch("/api/watch", { method: "POST", headers: HDR, body: JSON.stringify({ plate, nickname: nick }) });
+  await loadWatch();
+}
+async function unWatch(plate) {
+  await fetch("/api/watch/remove", { method: "POST", headers: HDR, body: JSON.stringify({ plate }) });
+  await loadWatch();
+}
+function watchHtml(p) {
+  const w = watchOf(p);
+  return w ? `<span class="watchbadge">&#9733; Watching${w.nickname ? " as " + esc(w.nickname) : ""} <button id="unwatch">Stop watching</button></span>`
+           : `<span class="wform"><button id="dowatch">&#9734; Watch</button><input id="wnick" placeholder="nickname" maxlength="40" hidden><button id="wadd" hidden>Add</button></span>`;
+}
+function wireWatch(p) {
+  const u = $("unwatch"), b = $("dowatch");
+  if (u) u.onclick = async () => { await unWatch(p); render(); };
+  if (b) b.onclick = () => { b.hidden = true; $("wnick").hidden = false; $("wadd").hidden = false; $("wnick").focus(); };
+  if ($("wadd")) {
+    const go = async () => { await setWatch(p, $("wnick").value.trim()); render(); };
+    $("wadd").onclick = go;
+    $("wnick").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+  }
+}
 
 function thumb(r) {
   if (!r.box) return `<span class="thumb"></span>`;
@@ -86,10 +121,10 @@ function rows(from, to) {
 }
 function render() {
   const d = data, out = $("out");
-  if (!d.count) { out.innerHTML = `<div class="card empty">No ${$("unv").checked ? "" : "confirmed "}sightings of <b>${esc(d.plate)}</b>.${$("unv").checked ? "" : " Tick &ldquo;include unreviewed reads&rdquo; to widen the search."}</div>`; return; }
+  if (!d.count) { out.innerHTML = `<div class="card empty">No ${$("unv").checked ? "" : "confirmed "}sightings of <b>${esc(d.plate)}</b>.${$("unv").checked ? "" : " Tick &ldquo;include unreviewed reads&rdquo; to widen the search."} ${watchHtml(d.plate)}</div>`; wireWatch(d.plate); return; }
   const mx = Math.max(...d.by_hour, 1);
   const st = Object.entries(d.states).map(([k, v]) => `${k} ${v}`).join(", ");
-  out.innerHTML = `<div class="card"><div class="sum"><span class="plate">${esc(d.plate)}</span>
+  out.innerHTML = `<div class="card"><div class="sum"><span class="plate">${esc(d.plate)}</span>${watchHtml(d.plate)}
     <span><b>${d.count}</b> sighting${d.count === 1 ? "" : "s"} on <b>${d.days}</b> day${d.days === 1 ? "" : "s"}</span>
     <span>first <b>${esc(d.first)}</b></span><span>last <b>${esc(d.last)}</b></span>${st ? `<span>state <b>${esc(st)}</b></span>` : ""}</div>
     <div class="hours" title="Sightings by hour of day">${d.by_hour.map((n, h) => `<i style="height:${Math.max(4, n / mx * 100)}%" title="${String(h).padStart(2, "0")}:00  ${n}"></i>`).join("")}</div>
@@ -97,15 +132,20 @@ function render() {
     <div class="card"><table><thead><tr><th>Day</th><th>Time</th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th></tr></thead>
     <tbody id="tb">${rows(0, PAGE)}</tbody></table><button class="more" id="more" ${d.count <= PAGE ? "hidden" : ""}>Show more</button>
     <p class="hint">Camera clocks may run behind the computer clock; times come from the clip file names.</p></div>`;
+  wireWatch(d.plate);
   shown = PAGE;
   $("more").onclick = () => { $("tb").insertAdjacentHTML("beforeend", rows(shown, shown + PAGE)); shown += PAGE; if (shown >= d.count) $("more").hidden = true; };
 }
 async function search(p) {
   p = clean(p); $("q").value = p;
   history.replaceState(null, "", p ? "/history?q=" + p + (unv() ? "&unverified=1" : "") : "/history");
-  if (!p) { $("out").innerHTML = ""; return; }
+  if (!p) { $("out").innerHTML = ""; showWatched(); return; }
   $("out").innerHTML = `<div class="card empty">Searching&hellip;</div>`;
   try { data = await api("/api/history?q=" + p + unv()); render(); } catch (e) { $("out").innerHTML = `<div class="card empty">Search failed. Is the review server running?</div>`; }
+}
+const chip = (p, n) => { const w = watchOf(p); return `<span class="chip"><a href="#" data-p="${esc(p)}">${esc(p)}${n != null ? `<small>${n}</small>` : ""}</a><button class="star${w ? " on" : ""}" data-star="${esc(p)}" title="${w ? "Watching" + (w.nickname ? " as " + esc(w.nickname) + ". Click to stop." : ". Click to stop.") : "Watch this plate"}">${w ? "&#9733;" : "&#9734;"}</button></span>`; };
+function showWatched() {
+  $("sugg").innerHTML = watching.length ? `<span class="hint" style="margin:0 6px 0 0">Watching:</span>` + watching.map(w => chip(w.plate, null).replace(`>${esc(w.plate)}</a>`, `>${esc(w.plate)}${w.nickname ? `<small>${esc(w.nickname)}</small>` : ""}</a>`)).join("") : "";
 }
 let t = null;
 $("q").addEventListener("input", () => {
@@ -115,16 +155,28 @@ $("q").addEventListener("input", () => {
     if (v.length < 2) { $("sugg").innerHTML = ""; return; }
     try {
       const s = await api("/api/plates?q=" + v + unv());
-      $("sugg").innerHTML = s.map(e => `<a href="#" data-p="${esc(e.plate)}">${esc(e.plate)}<small>${e.count}</small></a>`).join("");
+      await loadWatch();
+      $("sugg").innerHTML = s.map(e => chip(e.plate, e.count)).join("");
     } catch (e) { /* suggestions are optional */ }
   }, 250);
 });
-$("sugg").addEventListener("click", e => { const a = e.target.closest("a"); if (a) { e.preventDefault(); search(a.dataset.p); } });
+$("sugg").addEventListener("click", async e => {
+  const st = e.target.closest(".star");
+  if (st) {
+    const p = st.dataset.star;
+    if (watchOf(p)) await unWatch(p);
+    else { const n = window.prompt("Nickname for " + p + " (optional):", ""); if (n === null) return; await setWatch(p, n.trim()); }
+    if ($("q").value.length >= 2) $("q").dispatchEvent(new Event("input")); else showWatched();
+    if (data && data.plate === p) render();
+    return;
+  }
+  const a = e.target.closest("a"); if (a) { e.preventDefault(); search(a.dataset.p); }
+});
 $("f").addEventListener("submit", e => { e.preventDefault(); search($("q").value); });
 $("unv").addEventListener("change", () => { if ($("q").value) search($("q").value); });
 const u = new URLSearchParams(location.search);
 if (u.get("unverified") === "1") $("unv").checked = true;
-if (u.get("q")) search(u.get("q"));
+loadWatch().then(() => { if (u.get("q")) search(u.get("q")); else showWatched(); });
 </script>
 </body>
 </html>

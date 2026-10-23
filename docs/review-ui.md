@@ -170,6 +170,12 @@ text), or the auto-accept rule passed it. Plates marked not a plate, obstructed 
 (`verified`, `fixed`, `auto` or `unverified`) so you can tell them apart. The search box suggests plates that contain
 what you typed, with counts.
 
+Watching: a watched plate shows **Watching as <nickname>** with a **Stop watching** button in its summary, and a plate
+you are not watching has a **Watch** button with an optional nickname. The suggestion chips carry a star (filled when
+watched; click to watch with a nickname, or to stop). With no search, the page lists the plates you are watching.
+Watching here is the same watchlist as the Watch button on the queue page, and alerts need the watcher
+([watcher-and-alerts.md](watcher-and-alerts.md)).
+
 From the command line: `lpr seen ABC1234 --days 30 [--unverified]`.
 
 Sightings are read from the same files as the queue, so a plate appears as soon as it is processed. The first
