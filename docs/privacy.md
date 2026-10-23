@@ -12,6 +12,7 @@ retaining plate data and sharing it differ by country and region. Find out which
 | Recordings (`.dav`) | the camera share | high | Not created by this project. It only reads them. |
 | Saved frames with the plate in the file name | `<data_root>/frames/` | high | One full frame per plate, plus the plate text in the name and in `index.csv`. |
 | `index.csv`, `second_pass.csv` | `<data_root>/frames/` | high | A timestamped list of plates seen. |
+| Plate states | `<data_root>/labels/plate_states.jsonl` | high | The state you set on each plate. |
 | Your labels and crops | `<data_root>/labels/`, `<data_root>/crops/` | high | Confirmed plate text and plate images. |
 | Reports | `<data_root>/reports/` | low | Aggregate counts and character confusions. No plates. |
 | Watchlist | `<home>/watchlist.csv` | high | Plates you chose to watch, with your nicknames. |

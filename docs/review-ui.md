@@ -157,6 +157,16 @@ dropped: forcing a read into AAANNNN (for example a `0` in a letter position bec
 suggestions and rewrote 3 reads that were already right. The common errors (H read as M, N as M) are letter-for-letter,
 which a pattern cannot see.
 
+## A plate's state follows the plate
+
+A state you set when you save a **Correct** or **Save fix** is also the state of that plate on all its other sightings that
+have no state of their own. Nothing is written to those sightings' labels: the page records one line per plate in
+`<data_root>/labels/plate_states.jsonl` (latest line wins), and every view looks it up. So auto-accepted sightings show
+the state in History and in the Reports, and the toast after saving says how many other sightings got it ("state NJ
+also set on 3 other sightings of ..."). A sighting you labeled with its own state keeps it. If one plate really exists
+in two states, the last one you set is used for the sightings without their own state. For plates labeled before this
+existed, the state you used most often on that plate is used.
+
 ## Re-checking "not a plate" labels
 
 The **Re-check** view lists plates you marked **Not a plate** where the second pass found different, plate-shaped text

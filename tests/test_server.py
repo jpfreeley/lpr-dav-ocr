@@ -628,3 +628,64 @@ class ReportsTests(unittest.TestCase):
         finally:
             httpd.shutdown()
             httpd.server_close()
+
+
+class PlateStateTests(unittest.TestCase):
+    """A state set on one sighting of a plate becomes the plate's state on every sighting, without writing labels."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        d = cls.root / "frames" / "2026-01-01"
+        d.mkdir(parents=True)
+        cls.img = {}
+        with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+            w, v = csv.writer(f), csv.writer(g)
+            w.writerow(hdr_i)
+            v.writerow(hdr_s)
+            for t, p in (("01.00.00", "ABC1234"), ("02.00.00", "ABC1234"), ("03.00.00", "ABC1234"), ("04.00.00", "QRS5678")):
+                img = f"2026-01-01_{t}-{t}-{p}_0.999.png"
+                cls.img[t] = img
+                w.writerow([f"{t}-{t}[M].dav", p, 0.999, 30, "", img, 500, 1, 3, 5])
+                v.writerow([img, p, 0.999, p, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2])    # all auto-accepted
+        cls.store = S.Store(cls.root)
+        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), S.make_handler(cls.store))
+        cls.port = cls.httpd.server_address[1]
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+        cls.tmp.cleanup()
+
+    def post(self, img, state, verdict="ok"):
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        c.request("POST", "/api/label", body=json.dumps({"image": img, "verdict": verdict, "state": state}), headers=HDR)
+        r = c.getresponse()
+        body = json.loads(r.read())
+        c.close()
+        return r.status, body
+
+    def test_state_spreads_to_every_sighting_of_the_plate_once(self):
+        self.assertEqual([i["label"] for i in self.store.items("2026-01-01")][:1], [None])
+        st, body = self.post(self.img["01.00.00"], "NJ")
+        self.assertEqual((st, body["plate"], body["state"], body["applied"]), (200, "ABC1234", "NJ", 2))    # the two other sightings
+        rows = self.store.sightings("ABC1234")["sightings"]
+        self.assertEqual({r["state"] for r in rows}, {"NJ"})                                                 # all three show NJ
+        self.assertEqual(self.store.sightings("ABC1234")["states"], {"NJ": 3})
+        self.assertIsNone(self.store.state_of("QRS5678"))                                                    # other plates untouched
+        self.assertTrue((self.root / "labels" / "plate_states.jsonl").is_file())
+        labels = (self.root / "labels" / "labels.jsonl").read_text().splitlines()
+        self.assertEqual(len(labels), 1)                                                                     # no labels written for the others
+        # setting it again, an unknown state, or a not-a-plate verdict spreads to nobody
+        st, body = self.post(self.img["02.00.00"], "NJ")
+        self.assertEqual(body["applied"], 0)                                                                  # the third already has NJ
+        st, body = self.post(self.img["04.00.00"], "UNKN")
+        self.assertEqual(body["applied"], 0)
+        self.assertIsNone(self.store.state_of("QRS5678"))
+        st, body = self.post(self.img["04.00.00"], "NY", verdict="notplate")
+        self.assertEqual((body["plate"], body["applied"]), (None, 0))                                         # not a plate: no plate to spread to

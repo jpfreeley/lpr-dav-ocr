@@ -84,7 +84,7 @@ def build(store, days=None, unverified=False, watch=()):
         if len(dset) >= 3:
             for f in firsts:
                 commute[f // 30] += 1
-        states = collections.Counter((i["label"] or {}).get("state") for i in its if i["label"])
+        states = collections.Counter(store.eff_state(i, t) for i in its)
         states.pop("UNKN", None)
         states.pop(None, None)
         last = max((i["day"], i["time"]) for i in its)
@@ -118,7 +118,7 @@ def build(store, days=None, unverified=False, watch=()):
     types_by_day = {d: collections.Counter(plate_type(t) for t, b, i in S if i["day"] == d) for d in sel}
     state_counts = collections.Counter()
     for t, b, i in S:
-        s = (i["label"] or {}).get("state") if i["label"] else None
+        s = store.eff_state(i, t)
         if s:
             state_counts[s] += 1
     state_total = sum(state_counts.values())

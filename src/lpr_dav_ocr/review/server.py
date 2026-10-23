@@ -104,6 +104,7 @@ class Store:
         (root / "labels").mkdir(parents=True, exist_ok=True)
         (root / "crops").mkdir(parents=True, exist_ok=True)
         self.labels_path = root / "labels" / "labels.jsonl"
+        self.states_path = root / "labels" / "plate_states.jsonl"      # one state per plate, applied to every sighting of it
         self.write_lock = threading.Lock()
         self._cache = {}
         self._busy = set()
@@ -238,11 +239,36 @@ class Store:
             self._vi = (key, by, near, st)
         return self._vi[1], self._vi[2]
 
+    def registry(self):
+        """plate -> the state you last set on it (latest line wins)."""
+        return {r["plate"]: r["state"] for r in self._read(self.states_path, "jsonl") if r.get("plate") and r.get("state")}
+
     def state_of(self, plate):
-        """The state you set most often on verified sightings of this plate, or None."""
+        """The state of a plate: the one you last set on it, else the one you set most often on its verified sightings."""
+        if self.registry().get(plate):
+            return self.registry()[plate]
         self.vindex()
         c = self._vi[3].get(plate)
         return c.most_common(1)[0][0] if c else None
+
+    def eff_state(self, item, plate=None):
+        """State shown for one sighting: its own label if it has one, else the plate's state. A state you set on any
+        sighting of a plate therefore appears on all of them without writing labels for the auto-accepted ones."""
+        own = (item["label"] or {}).get("state")
+        if own and own != "UNKN":
+            return own
+        p = plate or (item["label"] or {}).get("truth") or item["plate"]
+        return self.state_of(p.upper()) if p else None
+
+    def set_plate_state(self, plate, state, image):
+        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, state=state, image=image)
+        with self.write_lock, self.states_path.open("a") as fh:
+            fh.write(json.dumps(rec) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        c = self._cache.get(self.states_path)
+        if c:
+            c[1].append(rec)
 
     @staticmethod
     def _ordinal(image):
@@ -344,7 +370,7 @@ class Store:
         """Exact-match history of one plate, newest first."""
         plate = re.sub(r"[^A-Z0-9]", "", (plate or "").upper())
         rows = [dict(image=i["image"], day=i["day"], time=i["time"], clip=i["clip"], conf=i["conf"], basis=b, box=i["box"],
-                     state=(i["label"] or {}).get("state"))
+                     state=self.eff_state(i, t))
                 for t, b, i in self.reads(unverified) if t == plate]
         rows.sort(key=lambda r: (r["day"], r["time"]), reverse=True)
         hours = [0] * 24
@@ -568,14 +594,20 @@ def make_handler(store):
                     truth = None
             except (StopIteration, KeyError, AssertionError, ValueError, TypeError):
                 return self._send(400, {"error": "bad label"})
+            plate_t = (truth or it["plate"]).upper() if verdict in ("ok", "fix") else None
+            applied = 0
+            if plate_t and state != "UNKN":              # a state you set on one sighting is the plate's state
+                applied = sum(1 for t, b, i in store.reads(True) if t == plate_t and i["image"] != it["image"] and not store.eff_state(i, t))
             store.add_label(dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), image=it["image"],
                                  clip=it["clip"], day=it["day"], plate_ocr=it["plate"], conf=it["conf"],
                                  plate_second=(it["alt"] or {}).get("plate"), shape=it["shape"],
                                  verdict=verdict, truth=truth, state=state,
                                  **({"rechecked": True} if d.get("recheck") and verdict == "notplate" else {})))
+            if plate_t and state != "UNKN":
+                store.set_plate_state(plate_t, state, it["image"])
             if truth:
                 store.save_crop(it, truth)
-            self._send(200, {"ok": True})
+            self._send(200, {"ok": True, "plate": plate_t, "state": state, "applied": applied})
     return H
 
 

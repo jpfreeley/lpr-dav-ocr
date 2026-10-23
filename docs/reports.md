@@ -21,7 +21,7 @@ All hours and times are **CamTime**: the camera's clock, taken from the clip fil
 | Overview | five tiles | sightings, distinct plates, share of returning sightings, regulars, share handled without you |
 | Traffic | heatmap of hour by day; average by hour | when the camera is busy, and which days differ |
 | Visitors | new and returning per day; days each plate was seen; arrival time of regulars; time between repeat sightings; day-to-day overlap | how many vehicles come back, when regulars arrive, and how a day's plates carry into the next |
-| Plate mix | plate type by day; state on labeled plates | standard versus taxi (TLC) versus other plates, and the states you recorded |
+| Plate mix | plate type by day; state by sighting | standard versus taxi (TLC) versus other plates, and the states you recorded |
 | Watched | one dot per sighting of each watchlist entry | when a watched plate passed. Rows show the nickname only |
 | Regulars | table | plates on 2 or more days, their usual first arrival and last sighting. "Steady" means 3 or more days with the first sighting inside a 90-minute window |
 | Review effort | what happened to each read, per day; first-pass accuracy by hour | how much work is left, how much was automatic, and where the first read is weakest |

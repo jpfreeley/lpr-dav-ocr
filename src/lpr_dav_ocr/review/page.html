@@ -565,10 +565,10 @@ async function decide(verdict, truth) {
   if (!it || busy) return;
   busy = true;
   try {
-    await api("/api/label", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" },
+    const saved = await api("/api/label", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" },
                               body: JSON.stringify({ image: it.image, verdict, truth, state: getState(), recheck: F === "recheck" }) });
     const msg = { ok: "Correct", fix: `Fixed: ${it.plate} \u2192 ${truth}`, notplate: "Not a plate", obstructed: "Obstructed", skip: "Can't tell" }[verdict];
-    toast("Saved: " + msg);
+    toast("Saved: " + msg + (saved && saved.applied ? ` \u00b7 state ${saved.state} also set on ${saved.applied} other sighting${saved.applied === 1 ? "" : "s"} of ${saved.plate}` : ""));
     const nxt = D.next_unreviewed || D.next;
     if (nxt) await go(nxt); else { await go(it.image, false); toast("Caught up. New plates appear as processing continues."); }
   } catch (e) { toast("Save failed, not recorded"); }
