@@ -100,7 +100,7 @@
   </div>
   <div class="kpis" id="kpis"></div>
   <div class="grid" id="grid">
-    <section class="card wide" id="traffic"><div class="bar"><div><h2>Traffic by hour and day</h2><p class="sub">Confirmed sightings per hour. Darker means busier. Hours are CamTime, the camera clock, which can run behind the computer clock.</p></div><button class="tbtn" data-t="heat" aria-pressed="false">Table</button></div><div class="body" id="c-heat"></div></section>
+    <section class="card wide" id="traffic"><div class="bar"><div><h2>Traffic by hour and day</h2><p class="sub">Confirmed sightings per hour. The scale under the chart shows how color maps to the count. Hours are CamTime, the camera clock, which can run behind the computer clock.</p></div><button class="tbtn" data-t="heat" aria-pressed="false">Table</button></div><div class="body" id="c-heat"></div></section>
     <section class="card"><div class="bar"><div><h2>Average sightings by hour</h2><p class="sub">Per selected day, by CamTime hour.</p></div><button class="tbtn" data-t="hour" aria-pressed="false">Table</button></div><div class="body" id="c-hour"></div></section>
     <section class="card" id="visitors"><div class="bar"><div><h2>New and returning plates</h2><p class="sub">A sighting is returning when that plate was seen earlier anywhere in the data.</p></div><button class="tbtn" data-t="newret" aria-pressed="false">Table</button></div><div class="body" id="c-newret"></div></section>
     <section class="card"><div class="bar"><div><h2>How many days each plate was seen</h2><p class="sub">Most plates appear once. The right-hand columns are your regulars.</p></div><button class="tbtn" data-t="seen" aria-pressed="false">Table</button></div><div class="body" id="c-seen"></div></section>
@@ -226,8 +226,16 @@ function heatmap(host, o) {
       if (o.labelCells && cw > 38) el("text", { x: x + cw / 2, y: y + ch / 2 + 4, "text-anchor": "middle", style: "fill:" + (!(o.skipDiag && i === j) && v / max > 0.55 && !dark() ? "#fff" : "var(--ink)") }, svg, o.fmtV ? o.fmtV(v) : fmt(v));
     });
   });
+  scaleLegend(host, max, o.fmtV);
   const every = Math.ceil(nc / Math.max(2, Math.floor((W - m.l) / 30)));
   o.cols.forEach((c, j) => { if (j % every === 0) el("text", { x: m.l + cw * (j + 0.5), y: H - 6, "text-anchor": "middle" }, svg, c); });
+}
+/* color scale for a heatmap: fewer on the left, more on the right (the ramp is reversed on the dark surface) */
+function scaleLegend(host, max, f) {
+  const lg = html("div", { class: "legend", style: "margin:4px 0 0; align-items:center" }, host); lg.setAttribute("aria-hidden", "true");
+  html("span", {}, lg, "0 (none)"); const bar = html("span", { style: "display:inline-flex; gap:2px" }, lg);
+  for (let k = 1; k <= 8; k++) html("i", { style: "width:22px;height:10px;margin:0;background:" + rampColor(max * k / 8, max) }, bar);
+  html("span", {}, lg, (f ? f(max) : fmt(max)) + " (most)");
 }
 /* dot strip: rows[{label, pts:[{x (0..1), tip}]}], x ticks */
 function dotStrip(host, o) {
