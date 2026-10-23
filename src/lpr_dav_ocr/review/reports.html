@@ -110,7 +110,7 @@
     <section class="card" id="mix"><div class="bar"><div><h2>Plate type by day</h2><p class="sub">Standard is three letters and four digits. TLC is the NYC taxi pattern. Other covers everything else.</p></div><button class="tbtn" data-t="types" aria-pressed="false">Table</button></div><div class="body" id="c-types"></div></section>
     <section class="card"><div class="bar"><div><h2>State on labeled plates</h2><p class="sub">Only plates where you set a state. Auto-accepted plates carry no state.</p></div><button class="tbtn" data-t="states" aria-pressed="false">Table</button></div><div class="body" id="c-states"></div></section>
     <section class="card wide" id="watch"><div class="bar"><div><h2>Watched plates</h2><p class="sub">One row per watchlist entry, one dot per sighting. Rows show the nickname only.</p></div><button class="tbtn" data-t="watch" aria-pressed="false">Table</button></div><div class="body" id="c-watch"></div></section>
-    <section class="card wide" id="regulars"><div class="bar"><div><h2>Regulars</h2><p class="sub">Plates seen on 2 or more days. Steady means 3 or more days with the first sighting inside a 90-minute window. Plate text is hidden until you tick "show plate text".</p></div></div><div class="body" id="c-regulars"></div></section>
+    <section class="card wide" id="regulars"><div class="bar"><div><h2>Regulars</h2><p class="sub">Plates seen on 2 or more days. Steady means 3 or more days with the first sighting inside a 90-minute window. Plate text is hidden until you tick "show plate text" here or at the top of the page.</p></div></div><div class="body" id="c-regulars"></div></section>
     <section class="card wide" id="effort"><div class="bar"><div><h2>Review effort by day</h2><p class="sub">What happened to every read: labeled by you, approved or rejected automatically, or still waiting for review.</p></div><button class="tbtn" data-t="quality" aria-pressed="false">Table</button></div><div class="body" id="c-quality"></div></section>
     <section class="card wide"><div class="bar"><div><h2>First-pass accuracy by hour</h2><p class="sub">Share of your labeled real plates where the first read was already right. Columns with fewer than 15 plates are lighter.</p></div><button class="tbtn" data-t="acc" aria-pressed="false">Table</button></div><div class="body" id="c-acc"></div></section>
   </div>
@@ -330,6 +330,8 @@ const PAINT = {
   },
   regulars(h) {
     const d = DATA; if (!d.regulars.length) return empty(h, "No plate has been seen on 2 or more days yet.");
+    const sw = html("label", { class: "opt", style: "margin:0 0 6px" }, h), cb = html("input", { type: "checkbox" }, sw); cb.checked = PLATES; sw.appendChild(document.createTextNode("show plate text"));
+    cb.onchange = () => { PLATES = cb.checked; $("plates").checked = PLATES; paint("regulars"); };
     const note = html("div", { class: "note" }, h, d.regulars_total + " plates seen on 2 or more days" + (d.regulars_total > d.regulars.length ? "; the top " + d.regulars.length + " are listed" : "") + ".");
     const cols = ["#", "Plate", "Days", "Sightings", "Usual first arrival (CamTime)", "Last seen", "State", "Type", ""];
     const tb = html("table", { class: "t" }), hd = html("tr", {}, html("thead", {}, tb)); cols.forEach((c, i) => html("th", i === 2 || i === 3 ? { class: "n" } : {}, hd, c));
