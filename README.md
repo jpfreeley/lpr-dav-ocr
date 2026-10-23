@@ -116,6 +116,7 @@ sharp edges elsewhere. [docs/known-issues.md](docs/known-issues.md) lists them h
 
 - [Installation](docs/installation.md) and [configuration](docs/configuration.md)
 - [Usage](docs/usage.md) and [the review page](docs/review-ui.md)
+- [Reports](docs/reports.md): traffic, repeat visitors, plate mix and review effort
 - [Watcher and alerts](docs/watcher-and-alerts.md)
 - [Architecture](docs/architecture.md) and [decision records](docs/adr/)
 - [Accuracy](docs/accuracy.md), [privacy](docs/privacy.md), [known issues](docs/known-issues.md)

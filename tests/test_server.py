@@ -545,3 +545,75 @@ class RecheckTests(unittest.TestCase):
     def test_unlabeled_and_correct_plates_are_never_listed(self):
         self.assertNotIn("DEMO001", self.plates())
         self.assertNotIn("DEMO006", self.plates())
+
+
+class ReportsTests(unittest.TestCase):
+    """The Reports page data: confirmed sightings only, with returning plates counted against the whole history."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        plan = {"2026-01-05": [("06.10.00", "ABC1234"), ("06.12.00", "ABC1234"), ("09.00.00", "T123456C"), ("10.00.00", "ZZZ0000")],
+                "2026-01-06": [("06.20.00", "ABC1234"), ("11.00.00", "QRS5678")]}
+        for day, items in plan.items():
+            d = cls.root / "frames" / day
+            d.mkdir(parents=True)
+            with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+                w, v = csv.writer(f), csv.writer(g)
+                w.writerow(hdr_i)
+                v.writerow(hdr_s)
+                for t, p in items:
+                    img = f"{day}_{t}-{t}-{p}_0.999.png"
+                    w.writerow([f"{t}-{t}[M].dav", p, 0.999, 30, "", img, 500, 1, 3, 5])
+                    v.writerow([img, p, 0.999, p, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2])    # all auto-accepted
+        cls.store = S.Store(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_counts_and_returning(self):
+        r = S._reports.build(self.store)
+        self.assertEqual((r["kpi"]["sightings"], r["kpi"]["plates"], r["kpi"]["days"]), (6, 4, 2))
+        d1, d2 = r["per_day"]
+        self.assertEqual((d1["sightings"], d1["new"], d1["returning"]), (4, 3, 1))     # 06.12 repeats the 06.10 sighting
+        self.assertEqual((d2["sightings"], d2["new"], d2["returning"]), (2, 1, 1))     # ABC1234 was seen yesterday
+
+    def test_regulars_and_types(self):
+        r = S._reports.build(self.store)
+        self.assertEqual([(x["plate"], x["days"], x["sightings"]) for x in r["regulars"]], [("ABC1234", 2, 3)])
+        self.assertEqual(r["seen_hist"], [3, 1])                                       # three plates on 1 day, one on 2 days
+        self.assertEqual(r["mix"]["types"][0], {"day": "2026-01-05", "standard": 3, "TLC": 1, "other": 0})
+        self.assertEqual(r["overlap"]["rows"], [[100, 33], [50, 100]])                 # 1 of 3 and 1 of 2 plates shared
+
+    def test_day_filter_keeps_history_for_returning(self):
+        r = S._reports.build(self.store, days=["2026-01-06"])
+        self.assertEqual(r["days"], ["2026-01-06"])
+        self.assertEqual(r["per_day"][0]["returning"], 1)                              # still judged against 01-05
+
+    def test_gaps_hours_and_watch(self):
+        r = S._reports.build(self.store, watch=[{"plate": "T123456C", "nickname": "Taxi"}])
+        self.assertEqual(r["gaps"]["counts"][1], 1)                                    # 06:10 to 06:12 is 2 min: the "2 to 10 min" bin
+        self.assertEqual(r["heat"]["rows"][0][6], 2)
+        self.assertEqual(r["watch"][0]["nickname"], "Taxi")
+        self.assertEqual(len(r["watch"][0]["sightings"]), 1)
+
+    def test_routes(self):
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), S.make_handler(self.store))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=10)
+            c.request("GET", "/api/report?days=2026-01-05")
+            r = c.getresponse()
+            body = json.loads(r.read())
+            self.assertEqual((r.status, body["days"]), (200, ["2026-01-05"]))
+            c.request("GET", "/reports")
+            r = c.getresponse()
+            self.assertIn(b"Plate reports", r.read())
+            c.close()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()

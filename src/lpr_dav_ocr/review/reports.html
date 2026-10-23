@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate Reports</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10); --wash: rgba(11,11,11,.05); --empty: #efeee9;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+    --accent: #2a78d6; --good: #006300;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --wash: rgba(255,255,255,.06); --empty: #242422;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+      --accent: #3987e5; --good: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --wash: rgba(255,255,255,.06); --empty: #242422;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --accent: #3987e5; --good: #0ca30c;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--ring); position: sticky; top: 0; z-index: 20; }
+  header.top h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  nav.main a { margin-right: 14px; color: var(--ink2); font-size: 13.5px; } nav.main a.on { color: var(--ink); font-weight: 600; }
+  nav.sections { margin-left: auto; display: flex; gap: 4px 12px; flex-wrap: wrap; font-size: 12.5px; }
+  nav.sections a { color: var(--ink2); }
+  main { max-width: 1200px; margin: 0 auto; padding: 14px 20px 60px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-bottom: 14px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--ring); background: var(--surface); color: var(--ink2); border-radius: 8px; padding: 4px 11px; font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .chip:hover { background: var(--wash); }
+  .chip[aria-pressed="true"] { color: var(--ink); border-color: var(--axis); font-weight: 600; }
+  .chip[aria-pressed="true"]::before { content: "\2713"; font-weight: 700; color: var(--accent); }
+  label.opt { color: var(--ink2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .note { color: var(--muted); font-size: 12.5px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 12px 14px; }
+  .tile .l { color: var(--ink2); font-size: 12.5px; }
+  .tile .v { font-size: 30px; font-weight: 600; letter-spacing: -.01em; margin-top: 2px; }
+  .tile .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; transition: opacity .15s; }
+  .grid.loading { opacity: .5; }
+  @media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } .card.wide { grid-column: auto; } nav.sections { display: none; } }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 14px 16px 12px; min-width: 0; scroll-margin-top: 64px; }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 { font-size: 14px; margin: 0; font-weight: 600; }
+  .card .sub { color: var(--ink2); font-size: 12.5px; margin: 2px 0 10px; max-width: 70ch; }
+  .card .bar { display: flex; align-items: flex-start; gap: 10px; }
+  .card .bar > div { flex: 1; }
+  .tbtn { border: 1px solid var(--ring); background: none; color: var(--ink2); border-radius: 7px; padding: 2px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+  .tbtn:hover { background: var(--wash); } .tbtn[aria-pressed="true"] { color: var(--ink); border-color: var(--axis); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 6px; font-size: 12.5px; color: var(--ink2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  svg text { fill: var(--muted); font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; }
+  svg text.v { fill: var(--ink2); }
+  svg .gl { stroke: var(--grid); stroke-width: 1; } svg .ax { stroke: var(--axis); stroke-width: 1; }
+  svg .hit { fill: transparent; cursor: default; outline: none; }
+  svg .hit:hover, svg .hit:focus-visible { fill: var(--wash); }
+  svg .cell:hover, svg .cell.on { stroke: var(--ink); stroke-width: 1.5; }
+  table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.t th, table.t td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
+  table.t th { color: var(--muted); font-weight: 500; font-size: 12px; position: sticky; top: 0; background: var(--surface); }
+  table.t td.n, table.t th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .scroll { max-height: 420px; overflow: auto; border-top: 1px solid var(--grid); }
+  .mono { font-family: var(--mono); letter-spacing: .04em; }
+  .tag { font-size: 11px; border: 1px solid var(--ring); color: var(--ink2); border-radius: 99px; padding: 0 7px; }
+  .empty { color: var(--muted); padding: 22px 0; text-align: center; }
+  #tip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; box-shadow: 0 4px 14px rgba(0,0,0,.18); max-width: 260px; }
+  #tip b { font-size: 14px; font-weight: 600; } #tip .k { color: var(--ink2); display: block; }
+  #tip .row { display: flex; gap: 6px; align-items: center; } #tip .row i { width: 12px; height: 2px; border-radius: 1px; display: inline-block; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 18px; max-width: 80ch; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Plate reports</h1>
+  <nav class="main"><a href="/">Review</a><a href="/history">History</a><a href="/reports" class="on">Reports</a></nav>
+  <nav class="sections" aria-label="Sections"><a href="#traffic">Traffic</a><a href="#visitors">Visitors</a><a href="#mix">Plate mix</a><a href="#watch">Watched</a><a href="#regulars">Regulars</a><a href="#effort">Review effort</a></nav>
+</header>
+<main>
+  <div class="filters">
+    <div class="chips" id="days" role="group" aria-label="Days"></div>
+    <label class="opt"><input type="checkbox" id="unv"> include unreviewed reads</label>
+    <label class="opt"><input type="checkbox" id="plates"> show plate text</label>
+    <span class="note" id="scope"></span>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid" id="grid">
+    <section class="card wide" id="traffic"><div class="bar"><div><h2>Traffic by hour and day</h2><p class="sub">Confirmed sightings per hour. Darker means busier. Hours are CamTime, the camera clock, which can run behind the computer clock.</p></div><button class="tbtn" data-t="heat" aria-pressed="false">Table</button></div><div class="body" id="c-heat"></div></section>
+    <section class="card"><div class="bar"><div><h2>Average sightings by hour</h2><p class="sub">Per selected day, by CamTime hour.</p></div><button class="tbtn" data-t="hour" aria-pressed="false">Table</button></div><div class="body" id="c-hour"></div></section>
+    <section class="card" id="visitors"><div class="bar"><div><h2>New and returning plates</h2><p class="sub">A sighting is returning when that plate was seen earlier anywhere in the data.</p></div><button class="tbtn" data-t="newret" aria-pressed="false">Table</button></div><div class="body" id="c-newret"></div></section>
+    <section class="card"><div class="bar"><div><h2>How many days each plate was seen</h2><p class="sub">Most plates appear once. The right-hand columns are your regulars.</p></div><button class="tbtn" data-t="seen" aria-pressed="false">Table</button></div><div class="body" id="c-seen"></div></section>
+    <section class="card"><div class="bar"><div><h2>When regulars arrive</h2><p class="sub">First sighting of each day for plates seen on 3 or more days, in 30-minute steps (CamTime).</p></div><button class="tbtn" data-t="commute" aria-pressed="false">Table</button></div><div class="body" id="c-commute"></div></section>
+    <section class="card"><div class="bar"><div><h2>Time between repeat sightings</h2><p class="sub">Gaps between sightings of the same plate on the same day. Under 2 minutes is usually one vehicle across adjacent clips.</p></div><button class="tbtn" data-t="gaps" aria-pressed="false">Table</button></div><div class="body" id="c-gaps"></div></section>
+    <section class="card"><div class="bar"><div><h2>Day-to-day overlap</h2><p class="sub">Of the plates seen on the row day, the share also seen on the column day. The grey diagonal is a day against itself.</p></div><button class="tbtn" data-t="overlap" aria-pressed="false">Table</button></div><div class="body" id="c-overlap"></div></section>
+    <section class="card" id="mix"><div class="bar"><div><h2>Plate type by day</h2><p class="sub">Standard is three letters and four digits. TLC is the NYC taxi pattern. Other covers everything else.</p></div><button class="tbtn" data-t="types" aria-pressed="false">Table</button></div><div class="body" id="c-types"></div></section>
+    <section class="card"><div class="bar"><div><h2>State on labeled plates</h2><p class="sub">Only plates where you set a state. Auto-accepted plates carry no state.</p></div><button class="tbtn" data-t="states" aria-pressed="false">Table</button></div><div class="body" id="c-states"></div></section>
+    <section class="card wide" id="watch"><div class="bar"><div><h2>Watched plates</h2><p class="sub">One row per watchlist entry, one dot per sighting. Rows show the nickname only.</p></div><button class="tbtn" data-t="watch" aria-pressed="false">Table</button></div><div class="body" id="c-watch"></div></section>
+    <section class="card wide" id="regulars"><div class="bar"><div><h2>Regulars</h2><p class="sub">Plates seen on 2 or more days. Steady means 3 or more days with the first sighting inside a 90-minute window. Plate text is hidden until you tick "show plate text".</p></div></div><div class="body" id="c-regulars"></div></section>
+    <section class="card wide" id="effort"><div class="bar"><div><h2>Review effort by day</h2><p class="sub">What happened to every read: labeled by you, approved or rejected automatically, or still waiting for review.</p></div><button class="tbtn" data-t="quality" aria-pressed="false">Table</button></div><div class="body" id="c-quality"></div></section>
+    <section class="card wide"><div class="bar"><div><h2>First-pass accuracy by hour</h2><p class="sub">Share of your labeled real plates where the first read was already right. Columns with fewer than 15 plates are lighter.</p></div><button class="tbtn" data-t="acc" aria-pressed="false">Table</button></div><div class="body" id="c-acc"></div></section>
+  </div>
+  <footer>All numbers are computed on this computer from your frames and labels. Plates you marked not a plate, obstructed or can't tell, and auto-rejected reads, are left out. A report of when named vehicles pass is a record of people's routines: see the privacy notes before sharing a screenshot.</footer>
+</main>
+<div id="tip" hidden></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const api = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status); return r.json(); };
+const fmt = n => n >= 10000 ? (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + "K" : n.toLocaleString();
+const HOUR = h => String(h).padStart(2, "0");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const dark = () => document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+const RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
+const rampColor = (v, max) => {      // one hue, light to dark; on the dark surface low values sink into it and high ones lift
+  if (!v || !max) return css("--empty");
+  const t = Math.min(1, v / max), n = RAMP.length;
+  return dark() ? RAMP[n - 1 - Math.round(t * (n - 5))] : RAMP[Math.round(t * (n - 1))];
+};
+const el = (tag, attrs, parent, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+const html = (tag, attrs, parent, text) => { const e = document.createElement(tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+const SER = ["--s1", "--s2", "--s3", "--s4", "--s5"];
+
+/* ---------- tooltip: enhances, never gates (every value is also in the table view) ---------- */
+const tip = $("tip");
+function showTip(target, x, y) {
+  const d = JSON.parse(target.getAttribute("data-tip"));
+  tip.replaceChildren();
+  const b = html("b", {}, tip, d.v); html("span", { class: "k" }, tip, d.t);
+  for (const r of d.rows || []) { const row = html("div", { class: "row" }, tip); if (r.c) html("i", { style: "background:var(" + r.c + ")" }, row); html("span", {}, row, r.k + ": " + r.v); }
+  tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(innerWidth - w - 8, Math.max(8, x + 12)) + "px";
+  tip.style.top = Math.min(innerHeight - h - 8, Math.max(8, y - h - 10 < 8 ? y + 16 : y - h - 10)) + "px";
+}
+document.addEventListener("pointermove", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (t) showTip(t, e.clientX, e.clientY); else tip.hidden = true; });
+document.addEventListener("focusin", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (t) { const r = t.getBoundingClientRect(); showTip(t, r.left + r.width / 2, r.top); } });
+document.addEventListener("focusout", () => { tip.hidden = true; });
+const tipAttr = (v, t, rows) => JSON.stringify({ v, t, rows });
+
+/* ---------- chart helpers ---------- */
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return ([1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(x => f <= x + 1e-9)) * p; }
+function legend(host, items) {
+  if (items.length < 2) return;
+  const lg = html("div", { class: "legend" }, host);
+  for (const it of items) { const s = html("span", {}, lg); html("i", { style: "background:var(" + it.c + ")" }, s); s.appendChild(document.createTextNode(it.name)); }
+}
+function barPath(x, y, w, h, r, roundTop) {   // 4px rounded data end, square at the baseline
+  r = Math.max(0, Math.min(r, w / 2, h));
+  if (!roundTop || r === 0) return `M${x},${y}h${w}v${h}h${-w}z`;
+  return `M${x},${y + h}V${y + r}a${r},${r} 0 0 1 ${r},${-r}h${w - 2 * r}a${r},${r} 0 0 1 ${r},${r}V${y + h}z`;
+}
+/* columns: labels[], series[{name, c, values[]}], stacked bool */
+function columns(host, o) {
+  const W = Math.max(280, host.clientWidth), H = o.height || 200, m = { l: 38, r: 8, t: 8, b: o.xTitle ? 34 : 22 };
+  const n = o.labels.length, pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const totals = o.labels.map((_, i) => o.stacked ? o.series.reduce((a, s) => a + s.values[i], 0) : Math.max(...o.series.map(s => s.values[i])));
+  const max = niceMax(Math.max(...totals, 1));
+  legend(host, o.series.length > 1 ? o.series.map(s => ({ name: s.name, c: s.c })) : []);
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  for (let k = 0; k <= 4; k++) { const v = max * k / 4, y = m.t + ph - ph * v / max; el("line", { class: k ? "gl" : "ax", x1: m.l, x2: W - m.r, y1: y, y2: y }, svg); el("text", { x: m.l - 6, y: y + 3.5, "text-anchor": "end" }, svg, fmt(Math.round(v * 10) / 10)); }
+  const slot = pw / n, bw = Math.min(24, slot * (o.series.length > 1 && !o.stacked ? 0.8 / o.series.length : 0.7));
+  o.labels.forEach((lab, i) => {
+    const cx = m.l + slot * (i + 0.5);
+    const every = Math.ceil(n / Math.max(2, Math.floor(pw / (o.labelW || 34)))); if (i % every === 0) el("text", { x: cx, y: H - m.b + 14, "text-anchor": "middle" }, svg, lab);
+    let acc = 0;
+    o.series.forEach((s, k) => {
+      const v = s.values[i], h = ph * v / max; if (!v) return;
+      const gap = o.stacked ? 2 : 0, x = o.stacked ? cx - bw / 2 : cx - (bw * o.series.length) / 2 + k * bw;
+      const y = m.t + ph - (o.stacked ? ph * (acc + v) / max : h), hh = Math.max(1, (o.stacked ? h : h) - gap);
+      const lastSeg = !o.stacked || k === o.series.map((q, j) => q.values[i] ? j : -1).filter(j => j >= 0).pop();
+      el("path", { d: barPath(x, y, bw - (o.stacked ? 0 : 2), hh, 4, lastSeg), fill: "var(" + s.c + ")", opacity: (o.dim && o.dim(i)) ? 0.5 : 1 }, svg);
+      acc += v;
+    });
+    const rows = o.series.map(s => ({ k: s.name, v: fmt(s.values[i]), c: s.c }));
+    const r = el("rect", { class: "hit", x: m.l + slot * i, y: m.t, width: slot, height: ph, tabindex: 0, "data-tip": tipAttr(o.tipValue ? o.tipValue(i) : fmt(totals[i]), (o.tipLabel ? o.tipLabel(i) : lab), o.series.length > 1 ? rows : (o.tipRows ? o.tipRows(i) : [])) }, svg);
+  });
+  if (o.xTitle) el("text", { x: m.l + pw / 2, y: H - 4, "text-anchor": "middle" }, svg, o.xTitle);
+}
+/* horizontal bars: labels[], series[], stacked */
+function hbars(host, o) {
+  const rowH = o.rowH || 30, W = Math.max(300, host.clientWidth), m = { l: o.left || 70, r: 46, t: 4, b: 20 }, n = o.labels.length, H = m.t + m.b + rowH * n;
+  const totals = o.labels.map((_, i) => o.series.reduce((a, s) => a + s.values[i], 0)), max = niceMax(Math.max(...totals, 1)), pw = W - m.l - m.r;
+  legend(host, o.series.length > 1 ? o.series.map(s => ({ name: s.name, c: s.c })) : []);
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  for (let k = 0; k <= 4; k++) { const x = m.l + pw * k / 4; el("line", { class: k ? "gl" : "ax", x1: x, x2: x, y1: m.t, y2: H - m.b }, svg); el("text", { x, y: H - 6, "text-anchor": "middle" }, svg, fmt(Math.round(max * k / 4))); }
+  o.labels.forEach((lab, i) => {
+    const y = m.t + rowH * i, bh = Math.min(20, rowH - 10), by = y + (rowH - bh) / 2;
+    el("text", { x: m.l - 8, y: by + bh / 2 + 4, "text-anchor": "end", class: "v" }, svg, lab);
+    let acc = 0; const present = o.series.map((s, k) => s.values[i] ? k : -1).filter(k => k >= 0), last = present[present.length - 1];
+    o.series.forEach((s, k) => {
+      const v = s.values[i]; if (!v) return; const w = Math.max(1, pw * v / max - (o.stacked ? 2 : 0));
+      const x = m.l + pw * acc / max; el("path", { d: `M${x},${by}h${w - 4 * (k === last)}${k === last ? "a4,4 0 0 1 4,4v" + (bh - 8) + "a4,4 0 0 1 -4,4" : "v" + bh}h${-(w - 4 * (k === last))}z`, fill: "var(" + s.c + ")" }, svg);
+      acc += v;
+    });
+    el("text", { x: m.l + pw * acc / max + 6, y: by + bh / 2 + 4, class: "v" }, svg, fmt(totals[i]));
+    el("rect", { class: "hit", x: 0, y, width: W, height: rowH, tabindex: 0, "data-tip": tipAttr(fmt(totals[i]), lab, o.series.length > 1 ? o.series.map(s => ({ k: s.name, v: fmt(s.values[i]), c: s.c })) : []) }, svg);
+  });
+}
+/* heatmap: rows[], cols[], values[row][col] */
+function heatmap(host, o) {
+  const W = Math.max(300, host.clientWidth), m = { l: o.left || 44, r: 8, t: 6, b: 24 }, nr = o.rows.length, nc = o.cols.length;
+  const cw = (W - m.l - m.r) / nc, ch = Math.min(o.cellH || 18, 26), H = m.t + m.b + ch * nr;
+  const max = Math.max(...o.values.flatMap((r, i) => o.skipDiag ? r.filter((_, j) => j !== i) : r), 1);
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  o.rows.forEach((r, i) => {
+    el("text", { x: m.l - 6, y: m.t + ch * i + ch / 2 + 3.5, "text-anchor": "end" }, svg, r);
+    o.cols.forEach((c, j) => {
+      const v = o.values[i][j], x = m.l + cw * j, y = m.t + ch * i;
+      el("rect", { class: "cell", x: x + 1, y: y + 1, width: Math.max(1, cw - 2), height: ch - 2, rx: 3, fill: o.skipDiag && i === j ? css("--empty") : rampColor(v, max), tabindex: 0, "data-tip": tipAttr(o.fmtV ? o.fmtV(v) : fmt(v), r + " · " + c, []) }, svg);
+      if (o.labelCells && cw > 38) el("text", { x: x + cw / 2, y: y + ch / 2 + 4, "text-anchor": "middle", style: "fill:" + (!(o.skipDiag && i === j) && v / max > 0.55 && !dark() ? "#fff" : "var(--ink)") }, svg, o.fmtV ? o.fmtV(v) : fmt(v));
+    });
+  });
+  const every = Math.ceil(nc / Math.max(2, Math.floor((W - m.l) / 30)));
+  o.cols.forEach((c, j) => { if (j % every === 0) el("text", { x: m.l + cw * (j + 0.5), y: H - 6, "text-anchor": "middle" }, svg, c); });
+}
+/* dot strip: rows[{label, pts:[{x (0..1), tip}]}], x ticks */
+function dotStrip(host, o) {
+  const W = Math.max(300, host.clientWidth), m = { l: 110, r: 14, t: 6, b: 26 }, rowH = 34, n = o.rows.length, H = m.t + m.b + rowH * n, pw = W - m.l - m.r;
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  o.ticks.forEach(t => { const x = m.l + pw * t.x; el("line", { class: "gl", x1: x, x2: x, y1: m.t, y2: H - m.b }, svg); el("text", { x, y: H - 8, "text-anchor": t.anchor || "middle" }, svg, t.label); });
+  o.rows.forEach((r, i) => {
+    const y = m.t + rowH * i + rowH / 2; el("line", { class: "gl", x1: m.l, x2: W - m.r, y1: y, y2: y }, svg);
+    el("text", { x: m.l - 8, y: y + 4, "text-anchor": "end", class: "v" }, svg, r.label);
+    if (!r.pts.length) el("text", { x: m.l + 8, y: y + 4 }, svg, "not seen in this period");
+    r.pts.forEach(p => { const x = m.l + pw * p.x; el("circle", { cx: x, cy: y, r: 6, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 }, svg); el("circle", { class: "hit", cx: x, cy: y, r: 13, tabindex: 0, "data-tip": p.tip }, svg); });
+  });
+}
+
+/* ---------- table views: every chart has a twin ---------- */
+const TABLES = {};
+function tableHtml(t) {
+  const tb = html("table", { class: "t" }); const hd = html("tr", {}, html("thead", {}, tb));
+  t.cols.forEach((c, i) => html("th", i ? { class: "n" } : {}, hd, c));
+  const body = html("tbody", {}, tb);
+  t.rows.forEach(r => { const tr = html("tr", {}, body); r.forEach((v, i) => html("td", i ? { class: "n" } : {}, tr, v)); });
+  const wrap = html("div", { class: "scroll" }); wrap.appendChild(tb); return wrap;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".tbtn"); if (!b) return;
+  const id = b.dataset.t, host = $("c-" + id), on = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", on); b.textContent = on ? "Chart" : "Table"; host.dataset.mode = on ? "table" : "chart"; paint(id);
+});
+function paint(id) { const host = $("c-" + id), p = PAINT[id]; if (!host || !p || !DATA) return; host.replaceChildren(); if (host.dataset.mode === "table" && TABLES[id]) host.appendChild(tableHtml(TABLES[id])); else p(host); }
+
+/* ---------- data and painters ---------- */
+let DATA = null, SEL = new Set(), PLATES = false;
+const dayLabel = (d, dow) => d.slice(5) + (dow ? " " + dow : "");
+const dowOf = d => (DATA.per_day.find(x => x.day === d) || {}).dow || "";
+const PAINT = {
+  heat(h) {
+    const d = DATA; if (!d.kpi.sightings) return empty(h);
+    const rows = d.heat.days.map(x => dayLabel(x, dowOf(x))), cols = Array.from({ length: 24 }, (_, i) => HOUR(i));
+    TABLES.heat = { cols: ["Day", ...cols], rows: d.heat.days.map((x, i) => [x, ...d.heat.rows[i]]) };
+    heatmap(h, { rows, cols, values: d.heat.rows, left: 74, cellH: 24, aria: "Sightings per hour and day", fmtV: v => v + " sightings" });
+    html("div", { class: "note" }, h, "Hour of day, CamTime");
+  },
+  hour(h) {
+    const d = DATA; TABLES.hour = { cols: ["Hour (CamTime)", "Average sightings"], rows: d.hour_avg.map((v, i) => [HOUR(i), v]) };
+    columns(h, { labels: d.hour_avg.map((_, i) => HOUR(i)), series: [{ name: "Sightings", c: "--s1", values: d.hour_avg }], aria: "Average sightings by hour", xTitle: "hour (CamTime)", tipLabel: i => HOUR(i) + ":00", tipValue: i => d.hour_avg[i] + " per day" });
+  },
+  newret(h) {
+    const d = DATA; if (!d.per_day.length) return empty(h);
+    TABLES.newret = { cols: ["Day", "Sightings", "New plates", "Returning"], rows: d.per_day.map(p => [p.day, p.sightings, p.new, p.returning]) };
+    columns(h, { labels: d.per_day.map(p => dayLabel(p.day, p.dow).slice(0, 9)), stacked: true, labelW: 60, series: [{ name: "New", c: "--s1", values: d.per_day.map(p => p.new) }, { name: "Returning", c: "--s2", values: d.per_day.map(p => p.returning) }], aria: "New and returning sightings per day", tipValue: i => fmt(d.per_day[i].sightings) + " sightings" });
+  },
+  seen(h) {
+    const d = DATA, labs = d.seen_hist.map((_, i) => i + 1 === d.cap_days && d.cap_days > 1 ? i + 1 + " (all)" : String(i + 1));
+    TABLES.seen = { cols: ["Days seen", "Plates"], rows: d.seen_hist.map((v, i) => [labs[i], v]) };
+    columns(h, { labels: labs, series: [{ name: "Plates", c: "--s1", values: d.seen_hist }], aria: "Plates by number of days seen", xTitle: "days a plate was seen", labelW: 50, tipLabel: i => "Seen on " + labs[i] + " day(s)", tipValue: i => fmt(d.seen_hist[i]) + " plates" });
+  },
+  commute(h) {
+    const d = DATA, n = d.commute.reduce((a, b) => a + b, 0); if (!n) return empty(h, "No plate was seen on 3 or more days yet.");
+    const labs = d.commute.map((_, i) => HOUR(Math.floor(i / 2)) + ":" + (i % 2 ? "30" : "00"));
+    TABLES.commute = { cols: ["Arrival (CamTime)", "Plate-days"], rows: labs.map((l, i) => [l, d.commute[i]]).filter(r => r[1]) };
+    columns(h, { labels: labs, series: [{ name: "Plate-days", c: "--s1", values: d.commute }], aria: "Arrival times of regulars", xTitle: "first sighting (CamTime)", labelW: 40, tipLabel: i => labs[i], tipValue: i => d.commute[i] + " plate-days" });
+  },
+  gaps(h) {
+    const d = DATA; TABLES.gaps = { cols: ["Gap", "Repeat sightings"], rows: d.gaps.labels.map((l, i) => [l, d.gaps.counts[i]]) };
+    columns(h, { labels: d.gaps.labels, series: [{ name: "Repeat sightings", c: "--s1", values: d.gaps.counts }], aria: "Time between repeat sightings", labelW: 70, tipLabel: i => d.gaps.labels[i], tipValue: i => fmt(d.gaps.counts[i]) + " gaps" });
+  },
+  overlap(h) {
+    const d = DATA; if (d.overlap.days.length < 2) return empty(h, "Select two or more days.");
+    const labs = d.overlap.days.map(x => x.slice(5));
+    TABLES.overlap = { cols: ["Row day \\ column day", ...labs], rows: d.overlap.rows.map((r, i) => [labs[i], ...r.map(v => v + "%")]) };
+    heatmap(h, { rows: labs.map((l, i) => l + " " + dowOf(d.overlap.days[i])), cols: labs, values: d.overlap.rows, left: 74, cellH: 26, labelCells: true, skipDiag: true, fmtV: v => v + "%", aria: "Share of plates seen on both days" });
+  },
+  types(h) {
+    const d = DATA; if (!d.mix.types.length) return empty(h);
+    TABLES.types = { cols: ["Day", "Standard", "TLC", "Other"], rows: d.mix.types.map(t => [t.day, t.standard, t.TLC, t.other]) };
+    columns(h, { labels: d.mix.types.map(t => t.day.slice(5)), stacked: true, labelW: 50, series: [{ name: "Standard", c: "--s1", values: d.mix.types.map(t => t.standard) }, { name: "TLC (taxi)", c: "--s2", values: d.mix.types.map(t => t.TLC) }, { name: "Other", c: "--s3", values: d.mix.types.map(t => t.other) }], aria: "Plate types per day" });
+  },
+  states(h) {
+    const d = DATA, rows = d.mix.states.filter(s => s.state !== "UNKN"); const unk = (d.mix.states.find(s => s.state === "UNKN") || {}).count || 0;
+    if (!rows.length) return empty(h, "No state labels yet.");
+    TABLES.states = { cols: ["State", "Labeled plates"], rows: [...rows.map(s => [s.state, s.count]), ["not set", unk]] };
+    hbars(h, { labels: rows.map(s => s.state), series: [{ name: "Plates", c: "--s1", values: rows.map(s => s.count) }], left: 40, rowH: 28, aria: "Labeled plates by state" });
+    if (unk) html("div", { class: "note" }, h, unk + " labeled plates have no state set.");
+  },
+  watch(h) {
+    const d = DATA; if (!d.watch.length) return empty(h, "Nothing on the watchlist yet. Use the star on the History page.");
+    const days = d.days, total = days.length, tick = [];
+    days.forEach((x, i) => { tick.push({ x: i / total, label: x.slice(5), anchor: "start" }); });
+    const rows = d.watch.map(w => ({ label: w.nickname, pts: w.sightings.map(s => { const m = (s.time || "00:00:00").split(":"), di = days.indexOf(s.day); return { x: (di + (+m[0] * 60 + +m[1]) / 1440) / total, tip: tipAttr(s.time + " CamTime", w.nickname + " · " + s.day, [{ k: "Basis", v: s.basis }]) }; }) }));
+    TABLES.watch = { cols: ["Nickname", "Day", "Time (CamTime)", "Basis"], rows: d.watch.flatMap(w => w.sightings.length ? w.sightings.map(s => [w.nickname, s.day, s.time, s.basis]) : [[w.nickname, "not seen", "", ""]]) };
+    dotStrip(h, { rows, ticks: tick, aria: "Watched plate sightings over time" });
+  },
+  regulars(h) {
+    const d = DATA; if (!d.regulars.length) return empty(h, "No plate has been seen on 2 or more days yet.");
+    const note = html("div", { class: "note" }, h, d.regulars_total + " plates seen on 2 or more days" + (d.regulars_total > d.regulars.length ? "; the top " + d.regulars.length + " are listed" : "") + ".");
+    const cols = ["#", "Plate", "Days", "Sightings", "Usual first arrival (CamTime)", "Last seen", "State", "Type", ""];
+    const tb = html("table", { class: "t" }), hd = html("tr", {}, html("thead", {}, tb)); cols.forEach((c, i) => html("th", i === 2 || i === 3 ? { class: "n" } : {}, hd, c));
+    const body = html("tbody", {}, tb), hm = m => m == null ? "" : HOUR(Math.floor(m / 60)) + ":" + HOUR(m % 60);
+    d.regulars.forEach((r, i) => {
+      const tr = html("tr", {}, body); html("td", {}, tr, String(i + 1));
+      const td = html("td", { class: "mono" }, tr);
+      if (PLATES) html("a", { href: "/history?q=" + encodeURIComponent(r.plate), title: "Open this plate's history" }, td, r.plate); else td.textContent = "•••••••";
+      html("td", { class: "n" }, tr, String(r.days)); html("td", { class: "n" }, tr, String(r.sightings));
+      html("td", {}, tr, r.win_from == null ? "" : hm(r.win_from) + (r.win_to !== r.win_from ? " to " + hm(r.win_to) : ""));
+      html("td", {}, tr, r.last); html("td", {}, tr, r.state || ""); html("td", {}, tr, r.type);
+      const last = html("td", {}, tr); if (r.steady) html("span", { class: "tag", title: "3 or more days, first sighting within a 90-minute window" }, last, "steady");
+    });
+    const wrap = html("div", { class: "scroll" }, h); wrap.appendChild(tb);
+  },
+  quality(h) {
+    const d = DATA; if (!d.quality.length) return empty(h);
+    const S = [["labeled", "You labeled", "--s1"], ["auto_conf", "Auto-accepted (confidence)", "--s2"], ["auto_recent", "Auto-approved (verified before)", "--s3"], ["rejected", "Auto-rejected (not plate-shaped)", "--s4"], ["left", "Left to review", "--s5"]];
+    TABLES.quality = { cols: ["Day", ...S.map(s => s[1]), "Waiting for second pass"], rows: d.quality.map(q => [q.day, ...S.map(s => q[s[0]]), q.waiting]) };
+    hbars(h, { labels: d.quality.map(q => q.day.slice(5) + " " + dowOf(q.day)), stacked: true, left: 78, rowH: 34, series: S.map(s => ({ name: s[1], c: s[2], values: d.quality.map(q => q[s[0]]) })), aria: "What happened to each read, per day" });
+  },
+  acc(h) {
+    const d = DATA, a = d.accuracy, any = a.some(x => x.total); if (!any) return empty(h, "No labels yet.");
+    const pct = a.map(x => x.total ? Math.round(100 * x.right / x.total) : 0);
+    TABLES.acc = { cols: ["Hour (CamTime)", "Labeled real plates", "First read right", "Share"], rows: a.map((x, i) => [HOUR(i), x.total, x.right, x.total ? pct[i] + "%" : ""]) };
+    columns(h, { labels: a.map((_, i) => HOUR(i)), series: [{ name: "First read right (%)", c: "--s1", values: pct }], height: 190, aria: "First-pass accuracy by hour", xTitle: "hour (CamTime)", dim: i => a[i].total < 15, tipLabel: i => HOUR(i) + ":00 CamTime", tipValue: i => a[i].total ? pct[i] + "% right" : "no labels", tipRows: i => [{ k: "Labeled plates", v: String(a[i].total) }] });
+  },
+};
+function empty(h, msg) { html("div", { class: "empty" }, h, msg || "No sightings for this selection."); }
+
+function paintAll() { Object.keys(PAINT).forEach(paint); }
+function kpis() {
+  const k = DATA.kpi, T = [["Sightings", fmt(k.sightings), "confirmed, " + k.days + " day" + (k.days === 1 ? "" : "s")], ["Distinct plates", fmt(k.plates), k.one_off_pct + "% seen only once"],
+    ["Returning sightings", k.returning_pct + "%", "plate seen earlier"], ["Regulars", fmt(k.multi_day), k.steady + " steady (3+ days, same hour)"], ["Handled without you", k.handled_pct + "%", "of " + fmt(k.reads) + " reads"]];
+  $("kpis").replaceChildren(); T.forEach(t => { const x = html("div", { class: "tile" }, $("kpis")); html("div", { class: "l" }, x, t[0]); html("div", { class: "v" }, x, t[1]); html("div", { class: "d" }, x, t[2]); });
+}
+function chips() {
+  const host = $("days"); host.replaceChildren();
+  const all = html("button", { class: "chip", "aria-pressed": String(SEL.size === 0) }, host, "All days"); all.onclick = () => { SEL.clear(); load(); };
+  DATA.all_days.forEach(d => { const b = html("button", { class: "chip", "aria-pressed": String(SEL.has(d)) }, host, d.slice(5)); b.onclick = () => { SEL.has(d) ? SEL.delete(d) : SEL.add(d); if (SEL.size === DATA.all_days.length) SEL.clear(); load(); }; });
+}
+let loadSeq = 0;
+async function load() {
+  const seq = ++loadSeq; $("grid").classList.add("loading");
+  const q = new URLSearchParams(); if (SEL.size) q.set("days", [...SEL].join(",")); if ($("unv").checked) q.set("unverified", "1");
+  history.replaceState(null, "", "/reports" + (q.toString() ? "?" + q : ""));
+  try { const d = await api("/api/report?" + q); if (seq !== loadSeq) return; DATA = d; }
+  catch (e) { $("scope").textContent = "Could not load the report. Is the review server running?"; $("grid").classList.remove("loading"); return; }
+  $("scope").textContent = DATA.kpi.sightings.toLocaleString() + " sightings" + (DATA.unverified ? " including unreviewed reads" : "") + ", times in CamTime";
+  chips(); kpis(); paintAll(); $("grid").classList.remove("loading");
+}
+$("unv").onchange = load;
+$("plates").onchange = () => { PLATES = $("plates").checked; paint("regulars"); };
+let rz = null; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => DATA && paintAll(), 150); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => DATA && paintAll());
+const u = new URLSearchParams(location.search);
+(u.get("days") || "").split(",").filter(Boolean).forEach(d => SEL.add(d)); $("unv").checked = u.get("unverified") === "1";
+load();
+</script>
+</body>
+</html>

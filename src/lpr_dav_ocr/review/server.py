@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 HERE = Path(__file__).resolve().parent
 from .. import config as _config
 from .. import watchlist as WL
+from . import reports as _reports
 
 CFG = _config.load()
 TILT, FPS = CFG["camera"]["tilt_degrees"], CFG["camera"]["fps"]
@@ -469,6 +470,11 @@ def make_handler(store):
                 return self._send(200, data, "image/png")
             if u.path == "/api/config":
                 return self._send(200, {"tilt": TILT, "w": FRAME_W, "h": FRAME_H})
+            if u.path == "/reports":
+                return self._send(200, (HERE / "reports.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/report":
+                days = [d for d in ((q.get("days") or [""])[0]).split(",") if re.fullmatch(r"\d{4}-\d\d-\d\d", d)]
+                return self._send(200, _reports.build(store, days or None, (q.get("unverified") or ["0"])[0] == "1", WL.load()))
             if u.path == "/history":
                 return self._send(200, (HERE / "history.html").read_bytes(), "text/html; charset=utf-8")
             if u.path == "/api/history":
