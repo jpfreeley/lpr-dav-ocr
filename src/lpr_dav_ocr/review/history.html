@@ -57,6 +57,7 @@
   .watchbadge button, .wform button { padding:3px 10px; font-size:12px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; font-weight:500; }
   .wform { display:inline-flex; gap:4px; align-items:center; }
   .wform input { width:130px; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--panel2); color:var(--text); font:inherit; font-size:12px; }
+  .camt { font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:3px; font-weight:400; }
   .more { margin-top:10px; background:var(--panel2); color:var(--text); border:1px solid var(--line); }
   .empty { color:var(--muted); padding:14px 0; }
 </style>
@@ -128,12 +129,12 @@ function render() {
   const st = Object.entries(d.states).map(([k, v]) => `${k} ${v}`).join(", ");
   out.innerHTML = `<div class="card"><div class="sum"><span class="plate">${esc(d.plate)}</span>${watchHtml(d.plate)}
     <span><b>${d.count}</b> sighting${d.count === 1 ? "" : "s"} on <b>${d.days}</b> day${d.days === 1 ? "" : "s"}</span>
-    <span>first <b>${esc(d.first)}</b></span><span>last <b>${esc(d.last)}</b></span>${st ? `<span>state <b>${esc(st)}</b></span>` : ""}</div>
+    <span>first <b>${esc(d.first)}</b> <span class="camt">CamTime</span></span><span>last <b>${esc(d.last)}</b> <span class="camt">CamTime</span></span>${st ? `<span>state <b>${esc(st)}</b></span>` : ""}</div>
     <div class="hours" title="Sightings by hour of day">${d.by_hour.map((n, h) => `<i style="height:${Math.max(4, n / mx * 100)}%" title="${String(h).padStart(2, "0")}:00  ${n}"></i>`).join("")}</div>
     <div class="hlab"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>
-    <div class="card"><table><thead><tr><th>Day</th><th>Time</th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th></tr></thead>
+    <div class="card"><table><thead><tr><th>Day</th><th>Time <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th></tr></thead>
     <tbody id="tb">${rows(0, PAGE)}</tbody></table><button class="more" id="more" ${d.count <= PAGE ? "hidden" : ""}>Show more</button>
-    <p class="hint">Camera clocks may run behind the computer clock; times come from the clip file names.</p></div>`;
+    <p class="hint">CamTime is the camera clock, taken from the clip file names. It may run behind the computer clock.</p></div>`;
   wireWatch(d.plate);
   shown = PAGE;
   $("more").onclick = () => { $("tb").insertAdjacentHTML("beforeend", rows(shown, shown + PAGE)); shown += PAGE; if (shown >= d.count) $("more").hidden = true; };

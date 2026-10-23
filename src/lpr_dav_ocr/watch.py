@@ -91,10 +91,10 @@ def check_matches(frames, clips, send, label=""):
         when = f"{t[1]}:{t[2]}" if t else "?"
         if level == "exact":
             title, pri = f"Watchlist: {e['nickname']}", 4
-            msg = f"{e['nickname']} ({e['plate']}) seen at {when}.\nConfidence {float(r['conf']):.2f}. Clip {r['clip'].split('[')[0]}."
+            msg = f"{e['nickname']} ({e['plate']}) seen at {when} CamTime (camera clock).\nConfidence {float(r['conf']):.2f}. Clip {r['clip'].split('[')[0]}."
         else:
             title, pri = f"Possible match: {e['nickname']}", 3
-            msg = f"Possible {e['nickname']} ({e['plate']}) at {when}. Read as {read} (one character off).\nConfidence {float(r['conf']):.2f}. Clip {r['clip'].split('[')[0]}."
+            msg = f"Possible {e['nickname']} ({e['plate']}) at {when} CamTime. Read as {read} (one character off).\nConfidence {float(r['conf']):.2f}. Clip {r['clip'].split('[')[0]}."
         if send:
             try:
                 W.notify(title, msg, pri, "rotating_light" if level == "exact" else "mag")

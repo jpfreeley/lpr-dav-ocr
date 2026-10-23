@@ -63,6 +63,7 @@
   .alt.agree .a { color:var(--ok); }
   .alt.agree { cursor:default; }
   #watchbtn.watching { color:#f5c518; border-color:#f5c518; font-weight:600; }
+  .camt { font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:3px; }
   .cropuse { cursor:pointer; text-decoration:underline dotted; }
   .cropuse:hover { color:var(--accent); }
 
@@ -257,7 +258,7 @@ function render() {
     Object.assign(b.style, { left: x0 / W * 100 + "%", top: y0 / H * 100 + "%", width: (x1 - x0) / W * 100 + "%", height: (y1 - y0) / H * 100 + "%" });
     b.hidden = false;
   } else b.hidden = true;
-  $("cap").innerHTML = `<span>Clip <b>${it.clip}</b></span><span>~<b>${it.time}</b></span><span>${it.image}</span>`;
+  $("cap").innerHTML = `<span>Clip <b>${it.clip}</b></span><span>~<b>${it.time}</b> <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></span><span>${it.image}</span>`;
   $("plate").textContent = it.plate;
   $("conf").textContent = it.conf.toFixed(2);
   $("meter").style.width = it.conf * 100 + "%";
@@ -374,7 +375,7 @@ async function openMontage() {
       const k = Math.min(230 / cw, 86 / ch);
       st = `background-image:url('/img/${encodeURIComponent(s.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px`;
     }
-    return `<button class="cell" data-i="${s.image}"><span class="th" style="${st}"></span><small>${s.day} ${s.time} &middot; ${s.basis}</small></button>`;
+    return `<button class="cell" data-i="${s.image}"><span class="th" style="${st}"></span><small>${s.day} ${s.time} CamTime &middot; ${s.basis}</small></button>`;
   }).join("");
 }
 const closeMontage = () => { $("mont").hidden = true; };

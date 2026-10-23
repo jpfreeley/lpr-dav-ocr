@@ -157,6 +157,13 @@ dropped: forcing a read into AAANNNN (for example a `0` in a letter position bec
 suggestions and rewrote 3 reads that were already right. The common errors (H read as M, N as M) are letter-for-letter,
 which a pattern cannot see.
 
+## Camera time
+
+Times on the review page, the montage, the history page and in alerts come from the clip file names, which is the
+camera's own clock. They are labeled **CamTime** because that clock can be wrong: on the author's camera it runs one hour
+behind the computer, so "06:16 CamTime" was 07:16 by the computer clock. A sighting near midnight can fall on the wrong
+date by the same amount.
+
 ## Plate history
 
 Next to the Watch button the review page shows **seen N other times within [7 days | 30 days | 90 days | all time]**.
