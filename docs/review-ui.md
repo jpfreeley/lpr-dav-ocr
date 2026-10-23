@@ -129,8 +129,8 @@ which a pattern cannot see.
 
 ## Plate history
 
-Next to the Watch button the review page shows **seen N times in the last [7 days | 30 days | 90 days | all time]**.
-The window counts back from the plate on screen, and only earlier sightings are counted. Click the number to open a
+Next to the Watch button the review page shows **seen N other times within [7 days | 30 days | 90 days | all time]**.
+The window is measured either side of the plate on screen and counts the other sightings, including unreviewed reads of the same text. Click the number to open a
 montage of those sightings, oldest first; click one to open it. The **History** link opens `/history?q=<plate>`, a
 search page with a summary (first and last seen, days, state, sightings by hour of day) and a table of every sighting.
 

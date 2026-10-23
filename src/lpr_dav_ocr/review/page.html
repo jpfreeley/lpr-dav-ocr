@@ -323,21 +323,20 @@ function render() {
 const seenPlate = () => ((it.label && it.label.truth) || it.plate);
 let seenDays = 30;
 try { seenDays = +localStorage.getItem("lprSeenDays") || 30; } catch (e) { /* storage is optional */ }
-/* earlier sightings of this plate within the chosen window (0 = no limit), measured back from this sighting */
+/* the OTHER sightings of this plate within the chosen window (0 = no limit) either side of this one, unreviewed reads included */
 function earlier(r) {
-  const cut = seenDays ? new Date(Date.parse(it.day + "T00:00:00") - seenDays * 86400000).toISOString().slice(0, 10) : "";
-  const now = it.day + " " + it.time;
-  return r.sightings.filter(s => s.image !== it.image && s.day >= cut && s.day + " " + s.time < now);
+  const t0 = Date.parse(it.day + "T00:00:00"), lim = seenDays * 86400000;
+  return r.sightings.filter(s => s.image !== it.image && (!seenDays || Math.abs(Date.parse(s.day + "T00:00:00") - t0) <= lim));
 }
 async function updateSeen() {
   const el = $("seen"), me = it && it.image;
   el.textContent = "";
   if (!me) return;
   try {
-    const r = await api("/api/history?q=" + encodeURIComponent(seenPlate()));
+    const r = await api("/api/history?unverified=1&q=" + encodeURIComponent(seenPlate()));
     if (!it || it.image !== me) return;
     const n = earlier(r).length, opts = [7, 30, 90, 0].map(d => `<option value="${d}"${d === seenDays ? " selected" : ""}>${d ? d + " days" : "all time"}</option>`).join("");
-    el.innerHTML = `${n ? `seen <a id="seenn" title="Show these sightings">${n}</a> time${n === 1 ? "" : "s"}` : "not seen"} in the last <select id="seeny" style="font-size:12px">${opts}</select>`;
+    el.innerHTML = `${n ? `seen <a id="seenn" title="Show these sightings">${n}</a> other time${n === 1 ? "" : "s"}` : "not seen again"} within <select id="seeny" style="font-size:12px">${opts}</select>`;
     if (n) $("seenn").onclick = openMontage;
     $("seeny").onchange = e => { seenDays = +e.target.value; try { localStorage.setItem("lprSeenDays", seenDays); } catch (x) { /* ignore */ } updateSeen(); };
   } catch (e) { /* the link is optional */ }
@@ -348,7 +347,7 @@ async function openMontage() {
   $("montfull").href = "/history?q=" + encodeURIComponent(p);
   const r = await api("/api/history?q=" + encodeURIComponent(p));
   const list = earlier(r).reverse();      // oldest first
-  $("montn").textContent = `${list.length} sighting${list.length === 1 ? "" : "s"} in the last ${seenDays ? seenDays + " days" : "(all time)"}, oldest first. Click one to open it.`;
+  $("montn").textContent = `${list.length} other sighting${list.length === 1 ? "" : "s"} within ${seenDays ? seenDays + " days" : "(all time)"}, oldest first. Click one to open it.`;
   $("montg").innerHTML = list.map(s => {
     let st = "";
     if (s.box) {

@@ -14,7 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 - Plate history: `lpr seen <plate>` and a History page (`/history`) list every sighting of a plate across all days, exact
   match, from plates you confirmed or corrected or that passed auto-accept (an option includes unreviewed reads). The
-  review page shows "seen N times in the last 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
+  review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
 - Recently verified plates: a read equal to a plate you verified within `review.recent_days` (30) is auto-approved; a
