@@ -121,7 +121,7 @@ function rows(from, to) {
   return data.sightings.slice(from, to).map(r => `<tr>
     <td>${esc(r.day)}</td><td class="mono">${esc(r.time)}</td>
     <td><a href="/i/${encodeURIComponent(r.image)}" title="Open in the review page">${thumb(r)}</a></td>
-    <td><span class="badge ${r.basis}">${r.basis}</span></td><td>${r.conf.toFixed(2)}</td><td>${esc(r.state && r.state !== "UNKN" ? r.state : "")}</td></tr>`).join("");
+    <td><span class="badge ${r.basis}">${r.basis}</span></td><td>${r.conf.toFixed(3)}</td><td>${esc(r.state && r.state !== "UNKN" ? r.state : "")}</td></tr>`).join("");
 }
 function render() {
   const d = data, out = $("out");

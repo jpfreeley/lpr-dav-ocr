@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- Confidences on the review and history pages show three decimals (a read of 0.9864 used to display as 0.99, next to the 0.99 auto-accept line).
 - Re-check view: earlier "not a plate" labels where the second pass found different plate-shaped text, so a real plate hiding behind a model badge or sign can be recovered.
 - Editing the boxes re-runs the checks live (seen count and montage, same-last-4 hints, verified-plate offer, watch status) for the text you typed.
 - Times are labeled **CamTime** (the camera clock from the clip file name) on the review page, montage, history page and alerts.

@@ -263,7 +263,7 @@ function render() {
   } else b.hidden = true;
   $("cap").innerHTML = `<span>Clip <b>${it.clip}</b></span><span>~<b>${it.time}</b> <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></span><span>${it.image}</span>`;
   $("plate").textContent = it.plate;
-  $("conf").textContent = it.conf.toFixed(2);
+  $("conf").textContent = it.conf.toFixed(3);
   $("meter").style.width = it.conf * 100 + "%";
   $("meter").style.background = it.conf >= 0.97 ? "var(--ok)" : it.conf >= 0.9 ? "var(--warn)" : "var(--bad)";
   $("autob").hidden = !(it.auto && !it.label);
@@ -302,8 +302,8 @@ function render() {
   else {
     const agree = it.alt.plate === it.plate;
     alt.hidden = false; alt.className = "alt" + (agree ? " agree" : "");
-    alt.innerHTML = agree ? `2nd pass agrees <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(2)}`
-                          : `2nd pass says <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(2)} &middot; use`;
+    alt.innerHTML = agree ? `2nd pass agrees <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(3)}`
+                          : `2nd pass says <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(3)} &middot; use`;
     if (it.crop && !agree) alt.innerHTML += ` &middot; <span id="cropuse" class="cropuse" title="Click to copy the crop read into the boxes">crop read <span class="a">${it.crop}</span>${it.crop === it.plate ? " (backs 1st)" : it.crop === it.alt.plate ? " (backs 2nd)" : ""} &middot; use</span>`;
     alt.onclick = agree ? null : () => { buildCells(it.alt.plate.split("")); focusCell(cells().length - 1); };
     const cu = $("cropuse");
