@@ -87,6 +87,14 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertIn(b"Plate history", page)
 
+    # -- live check while editing the boxes
+    def test_lookup_route(self):
+        st, body = self.call("GET", "/api/lookup?q=demo%2D001&image=" + self.images[0])
+        self.assertEqual((st, body["plate"]), (200, "DEMO001"))                 # case and punctuation normalised
+        self.assertEqual(set(body), {"plate", "fits", "like", "recent", "watch"})
+        st, body = self.call("GET", "/api/lookup?q=")
+        self.assertEqual((st, body["like"], body["watch"]), (200, [], None))
+
     # -- queue rules
     def test_default_queue_excludes_auto_accepted_and_unready(self):
         d = self.item("need")

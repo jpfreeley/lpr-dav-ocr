@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- Editing the boxes re-runs the checks live (seen count and montage, same-last-4 hints, verified-plate offer, watch status) for the text you typed.
 - Times are labeled **CamTime** (the camera clock from the clip file name) on the review page, montage, history page and alerts.
 - History page: shows whether a plate is on the watchlist, lets you watch or stop watching it (summary and the suggestion
   chips), and lists your watched plates when no search is active.

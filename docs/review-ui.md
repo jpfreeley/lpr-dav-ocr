@@ -157,6 +157,15 @@ dropped: forcing a read into AAANNNN (for example a `0` in a letter position bec
 suggestions and rewrote 3 reads that were already right. The common errors (H read as M, N as M) are letter-for-letter,
 which a pattern cannot see.
 
+## Editing updates the checks
+
+As soon as you change a box (after a short pause, once every box is filled) the page re-checks the text you typed: the
+"seen N other times" count and its montage, the same-last-4 hints, the one-character-from-a-verified-plate offer, and
+the Watch button all follow the edited text. A line beside the count says what the typed plate is: "checking ABC1234:
+fits the NYS standard pattern, you verified it 3 other times nearby, on your watchlist as ...". If the text matches
+a plate you know, the count goes up and the hints disappear; if it is a new plate you will see "not seen again". This
+is a confirmation that the edit is right, not a rule. Clear a box or press Reset to go back to the OCR read.
+
 ## Camera time
 
 Times on the review page, the montage, the history page and in alerts come from the clip file names, which is the

@@ -463,6 +463,14 @@ def make_handler(store):
                 return self._send(200, store.sightings((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1"))
             if u.path == "/api/plates":
                 return self._send(200, store.plate_search((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1"))
+            if u.path == "/api/lookup":
+                # live check while you edit the boxes: hints, recent-verified match and watch status for that text
+                p = re.sub(r"[^A-Z0-9]", "", (q.get("q") or [""])[0].upper())[:10]
+                img = (q.get("image") or [""])[0]
+                m = WL.match([p]) if p else []
+                return self._send(200, dict(plate=p, fits=fits(p), like=store.like(dict(plate=p, image=img, alt=None)) if p else [],
+                                            recent=store.recent(p, img) if p else None,
+                                            watch=dict(plate=m[0][0]["plate"], nickname=m[0][0]["nickname"], level=m[0][1]) if m else None))
             if u.path == "/api/watch":
                 return self._send(200, WL.load())
             if u.path == "/api/item":
