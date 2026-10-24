@@ -160,7 +160,8 @@ function render() {
   if (v && v.available && !v.none) {
     const st = v.stale && v.stale.same_record;
     if (v.stale) ve.appendChild(document.createTextNode(st ? " Marked verified stale on " + v.stale.ts.slice(0, 10) + ": the vehicle you saw did not match." : " It was marked stale on " + v.stale.ts.slice(0, 10) + ", but the record has changed since."));
-    const b = html("button", { class: "tbtn", style: "margin-left:8px" }, ve, st ? "Undo stale mark" : "Mark verified stale");
+    const b = document.createElement("button");
+    b.className = "tbtn"; b.style.marginLeft = "8px"; b.textContent = st ? "Undo stale mark" : "Mark verified stale"; ve.appendChild(b);
     b.onclick = async () => { await fetch("/api/vehicle/flag", { method: "POST", headers: HDR, body: JSON.stringify({ plate: v.plate, stale: !st }) }); search(d.plate); };
   }
   shown = PAGE;

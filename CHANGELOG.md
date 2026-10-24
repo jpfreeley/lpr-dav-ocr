@@ -4,6 +4,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ## [Unreleased]
 
+### Fixed
+
+- History page: searching a plate that has a NYC ticket record failed with "Search failed" because the stale-mark button used a helper that exists only on the reports page.
+
 ### Added
 
 - Operations page (`/ops`, `lpr ops`): needs-attention list, pipeline and watcher, scheduled jobs, storage with a nightly snapshot, accuracy by confidence, confusion-matrix heatmap, review and labels, alerts and machine health. See docs/operations.md.
