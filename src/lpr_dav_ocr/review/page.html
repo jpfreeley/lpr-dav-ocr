@@ -48,7 +48,13 @@
   .dot.s-obstructed { background:#b784f5; color:#1d0a33; border-color:transparent; }
   .dot.s-skip { background:var(--line); }
 
-  .right { display:flex; flex-direction:column; gap:8px; min-height:0; }
+  .right { display:flex; flex-direction:column; gap:8px; min-height:0; overflow-y:auto; }
+  .right > .card:last-child { overflow:visible; }
+  .actions4 { position:sticky; bottom:0; z-index:5; background:var(--panel); padding:8px 0 2px; box-shadow:0 -8px 8px -8px rgba(0,0,0,.35); }
+  /* the lookup lines (seen count, vehicle, live check) get a full line each instead of a narrow wrapping column */
+  #watchwrap { display:flex !important; flex-wrap:wrap; gap:6px 10px; align-items:center; flex:1 1 100%; }
+  #watchwrap #seen, #watchwrap #veh, #watchwrap #editchk { flex:1 1 100%; order:5; }
+  #watchwrap #veh, #watchwrap #editchk { font-size:12px; }
   .zoomcard { padding:6px; display:flex; justify-content:center; background:#000; }
   canvas { height:min(30vh, 260px); width:auto; max-width:100%; display:block; }
   .readrow { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
