@@ -16,6 +16,11 @@
 | `review.server`, `review/page.html` | `lpr review` | Local review page and its JSON API. |
 | `score` | `lpr score` | Accuracy against labels, confidence calibration, confusion table. |
 | `watch`, `watchlist` | `lpr watch`, `lpr watchlist` | Unattended processing of new clips, watchlist matching, ntfy alerts. |
+| `dedupe` | `lpr dedupe` | Merge duplicate sightings, keep the clearer frame ([ADR 0014](adr/0014-merge-duplicate-sightings.md)). |
+| `vehicles` | `lpr vehicles` | Local make, body, year and color index from NYC ticket data ([ADR 0016](adr/0016-local-vehicle-index-from-ticket-data.md)). |
+| `cleanup` | `lpr cleanup` | Gray frame rewrite, cache, trash and log cleanup ([ADR 0017](adr/0017-lossless-gray-storage-and-nightly-cleanup.md)). |
+| `ops`, `review/reports` | `lpr ops` | Data for the Operations and Reports pages ([ADR 0018](adr/0018-operations-page-and-storage-snapshots.md)). |
+| `seen` | `lpr seen` | Exact-match history of one plate. |
 | `config` | `lpr config` | Defaults, TOML file, environment. |
 | `demo` | `lpr demo` | Synthetic data. |
 | `cli` | `lpr` | Dispatcher. |
@@ -37,6 +42,8 @@ flowchart TD
   out1 --> srv["review server"]
   out2 --> srv
   srv --> lab[("labels.jsonl<br/>crops/")]
+  out1 --> dd["dedupe"] --> trash[("trash/ + duplicates.jsonl")]
+  veh[("vehicles.sqlite<br/>NYC ticket index")] --> srv
   lab --> score["lpr score"]
   out1 --> match["watchlist match"]
   out2 --> match

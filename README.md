@@ -22,6 +22,13 @@ network use is a one-time download of the OCR models and, if you turn it on, pus
   obstructed, can't tell. Confident, agreeing reads can skip the queue.
 - **Measures accuracy from your labels.** `lpr score` reports exact-match accuracy, how trustworthy the
   confidence is, and a character confusion table (for example M read as H).
+- **Cuts the review work.** Duplicate sightings of one plate are merged, reads equal to a plate you verified recently
+  are approved, and reads of badges and signs are rejected, all with the clearer frame kept and your labels always winning.
+- **Knows the vehicle.** A local index built from public NYC parking-ticket data gives make, body type, year and color for
+  many plates, with no plate sent to anyone. See [ADR 0016](docs/adr/0016-local-vehicle-index-from-ticket-data.md).
+- **Reports and operations pages.** Traffic, repeat visitors, plate mix and fleet mix on `/reports`; watcher health, jobs,
+  disk use, accuracy and a confusion matrix on `/ops`.
+- **Looks after itself.** A nightly cleanup stores frames losslessly in a third of the space and trims caches.
 - **Watches for plates you care about.** A background watcher processes new clips as they appear and
   sends an ntfy alert for exact and one-character-off matches against a watchlist.
 
@@ -83,6 +90,11 @@ lpr score                                # how accurate was it?
 | `lpr second-pass <frames-folder>` | Re-read saved frames un-rotated for a second opinion. |
 | `lpr review` | Local review page (binds 127.0.0.1 only). |
 | `lpr score` | Accuracy against your labels, plus a confusion table. |
+| `lpr dedupe` | Merge duplicate sightings of one plate (keeps the clearer frame). |
+| `lpr vehicles import\|refresh\|lookup` | Local make, body, year and color by plate from NYC ticket data. |
+| `lpr cleanup` | Free disk space safely: gray frames, image cache, merged-away frames, logs. |
+| `lpr seen <plate>` | Every time one plate was seen (exact match). |
+| `lpr ops` | Operations data as JSON, or `lpr ops snapshot` for the daily storage sizes. |
 | `lpr watch` | Process new clips as they appear and alert on watchlist plates. |
 | `lpr watchlist add\|remove\|list` | Manage watched plates. |
 | `lpr demo results\|clips` | Synthetic data to try everything without a camera. |

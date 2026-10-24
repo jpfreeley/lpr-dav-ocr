@@ -127,6 +127,12 @@ A run stops after `--max-seconds` and continues next time; two runs never overla
 An option this does not take, because it loses pixels: replacing old full frames with JPEGs would save another 60% but
 makes re-reading and reviewing them worse.
 
+### Operations and storage snapshots
+
+`lpr ops` prints the data behind the [Operations page](operations.md) as JSON. `lpr ops snapshot` measures the data root and
+appends one line to `<home>/storage_history.jsonl`; the nightly cleanup does this for you. Measuring takes minutes over a
+network share.
+
 ### Pausing and stopping
 
 ```bash

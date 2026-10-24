@@ -19,3 +19,8 @@ from where the decision shows up.
 | [0011](0011-review-queue-requires-second-pass.md) | A plate is reviewable only after its second pass |
 | [0012](0012-confusion-rerank-deferred.md) | Defer confusion-aware reranking |
 | [0013](0013-config-file-and-single-cli.md) | One TOML config, one `lpr` command |
+| [0014](0014-merge-duplicate-sightings.md) | Merge duplicate sightings, keep the clearer frame |
+| [0015](0015-auto-approve-and-auto-reject.md) | Auto-approve recently verified plates, auto-reject wide reads |
+| [0016](0016-local-vehicle-index-from-ticket-data.md) | A local vehicle index from public parking-ticket data |
+| [0017](0017-lossless-gray-storage-and-nightly-cleanup.md) | Single-channel PNG frames and a nightly cleanup |
+| [0018](0018-operations-page-and-storage-snapshots.md) | Operations page fed by cheap reads and a daily snapshot |

@@ -246,3 +246,5 @@ search after a start can take a few seconds on a slow share.
 Reads of the index files over a busy network share can take seconds. The server answers from its last good
 read and refreshes in the background, and it keeps a local copy of frames it has served in
 `<home>/imgcache`. See [ADR 0009](adr/0009-data-layout-and-share-caching.md).
+
+The header links to the [reports](reports.md) page and to the [operations](operations.md) page.
