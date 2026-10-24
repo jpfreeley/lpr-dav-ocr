@@ -34,6 +34,12 @@ class LookupTests(unittest.TestCase):
             self.assertEqual(V.describe(None), "no ticket on record")
             self.assertIsNone(V.lookup(db, "XYZ9999", "NY"))                      # a different state is a different plate
 
+    def test_more_ticket_writer_spellings(self):
+        d, db = make_db([("AAA1111", "NY", "ROVER", "SPOR", 2018, "GREY", 3, 2027)])
+        with d:
+            v = V.lookup(db, "AAA1111")
+            self.assertEqual((v["make"], v["body"], v["color"]), ("Land Rover", "sport utility", "gray"))
+
     def test_the_state_you_ask_for_is_used(self):
         d, db = make_db([("ABC1234", "NY", "FORD", "PICK", 2015, "BL", 5, 2027), ("ABC1234", "NJ", "HONDA", "4DSD", 2018, "RD", 9, 2027)])
         with d:

@@ -41,10 +41,13 @@ PREFIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 BODY = {"SUBN": "SUV or wagon", "4DSD": "4-door sedan", "2DSD": "2-door sedan", "SEDN": "sedan", "PICK": "pickup",
         "VAN": "van", "DELV": "delivery truck", "UTIL": "utility vehicle", "CONV": "convertible", "TAXI": "taxi",
         "TRAC": "tractor", "TRLR": "trailer", "REFG": "refrigerated truck", "FLAT": "flatbed", "BUS": "bus",
-        "MCY": "motorcycle", "MOPD": "moped", "LIMO": "limousine", "H/WH": "hearse", "AMBU": "ambulance"}
+        "MCY": "motorcycle", "MOPD": "moped", "LIMO": "limousine", "H/WH": "hearse", "AMBU": "ambulance",
+        "SPOR": "sport utility", "SEDA": "sedan", "SDN": "sedan", "4D": "4-door sedan", "SD": "sedan", "SW": "station wagon",
+        "UT": "utility vehicle", "HATC": "hatchback", "TK": "truck", "STRA": "straight truck", "DUMP": "dump truck",
+        "COUP": "coupe", "VN": "van"}
 COLOR = {"WH": "white", "WHITE": "white", "BK": "black", "BLACK": "black", "GY": "gray", "GRAY": "gray", "BL": "blue",
          "BLUE": "blue", "RD": "red", "RED": "red", "GR": "green", "GN": "green", "GREEN": "green", "SL": "silver",
-         "SILVE": "silver", "TN": "tan", "BR": "brown", "BRN": "brown", "YW": "yellow", "YELLO": "yellow", "OR": "orange",
+         "SILVE": "silver", "SIL": "silver", "GREY": "gray", "GRY": "gray", "LTGY": "light gray", "BLK": "black", "WHI": "white", "BLU": "blue", "BROWN": "brown", "TN": "tan", "BR": "brown", "BRN": "brown", "YW": "yellow", "YELLO": "yellow", "OR": "orange",
          "MR": "maroon", "GL": "gold", "GOLD": "gold", "PR": "purple"}
 MAKE = {"TOYOT": "Toyota", "NISSA": "Nissan", "CHEVR": "Chevrolet", "HYUND": "Hyundai", "VOLKS": "Volkswagen",
         "ME/BE": "Mercedes-Benz", "MERCE": "Mercedes-Benz", "INFIN": "Infiniti", "LINCO": "Lincoln", "CADIL": "Cadillac",
@@ -55,7 +58,10 @@ MAKE = {"TOYOT": "Toyota", "NISSA": "Nissan", "CHEVR": "Chevrolet", "HYUND": "Hy
         "HINO": "Hino", "ISUZU": "Isuzu", "FRHT": "Freightliner", "INTER": "International", "MACK": "Mack",
         "PETER": "Peterbilt", "KENWO": "Kenworth", "SATUR": "Saturn", "PONTI": "Pontiac", "OLDSM": "Oldsmobile",
         "MERCU": "Mercury", "SCION": "Scion", "SUZUK": "Suzuki", "HARLE": "Harley-Davidson", "YAMAH": "Yamaha",
-        "KAWAS": "Kawasaki", "VESPA": "Vespa", "RIVIA": "Rivian"}
+        "KAWAS": "Kawasaki", "VESPA": "Vespa", "RIVIA": "Rivian", "FRUEH": "Fruehauf", "ROVER": "Land Rover", "HIN": "Hino",
+        "NS": "Nissan", "ALFAR": "Alfa Romeo", "WORKH": "Workhorse", "MASE": "Maserati", "SMART": "Smart", "FSKR": "Fisker",
+        "FISK": "Fisker", "LAMBO": "Lamborghini", "BENTL": "Bentley", "HUMME": "Hummer", "SAAB": "Saab", "TRIUM": "Triumph",
+        "ROLLS": "Rolls-Royce", "IC": "IC Bus"}
 
 
 def default_home():
