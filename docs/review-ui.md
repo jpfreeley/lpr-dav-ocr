@@ -145,9 +145,9 @@ not automatic. `lpr score` prints both numbers for your own data. Set `review.re
 
 ## Plate patterns and the state chip
 
-The page knows four common patterns: a NYC taxi (TLC) plate, T or Y, six digits and a letter; a NYS standard plate, three
-letters and four digits; a NJ plate, a letter, two digits and three letters; and a NY commercial plate, five digits and
-two letters. A read that fits one shows a small badge. Each badge points at a state, so it also has a
+The page knows five common patterns: a NYC taxi (TLC) plate, T or Y, six digits and a letter; a NYS standard plate, three
+letters and four digits; a NJ plate, a letter, two digits and three letters; a NY commercial plate, five digits and
+two letters; and a NYS moped plate, three digits, two letters and a digit. A read that fits one shows a small badge. Each badge points at a state, so it also has a
 **set NY** or **set NJ** button that selects the state chip for you, and using the TLC correction ("NYC TLC pattern
 T123456C - use") selects **NY** automatically. These are habits of the plates, not rules: a pattern never rejects or
 changes a plate, and it never picks a state on its own except through that TLC button.

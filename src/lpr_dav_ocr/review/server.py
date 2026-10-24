@@ -55,13 +55,14 @@ def tlc_fix(p):
 STD_RX = re.compile(r"[A-Z]{3}\d{4}")
 NJ_RX = re.compile(r"[A-Z]\d{2}[A-Z]{3}")        # NJ passenger plates are often a letter, two digits, three letters
 COM_RX = re.compile(r"\d{5}[A-Z]{2}")            # NY commercial plates are often five digits then two letters
+MOP_RX = re.compile(r"\d{3}[A-Z]{2}\d")           # NYS moped plates are often three digits, two letters, a digit
 
 
 def fits(p):
-    """'TLC', 'NYS', 'NJ', 'COM' or None: which common pattern a read already fits."""
+    """'TLC', 'NYS', 'NJ', 'COM', 'MOP' or None: which common pattern a read already fits."""
     if not p:
         return None
-    return "TLC" if TLC_RX.fullmatch(p) else "NYS" if STD_RX.fullmatch(p) else "NJ" if NJ_RX.fullmatch(p) else "COM" if COM_RX.fullmatch(p) else None
+    return "TLC" if TLC_RX.fullmatch(p) else "NYS" if STD_RX.fullmatch(p) else "NJ" if NJ_RX.fullmatch(p) else "COM" if COM_RX.fullmatch(p) else "MOP" if MOP_RX.fullmatch(p) else None
 
 
 def pick_read(p1, c1, p2, c2, p3):
