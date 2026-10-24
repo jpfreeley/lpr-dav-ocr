@@ -114,6 +114,25 @@ class CacheTrashLogTests(unittest.TestCase):
             self.assertFalse(old.exists())
             self.assertTrue(new.exists())
 
+    def test_trash_age_counts_from_the_day_it_was_merged_not_the_frame_time(self):
+        import json
+        from datetime import datetime, timedelta
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "trash" / "2026-01-01").mkdir(parents=True)
+            (root / "labels").mkdir()
+            a, b = root / "trash" / "2026-01-01" / "a.png", root / "trash" / "2026-01-01" / "b.png"
+            a.write_bytes(b"12")
+            b.write_bytes(b"12")
+            t = time.time()
+            for p in (a, b):                                          # both frames were saved long ago
+                os.utime(p, (t - 90 * 86400, t - 90 * 86400))
+            ts = lambda days: (datetime.now().astimezone() - timedelta(days=days)).isoformat(timespec="seconds")
+            (root / "labels" / "duplicates.jsonl").write_text(json.dumps({"image": "a.png", "ts": ts(10)}) + "\n" + json.dumps({"image": "b.png", "ts": ts(2)}) + "\n")
+            C.step_trash(root, True, 7, lambda *_: None)
+            self.assertFalse(a.exists())                              # merged 10 days ago
+            self.assertTrue(b.exists())                               # merged 2 days ago, although the frame is 90 days old
+
     def test_big_logs_keep_their_tail(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)

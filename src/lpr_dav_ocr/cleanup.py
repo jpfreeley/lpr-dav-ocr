@@ -12,7 +12,7 @@ Every step is either lossless or only removes something that can be made again:
           oldest files go until it is under --cache-mb and nothing is older than --cache-days. The page refetches from the
           share when it needs one again.
   trash   Frames that `lpr dedupe` merged away wait in <data_root>/trash. With --trash-days N (N > 0), files older than N days
-          are deleted for good. Off unless you ask: this is the one step that removes data.
+          are deleted for good, counted from the day they were merged. Off unless you ask: this is the one step that removes data.
   vacuum  SQLite does not shrink a file after rows are replaced. When more than 15% of the vehicle index is free space,
           rebuild it (not while an import or refresh is running).
   logs    Logs larger than 10 MB keep only their last megabyte.
@@ -198,13 +198,35 @@ def step_cache(home, apply, cache_mb, cache_days, log, now=None):
     return freed
 
 
+def merged_at(root):
+    """image name -> when `lpr dedupe` merged it away (epoch seconds), from labels/duplicates.jsonl."""
+    out = {}
+    p = Path(root) / "labels" / "duplicates.jsonl"
+    if p.is_file():
+        import json
+        from datetime import datetime
+        with open(p) as fh:
+            for line in fh:
+                if line.strip():
+                    r = json.loads(line)
+                    try:
+                        out[r["image"]] = datetime.fromisoformat(r["ts"]).timestamp()
+                    except (KeyError, ValueError):
+                        pass
+    return out
+
+
 def step_trash(root, apply, trash_days, log, now=None):
+    """Delete merged-away frames that have been in the trash longer than trash_days. The age counts from the day they were
+    merged (moving a file keeps its old modification time), falling back to the file's own time."""
     t = Path(root) / "trash"
     if trash_days <= 0 or not t.is_dir():
         log("trash: left alone" + (" (use --trash-days N to delete merged frames older than N days)" if t.is_dir() else ""))
         return 0
     now = now or time.time()
-    old = [p for p in t.rglob("*") if p.is_file() and now - p.stat().st_mtime > trash_days * 86400]
+    when = merged_at(root)
+    files = [p for p in t.rglob("*") if p.is_file()]
+    old = [p for p in files if now - when.get(p.name, p.stat().st_mtime) > trash_days * 86400]
     size = sum(p.stat().st_size for p in old)
     if apply:
         for p in old:
@@ -214,7 +236,7 @@ def step_trash(root, apply, trash_days, log, now=None):
                 d.rmdir()
             except OSError:
                 pass
-    log(f"trash: {'deleted' if apply else 'would delete'} {len(old)} file(s) older than {trash_days} days ({human(size)})")
+    log(f"trash: {'deleted' if apply else 'would delete'} {len(old)} of {len(files)} file(s) merged more than {trash_days} days ago ({human(size)})")
     return size
 
 
