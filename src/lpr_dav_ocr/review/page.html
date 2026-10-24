@@ -337,7 +337,7 @@ function render() {
 /* hints under the OCR read; they follow the boxes while you edit (see liveRefresh) */
 /* picking a hint for a plate you already labeled with a state also sets that state */
 const FIT = {      // plate patterns you described, and the state each one usually means
-  TLC: { name: "NYC TLC", state: "NY", detail: "T, 6 digits, letter" }, NYS: { name: "NYS standard", state: null, detail: "3 letters, 4 digits" },
+  TLC: { name: "NYC TLC", state: "NY", detail: "T, 6 digits, letter" }, NYS: { name: "NYS standard", state: "NY", detail: "3 letters, 4 digits" },
   NJ: { name: "NJ", state: "NJ", detail: "letter, 2 digits, 3 letters" }, COM: { name: "NY commercial", state: "NY", detail: "5 digits, 2 letters" },
 };
 function applyState(s, why) { if (s && s !== "UNKN") { setState(s); toast("State set to " + s + " (" + (why || "from your earlier label") + ")"); } }
