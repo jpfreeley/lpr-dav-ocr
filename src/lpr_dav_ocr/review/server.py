@@ -9,7 +9,7 @@ Default root: the data root from the configuration (paths.data_root, see docs/co
 Pages: /  (first unreviewed)   /i/<image-file>   ?f=need|auto|unrev|flag|all filters the queue   ?day=YYYY-MM-DD picks a day.
 All days under <root>/frames/ are available from the day selector; labels are shared.
 """
-import argparse, collections, csv, json, os, re, threading, time
+import argparse, collections, csv, json, os, re, subprocess, sys, threading, time
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,6 +20,7 @@ from .. import config as _config
 from .. import watchlist as WL
 from . import reports as _reports
 from .. import vehicles as _veh
+from .. import ops as _ops
 
 CFG = _config.load()
 TILT, FPS = CFG["camera"]["tilt_degrees"], CFG["camera"]["fps"]
@@ -98,6 +99,30 @@ def one_off(a, b):
 def _variants(p):
     """The plate and each plate with one character removed. Two plates one edit apart share a variant."""
     return {p} | {p[:i] + p[i + 1:] for i in range(len(p))}
+
+
+_OPS = {"t": 0.0, "data": None, "busy": False}
+
+
+def ops_cached(store, max_age=25):
+    """Operations data, stale-while-revalidate: answer from the last build at once and rebuild in a thread when it is
+    older than max_age seconds. Only the very first request waits."""
+    home = Path(os.environ.get("LPR_HOME", Path.home() / ".lpr-ocr"))
+    cam = store.root.parent / store.root.name.removeprefix("db_") if store.root.name.startswith("db_") else None
+
+    def work():
+        try:
+            _OPS["data"] = _ops.build(store, home, cam)
+            _OPS["t"] = time.monotonic()
+        finally:
+            _OPS["busy"] = False
+    if _OPS["data"] is None:
+        _OPS["busy"] = True
+        work()
+    elif time.monotonic() - _OPS["t"] > max_age and not _OPS["busy"]:
+        _OPS["busy"] = True
+        threading.Thread(target=work, daemon=True).start()
+    return _OPS["data"]
 
 
 class Store:
@@ -551,6 +576,10 @@ def make_handler(store):
                 return self._send(200, {"tilt": TILT, "w": FRAME_W, "h": FRAME_H})
             if u.path == "/reports":
                 return self._send(200, (HERE / "reports.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/ops":
+                return self._send(200, (HERE / "ops.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/ops":
+                return self._send(200, ops_cached(store))
             if u.path == "/api/report":
                 days = [d for d in ((q.get("days") or [""])[0]).split(",") if re.fullmatch(r"\d{4}-\d\d-\d\d", d)]
                 return self._send(200, _reports.build(store, days or None, (q.get("unverified") or ["0"])[0] == "1", WL.load()))
@@ -618,6 +647,12 @@ def make_handler(store):
             path = urlparse(self.path).path
             if self.headers.get("X-Requested-With") != "lpr-review":
                 return self._send(403, {"error": "forbidden"})
+            if path == "/api/ops/score":
+                if _OPS.get("score") and _OPS["score"].poll() is None:
+                    return self._send(200, {"ok": True, "running": True})
+                _OPS["score"] = subprocess.Popen([sys.executable, "-m", "lpr_dav_ocr.score", "--root", str(store.root)],
+                                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                return self._send(200, {"ok": True, "running": False})
             if path == "/api/vehicle/flag":
                 try:
                     d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))

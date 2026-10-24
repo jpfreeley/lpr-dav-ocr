@@ -117,7 +117,8 @@ sharp edges elsewhere. [docs/known-issues.md](docs/known-issues.md) lists them h
 - [Installation](docs/installation.md) and [configuration](docs/configuration.md)
 - [Usage](docs/usage.md) and [the review page](docs/review-ui.md)
 - [Vehicle lookup by plate](docs/usage.md#vehicle-make-body-year-and-color) from public NYC ticket data, kept local
-- [Reports](docs/reports.md): traffic, repeat visitors, plate mix and review effort
+- [Reports](docs/reports.md): traffic, repeat visitors, plate mix, vehicles and review effort
+- [Operations](docs/operations.md): watcher health, scheduled jobs, disk use, accuracy and the confusion matrix
 - [Watcher and alerts](docs/watcher-and-alerts.md)
 - [Architecture](docs/architecture.md) and [decision records](docs/adr/)
 - [Accuracy](docs/accuracy.md), [privacy](docs/privacy.md), [known issues](docs/known-issues.md)

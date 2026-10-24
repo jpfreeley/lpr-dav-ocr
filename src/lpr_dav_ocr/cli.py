@@ -13,6 +13,7 @@ COMMANDS = {
     "second-pass": ("lpr_dav_ocr.second_pass", "re-read saved frames un-rotated for a second opinion"),
     "review": ("lpr_dav_ocr.review.server", "start the local review page"),
     "vehicles": ("lpr_dav_ocr.vehicles", "local make/body/year/color by plate from NYC ticket data (import, lookup)"),
+    "ops": ("lpr_dav_ocr.ops", "operations data as JSON; `lpr ops snapshot` records today's storage sizes"),
     "cleanup": ("lpr_dav_ocr.cleanup", "free disk space safely: gray frames, image cache, merged-away frames, index and logs"),
     "dedupe": ("lpr_dav_ocr.dedupe", "merge duplicate sightings of one plate (keeps the clearer frame)"),
     "seen": ("lpr_dav_ocr.seen", "every time one plate was seen (exact match)"),

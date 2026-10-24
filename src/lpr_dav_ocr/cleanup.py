@@ -331,6 +331,11 @@ def main(argv=None):
     freed = run(root, home, a.apply, only, a.cache_mb, a.cache_days, a.trash_days, a.max_seconds)
     if a.apply:
         mark_done(home)
+        try:                                    # one line a day for the Operations page (size of each part of the data root)
+            from . import ops as _ops
+            _ops.storage_snapshot(home, root)
+        except Exception as ex:
+            print(f"storage snapshot skipped: {ex}")
     total = sum(freed.values())
     print(f"{'freed' if a.apply else 'could free'} about {human(total)}" + ("" if a.apply else ". Add --apply to do it."))
 

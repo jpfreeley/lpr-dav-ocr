@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Operations page (`/ops`, `lpr ops`): needs-attention list, pipeline and watcher, scheduled jobs, storage with a nightly snapshot, accuracy by confidence, confusion-matrix heatmap, review and labels, alerts and machine health. See docs/operations.md.
 - Reports: a Vehicles section (fleet mix, vehicle kind by hour, regulars by vehicle kind, record coverage by plate type) and a Vehicle column in the regulars table, from the local ticket index. The report build reuses one stale-mark map and remembers a missing file, so it takes about a second.
 - Second pass ladder (un-rotated 960 px, rotated 960 px, rotated 640 px outline-only) and `--retry-empty`.
 - Crop read: when the two passes disagree, a third read of a tight, enlarged crop around the outline breaks the tie.
