@@ -53,13 +53,15 @@ def tlc_fix(p):
 # digits (AAANNNN); NYC TLC plates are in the TLC pattern above. Many valid plates fit neither (vanity, older
 # styles, other states), so a fit only ever breaks a tie. It never rejects a read.
 STD_RX = re.compile(r"[A-Z]{3}\d{4}")
+NJ_RX = re.compile(r"[A-Z]\d{2}[A-Z]{3}")        # NJ passenger plates are often a letter, two digits, three letters
+COM_RX = re.compile(r"\d{5}[A-Z]{2}")            # NY commercial plates are often five digits then two letters
 
 
 def fits(p):
-    """'TLC', 'NYS' or None: which common pattern a read already fits."""
+    """'TLC', 'NYS', 'NJ', 'COM' or None: which common pattern a read already fits."""
     if not p:
         return None
-    return "TLC" if TLC_RX.fullmatch(p) else "NYS" if STD_RX.fullmatch(p) else None
+    return "TLC" if TLC_RX.fullmatch(p) else "NYS" if STD_RX.fullmatch(p) else "NJ" if NJ_RX.fullmatch(p) else "COM" if COM_RX.fullmatch(p) else None
 
 
 def pick_read(p1, c1, p2, c2, p3):

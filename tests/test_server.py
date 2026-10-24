@@ -318,6 +318,13 @@ class PickReadTests(unittest.TestCase):
         self.assertIsNone(S.pick_read("ABC1234", 0.9, "ABC1234", 0.9, None))
         self.assertIsNone(S.pick_read("ABC1234", 0.9, None, 0.0, None))
 
+    def test_state_specific_patterns(self):
+        self.assertEqual(S.fits("K12ABC"), "NJ")                # a letter, two digits, three letters
+        self.assertEqual(S.fits("12345AB"), "COM")              # NY commercial: five digits, two letters
+        self.assertIsNone(S.fits("K1ABC2"))
+        self.assertIsNone(S.fits("1234AB"))
+        self.assertEqual(S.pick_read("K12ABC", 0.7, "K12A8C", 0.9, None)[0], "K12ABC")      # fitting a pattern beats confidence
+
     def test_fits(self):
         self.assertEqual(S.fits("ABC1234"), "NYS")
         self.assertEqual(S.fits("T123456C"), "TLC")
@@ -597,7 +604,7 @@ class ReportsTests(unittest.TestCase):
         r = S._reports.build(self.store)
         self.assertEqual([(x["plate"], x["days"], x["sightings"]) for x in r["regulars"]], [("ABC1234", 2, 3)])
         self.assertEqual(r["seen_hist"], [3, 1])                                       # three plates on 1 day, one on 2 days
-        self.assertEqual(r["mix"]["types"][0], {"day": "2026-01-05", "standard": 3, "TLC": 1, "other": 0})
+        self.assertEqual(r["mix"]["types"][0], {"day": "2026-01-05", "standard": 3, "TLC": 1, "NJ": 0, "commercial": 0, "other": 0})
         self.assertEqual(r["overlap"]["rows"], [[100, 33], [50, 100]])                 # 1 of 3 and 1 of 2 plates shared
 
     def test_day_filter_keeps_history_for_returning(self):

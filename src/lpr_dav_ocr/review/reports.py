@@ -11,6 +11,8 @@ import re
 
 TLC_RX = re.compile(r"[TY]\d{6}[A-Z]")
 STD_RX = re.compile(r"[A-Z]{3}\d{4}")
+NJ_RX = re.compile(r"[A-Z]\d{2}[A-Z]{3}")
+COM_RX = re.compile(r"\d{5}[A-Z]{2}")
 GAP_BINS = [(2, "under 2 min"), (10, "2 to 10 min"), (30, "10 to 30 min"), (60, "30 to 60 min"), (180, "1 to 3 h"), (10 ** 9, "over 3 h")]
 MAX_REGULARS = 200
 
@@ -25,7 +27,8 @@ def minutes(t):
 
 
 def plate_type(p):
-    return "TLC" if TLC_RX.fullmatch(p) else "standard" if STD_RX.fullmatch(p) else "other"
+    return ("TLC" if TLC_RX.fullmatch(p) else "standard" if STD_RX.fullmatch(p) else "NJ" if NJ_RX.fullmatch(p)
+            else "commercial" if COM_RX.fullmatch(p) else "other")
 
 
 def build(store, days=None, unverified=False, watch=()):
@@ -170,7 +173,7 @@ def build(store, days=None, unverified=False, watch=()):
         seen_hist=[seen_hist.get(k, 0) for k in range(1, cap + 1)], cap_days=cap,
         regulars=regulars[:MAX_REGULARS], regulars_total=len(regulars), commute=commute,
         gaps=dict(labels=[n for _, n in GAP_BINS], counts=gaps), overlap=dict(days=sel, rows=overlap),
-        mix=dict(types=[dict(day=d, **{k: types_by_day[d].get(k, 0) for k in ("standard", "TLC", "other")}) for d in sel],
+        mix=dict(types=[dict(day=d, **{k: types_by_day[d].get(k, 0) for k in ("standard", "TLC", "NJ", "commercial", "other")}) for d in sel],
                  states=[dict(state=s, count=n) for s, n in state_counts.most_common(7)], state_total=state_total),
         watch=w_rows, quality=quality,
         accuracy=[dict(hour=h, right=r, total=n) for h, (r, n) in enumerate(acc)],

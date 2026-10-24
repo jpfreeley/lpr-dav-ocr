@@ -288,15 +288,19 @@ function render() {
     pk.innerHTML = `best guess <span class="a">${it.pick.plate}</span> (${it.pick.why}) &middot; use`;
     pk.title = "Chosen from the first pass, second pass and crop read. A hint: check it against the frame.";
     pk.onclick = () => { buildCells(it.pick.plate.split("")); focusCell(cells().length - 1); };
-  } else if (it.fits === "NYS" && !it.tlc) {
-    pk.hidden = false; pk.className = "alt agree"; pk.textContent = "fits the NYS standard pattern (3 letters, 4 digits)"; pk.onclick = null; pk.title = "";
+  } else if (it.fits && it.fits !== "TLC") {
+    const f = FIT[it.fits];
+    pk.hidden = false; pk.className = "alt agree"; pk.title = f.state ? "Click to set the state chip" : "";
+    pk.textContent = `fits the ${f.name} pattern (${f.detail})` + (f.state ? ` \u00b7 set ${f.state}` : "");
+    pk.onclick = f.state ? () => applyState(f.state, "from the plate pattern") : null;
   } else pk.hidden = true;
   const tl = $("tlc");
   if (it.tlc) {
     tl.hidden = false; tl.className = "alt tlc" + (it.tlc.shaped ? " agree" : "");
-    tl.innerHTML = it.tlc.shaped ? `fits the NYC TLC pattern` : `NYC TLC pattern <span class="a">${it.tlc.plate}</span> &middot; use`;
+    tl.innerHTML = it.tlc.shaped ? `fits the NYC TLC pattern &middot; set NY` : `NYC TLC pattern <span class="a">${it.tlc.plate}</span> &middot; use`;
     tl.title = "TLC plates are T or Y, six digits, a letter. The reader often gives 1 for T and 0 for C.";
-    tl.onclick = it.tlc.shaped ? null : () => { buildCells(it.tlc.plate.split("")); focusCell(cells().length - 1); };
+    tl.onclick = it.tlc.shaped ? () => applyState("NY", "TLC plates are NYC taxis")
+                               : () => { buildCells(it.tlc.plate.split("")); focusCell(cells().length - 1); applyState("NY", "TLC plates are NYC taxis"); };
   } else tl.hidden = true;
   const alt = $("alt");
   if (!it.alt) { alt.hidden = !it.second_pass; alt.className = "alt"; alt.textContent = "2nd pass: no read"; alt.onclick = null; }
@@ -332,7 +336,11 @@ function render() {
 /* "seen N times before" link and the montage of earlier sightings of this plate */
 /* hints under the OCR read; they follow the boxes while you edit (see liveRefresh) */
 /* picking a hint for a plate you already labeled with a state also sets that state */
-function applyState(s) { if (s && s !== "UNKN") { setState(s); toast("State set to " + s + " (from your earlier label)"); } }
+const FIT = {      // plate patterns you described, and the state each one usually means
+  TLC: { name: "NYC TLC", state: "NY", detail: "T, 6 digits, letter" }, NYS: { name: "NYS standard", state: null, detail: "3 letters, 4 digits" },
+  NJ: { name: "NJ", state: "NJ", detail: "letter, 2 digits, 3 letters" }, COM: { name: "NY commercial", state: "NY", detail: "5 digits, 2 letters" },
+};
+function applyState(s, why) { if (s && s !== "UNKN") { setState(s); toast("State set to " + s + " (" + (why || "from your earlier label") + ")"); } }
 function renderLike(list) {
   const lk = $("like");
   lk.innerHTML = "";
@@ -375,7 +383,7 @@ function liveRefresh() {
       if (!it || !edited() || value() !== p) return;            // edited again while waiting
       renderLike(r.like); renderNear(r.recent); liveWatch = r.watch; renderWatch();
       const bits = [];
-      if (r.fits) bits.push(`fits the ${r.fits === "TLC" ? "NYC TLC" : "NYS standard"} pattern`);
+      if (r.fits) bits.push(`fits the ${FIT[r.fits].name} pattern`);
       if (r.recent && r.recent.exact) bits.push(`you verified it ${r.recent.n} other time${r.recent.n === 1 ? "" : "s"} nearby`);
       if (r.watch && r.watch.level === "exact") bits.push(`on your watchlist as ${r.watch.nickname}`);
       chk.hidden = false; chk.className = "seen";

@@ -143,6 +143,15 @@ On the author's labels (two days) an exact match was right 165 of 168 times (98.
 the right plate 42 of 65 times (65%) while 16 of those reads were already right, which is why that one is an offer and
 not automatic. `lpr score` prints both numbers for your own data. Set `review.recent_days = 0` to switch this off.
 
+## Plate patterns and the state chip
+
+The page knows four common patterns: a NYC taxi (TLC) plate, T or Y, six digits and a letter; a NYS standard plate, three
+letters and four digits; a NJ plate, a letter, two digits and three letters; and a NY commercial plate, five digits and
+two letters. A read that fits one shows a small badge. For the three that point at a state, the badge also has a
+**set NY** or **set NJ** button that selects the state chip for you, and using the TLC correction ("NYC TLC pattern
+T123456C - use") selects **NY** automatically. These are habits of the plates, not rules: a pattern never rejects or
+changes a plate, and it never picks a state on its own except through that TLC button.
+
 ## Pattern fit and "best guess"
 
 Many New York plates are three letters then four digits (`ABC1234`), and TLC plates follow the pattern above. When the
