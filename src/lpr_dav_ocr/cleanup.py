@@ -38,7 +38,7 @@ STEPS = ("frames", "cache", "trash", "vacuum", "logs")
 SAFE_STEPS = ("frames", "cache", "vacuum", "logs")      # what a scheduled run does unless you ask for more
 DONE_MARK = ".gray_done"                                    # a day folder with this file has no color-channel frames left
 FRESH_SECONDS = 600                                      # a frame younger than this may still be in use
-DEFAULT_ROOT = Path("~/lpr_plates")
+DEFAULT_ROOT = Path.home() / "lpr_plates"
 
 
 def resolve(root=None, home=None):
