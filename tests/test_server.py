@@ -102,7 +102,7 @@ class ServerTests(unittest.TestCase):
     def test_lookup_route(self):
         st, body = self.call("GET", "/api/lookup?q=demo%2D001&image=" + self.images[0])
         self.assertEqual((st, body["plate"]), (200, "DEMO001"))                 # case and punctuation normalised
-        self.assertEqual(set(body), {"plate", "fits", "like", "recent", "watch"})
+        self.assertEqual(set(body), {"plate", "fits", "like", "recent", "vehicle", "watch"})
         st, body = self.call("GET", "/api/lookup?q=")
         self.assertEqual((st, body["like"], body["watch"]), (200, [], None))
 

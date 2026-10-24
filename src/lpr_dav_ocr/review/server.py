@@ -19,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 from .. import config as _config
 from .. import watchlist as WL
 from . import reports as _reports
+from .. import vehicles as _veh
 
 CFG = _config.load()
 TILT, FPS = CFG["camera"]["tilt_degrees"], CFG["camera"]["fps"]
@@ -328,6 +329,16 @@ class Store:
                     out[t] = dict(plate=t, n=n, d=min(d, out.get(t, {}).get("d", 9)), state=self.state_of(t))
         return sorted(out.values(), key=lambda e: (e["d"], -e["n"], e["plate"]))[:limit]
 
+    def vehicle(self, plate, state=None):
+        """What the local NYC ticket index says about a plate (see vehicles.py): {available, make, body, year, color, ...}."""
+        db = getattr(self, "_vdb", None)
+        if db is None:
+            db = self._vdb = _veh.open_db()              # None until `vehicles import` has been run
+        if db is None:
+            return dict(available=False)
+        v = _veh.lookup(db, plate, state)
+        return dict(available=True, text=_veh.describe(v), **v) if v else dict(available=True, none=True)
+
     @staticmethod
     def _time(img, frame):
         m = re.search(r"_(\d\d)\.(\d\d)\.(\d\d)-", img)
@@ -517,7 +528,10 @@ def make_handler(store):
             if u.path == "/history":
                 return self._send(200, (HERE / "history.html").read_bytes(), "text/html; charset=utf-8")
             if u.path == "/api/history":
-                return self._send(200, store.sightings((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1"))
+                h = store.sightings((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1")
+                st = max(h["states"], key=h["states"].get) if h["states"] else None
+                h["vehicle"] = store.vehicle(h["plate"], st) if h["plate"] else None
+                return self._send(200, h)
             if u.path == "/api/plates":
                 return self._send(200, store.plate_search((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1"))
             if u.path == "/api/lookup":
@@ -526,7 +540,7 @@ def make_handler(store):
                 img = (q.get("image") or [""])[0]
                 m = WL.match([p]) if p else []
                 return self._send(200, dict(plate=p, fits=fits(p), like=store.like(dict(plate=p, image=img, alt=None)) if p else [],
-                                            recent=store.recent(p, img) if p else None,
+                                            recent=store.recent(p, img) if p else None, vehicle=store.vehicle(p) if p else None,
                                             watch=dict(plate=m[0][0]["plate"], nickname=m[0][0]["nickname"], level=m[0][1]) if m else None))
             if u.path == "/api/watch":
                 return self._send(200, WL.load())
@@ -555,6 +569,7 @@ def make_handler(store):
                     reads = ([lb_["truth"]] if lb_ and lb_.get("truth") else []) + [it_["plate"]] + ([it_["alt"]["plate"]] if it_["alt"] else [])
                     m_ = WL.match(reads)
                     it_["like"] = store.like(it_)
+                    it_["vehicle"] = store.vehicle(((it_["label"] or {}).get("truth") or it_["plate"]).upper(), (it_["label"] or {}).get("state"))
                     it_["watch"] = dict(plate=m_[0][0]["plate"], nickname=m_[0][0]["nickname"], level=m_[0][1]) if m_ else None
                 resp = dict(last_reviewed=last, item=its[pos] if pos is not None else None, n=(pos or 0) + 1, total=len(its),
                             counts=counts, all=len(everything), day=day, days=store.days())

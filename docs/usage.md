@@ -55,6 +55,27 @@ The review page, history, reports and `lpr score` ignore merged frames. `index.c
 rewritten, so it is safe to run while the watcher is working. A frame you verified is never dropped in favor of one you
 did not.
 
+### Vehicle make, body, year and color
+
+The review and history pages can show what kind of vehicle a plate belongs to: for example "2019 Toyota SUV or wagon,
+white (5 tickets)". The source is NYC's public parking-ticket data, which records the plate and what the ticket writer
+typed for the make, body type, year and color. You build a local index once:
+
+```bash
+lpr vehicles import                      # fiscal years 2027, 2026, 2025; NY, NJ, PA, CT, MA and FL plates; resumable
+lpr vehicles import --fy 2024 --states NY
+lpr vehicles lookup ABC1234 --state NY
+lpr vehicles stats
+```
+
+It takes a while (the city's data is large and the download is polite, three requests at a time) and creates
+`<home>/vehicles.sqlite`. The download asks the city for aggregate rows by two-character plate prefix: it contains none of
+your plates and sends none. After that every lookup is a local query.
+
+Know the limits. Only vehicles ticketed in New York City in the imported years appear, so many plates have no entry. The
+values are what a ticket writer typed: typos and old registrations happen, and the answer is the most common record with
+the number of tickets behind it. The city records no model and no trim.
+
 ### Pausing and stopping
 
 ```bash

@@ -12,6 +12,7 @@ COMMANDS = {
     "process": ("lpr_dav_ocr.pipeline", "find plates in a folder of .dav clips (resumable)"),
     "second-pass": ("lpr_dav_ocr.second_pass", "re-read saved frames un-rotated for a second opinion"),
     "review": ("lpr_dav_ocr.review.server", "start the local review page"),
+    "vehicles": ("lpr_dav_ocr.vehicles", "local make/body/year/color by plate from NYC ticket data (import, lookup)"),
     "dedupe": ("lpr_dav_ocr.dedupe", "merge duplicate sightings of one plate (keeps the clearer frame)"),
     "seen": ("lpr_dav_ocr.seen", "every time one plate was seen (exact match)"),
     "score": ("lpr_dav_ocr.score", "score the OCR passes against your review labels"),

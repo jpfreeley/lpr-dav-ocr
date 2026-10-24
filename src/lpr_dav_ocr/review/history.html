@@ -145,12 +145,17 @@ function render() {
   out.innerHTML = `<div class="card"><div class="sum"><a class="plate ext" href="https://howsmydrivingny.nyc/" target="_blank" rel="noopener noreferrer" title="Copies the plate, then opens How's My Driving NY (parking and camera violations) in a new tab. Paste the plate there.">${esc(d.plate)}<span class="arrow"> &#8599;</span></a>${watchHtml(d.plate)}
     <span><b>${d.count}</b> sighting${d.count === 1 ? "" : "s"} on <b>${d.days}</b> day${d.days === 1 ? "" : "s"}</span>
     <span>first <b>${esc(d.first)}</b> <span class="camt">CamTime</span></span><span>last <b>${esc(d.last)}</b> <span class="camt">CamTime</span></span>${st ? `<span>state <b>${esc(st)}</b></span>` : ""}</div>
+    <div class="note" id="veh" style="margin:8px 0 0"></div>
     <div class="hours" title="Sightings by hour of day">${d.by_hour.map((n, h) => `<i style="height:${Math.max(4, n / mx * 100)}%" title="${String(h).padStart(2, "0")}:00  ${n}"></i>`).join("")}</div>
     <div class="hlab"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>
     <div class="card"><table><thead><tr><th>Day</th><th>Time <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th></tr></thead>
     <tbody id="tb">${rows(0, PAGE)}</tbody></table><button class="more" id="more" ${d.count <= PAGE ? "hidden" : ""}>Show more</button>
     <p class="hint">CamTime is the camera clock, taken from the clip file names. It may run behind the computer clock.</p></div>`;
   wireWatch(d.plate);
+  const v = d.vehicle, ve = $("veh");
+  ve.textContent = !v || !v.available ? "Vehicle lookup is off. Build the local NYC ticket index with: lpr vehicles import"
+    : v.none ? "No NYC parking ticket on record for this plate in the imported years, so make and model are unknown."
+    : "Vehicle on NYC tickets: " + v.text + ". Last in fiscal year " + v.last_fy + (v.others ? "; " + v.others + " other recorded variant(s)" : "") + ". A ticket writer typed it: it can be wrong or out of date, and the city records no model or trim.";
   shown = PAGE;
   $("more").onclick = () => { $("tb").insertAdjacentHTML("beforeend", rows(shown, shown + PAGE)); shown += PAGE; if (shown >= d.count) $("more").hidden = true; };
 }

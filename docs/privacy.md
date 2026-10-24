@@ -19,6 +19,7 @@ retaining plate data and sharing it differ by country and region. Find out which
 | Watchlist | `<home>/watchlist.csv` | high | Plates you chose to watch, with your nicknames. |
 | Notification topic | `<home>/ntfy_topic` | secret | Whoever knows it can read your alerts. Mode 600. |
 | Alert log | `<home>/alerts.jsonl` | high | Which watched plates were seen when. |
+| Vehicle index | `<home>/vehicles.sqlite` | medium | Public NYC ticket data (plate, state, make, body, year, color). Public, but it links plates to vehicles. Safe to delete. |
 | Image cache | `<home>/imgcache/` | high | Copies of frames the review page served. Safe to delete. |
 | OCR models | `<home>/models/` | none | Public models. |
 
@@ -32,6 +33,8 @@ Nothing is written outside `<home>`, `<data_root>` and the config file.
   The public ntfy.sh service may log or cache messages and the topic name is the only access control. See
   [watcher-and-alerts.md](watcher-and-alerts.md#read-this-first-what-leaves-your-machine) for how to keep alerts
   inside your network (your own ntfy server) or switch them off (`ntfy.enabled = false`).
+- **`lpr vehicles import`, once.** It downloads public parking-ticket records from NYC Open Data (data.cityofnewyork.us),
+  grouped by plate prefix. The requests contain no plate of yours. The result is stored locally in `<home>/vehicles.sqlite`.
 - **The "How's My Driving NY" link on the history page.** Clicking it opens a public website in a new tab and copies the
   plate to your clipboard. The program sends nothing: the plate only leaves your computer if you paste it into that site.
 - Nothing else. The review page is loopback-only and uses no external scripts, fonts or analytics.

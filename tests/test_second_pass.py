@@ -132,10 +132,12 @@ class RewriteTests(unittest.TestCase):
                 w.writerow(old)
                 w.writerow(["a.png", "DEMO001", "0.9", "DEMO002", "0.8", 0, 1, 2, 3, 4, "2.0", "ok", "1"])
                 w.writerow(["b.png", "DEMO003", "0.9", "", "", 0, "", "", "", "", "", "", "1"])
-            existing = list(csv.DictReader(out.open()))
+            with out.open() as fh:
+                existing = list(csv.DictReader(fh))
             S.rewrite(day, out, existing, {"a.png": S.row_for({"image": "a.png", "plate": "DEMO001", "conf": "0.9"},
                                                                 ("DEMO002", 0.8, [1, 2, 3, 4], 2.0), 1.0, ("DEMO001", 0.7))})
-            rows = list(csv.DictReader(out.open()))
+            with out.open() as fh:
+                rows = list(csv.DictReader(fh))
             self.assertEqual(list(rows[0].keys()), S.HEADER)
             self.assertEqual(rows[0]["plate3"], "DEMO001")
             self.assertEqual(rows[1]["plate3"], "")

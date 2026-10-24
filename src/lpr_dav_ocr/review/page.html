@@ -169,6 +169,7 @@
         <span id="watchwrap" style="display:inline-flex;gap:6px;align-items:center">
           <a id="histlink" class="ghost" href="/history" style="padding:3px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;color:var(--text);text-decoration:none" title="Every time this plate was seen">History</a>
           <span id="seen" class="seen"></span>
+          <span id="veh" class="seen" hidden></span>
           <span id="editchk" class="seen" hidden></span>
           <button id="watchbtn" class="ghost" style="padding:3px 10px;font-size:12px" title="Alert me when this plate is seen again">&#9734; Watch</button>
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
@@ -280,6 +281,7 @@ function render() {
   const sh = $("shape");
   sh.hidden = !(it.shape && it.shape !== "ok");
   sh.textContent = `shape ${it.shape} (${it.aspect})`; sh.title = "US plates are 2:1. This text region is not plate-shaped, so it may not be a plate.";
+  showVehicle(it.vehicle);
   updateSeen();
   $("histlink").href = "/history?q=" + encodeURIComponent((it.label && it.label.truth) || it.plate);
   const pk = $("pick");
@@ -377,12 +379,12 @@ function liveRefresh() {
   liveT = setTimeout(async () => {
     updateSeen();
     const chk = $("editchk");
-    if (!edited()) { chk.hidden = true; renderLike(it.like); renderNear(it.recent); liveWatch = null; renderWatch(); return; }
+    if (!edited()) { chk.hidden = true; renderLike(it.like); renderNear(it.recent); liveWatch = null; renderWatch(); showVehicle(it.vehicle); return; }
     const p = value();
     try {
       const r = await api(`/api/lookup?q=${encodeURIComponent(p)}&image=${encodeURIComponent(it.image)}`);
       if (!it || !edited() || value() !== p) return;            // edited again while waiting
-      renderLike(r.like); renderNear(r.recent); liveWatch = r.watch; renderWatch();
+      renderLike(r.like); renderNear(r.recent); liveWatch = r.watch; renderWatch(); showVehicle(r.vehicle);
       const bits = [];
       if (r.fits) bits.push(`fits the ${FIT[r.fits].name} pattern`);
       if (r.recent && r.recent.exact) bits.push(`you verified it ${r.recent.n} other time${r.recent.n === 1 ? "" : "s"} nearby`);
@@ -391,6 +393,12 @@ function liveRefresh() {
       chk.innerHTML = `checking <b>${p}</b>${bits.length ? ": " + bits.join(" &middot; ") : ""}`;
     } catch (e) { /* optional */ }
   }, 250);
+}
+/* what NYC parking tickets say this plate is (local index, see docs/usage.md); shows nothing until it is built */
+function showVehicle(v) {
+  const el = $("veh");
+  if (!v || !v.available || v.none) { el.hidden = !(v && v.available); el.textContent = v && v.none ? "no NYC ticket on record" : ""; el.title = "Vehicle make, body, year and color from NYC parking tickets (local index). None found for this plate."; return; }
+  el.hidden = false; el.textContent = "\u{1F697} " + v.text; el.title = "From NYC parking tickets (" + v.state + ", up to fiscal year " + v.last_fy + "). A ticket writer typed it, so it can be wrong or out of date.";
 }
 const seenPlate = () => (edited() ? value() : ((it.label && it.label.truth) || it.plate));
 let seenDays = 30;
