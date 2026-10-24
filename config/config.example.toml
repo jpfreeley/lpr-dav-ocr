@@ -67,6 +67,9 @@ cooldown_seconds = 600    # minimum time between alerts for the same watched pla
 dedupe = true             # after each batch, merge duplicate sightings (keeps the clearer frame; extras go to <data_root>/trash)
 dedupe_window = 30        # seconds: reads of one plate this close are one sighting
 vehicles_refresh_days = 7 # refresh the local vehicle index (lpr vehicles) this often, in the background; 0 = off
+cleanup_days = 1          # once a day at night: gray frames (lossless), image cache and log trim, index compaction; 0 = off
+cache_mb = 1024           # keep the review page image cache under this size
+trash_keep_days = 0       # delete merged-away frames after this many days (0 = keep until you run lpr dedupe --purge)
 workers = 1               # keep low: the watcher runs next to everything else
 
 [ntfy]

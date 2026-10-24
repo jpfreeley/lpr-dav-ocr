@@ -12,11 +12,12 @@ growing. Those go through process_day.py and second_pass.py, then each new plate
 <home>/watchlist.csv. exact = same plate; possible = one wrong character. Alerts carry the
 nickname and the plate and go to ntfy.sh (the only network call). Everything else stays local.
 """
-import argparse, re, subprocess, sys, time
+import argparse, os, re, subprocess, sys, time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import config as _config
+from . import cleanup as CL
 from . import dedupe as DD
 from . import vehicles as V
 from . import watchlist as W
@@ -141,6 +142,24 @@ def maybe_refresh_vehicles():
         log(f"vehicle refresh skipped: {ex}")
 
 
+_ctry = [0.0]
+
+
+def maybe_cleanup():
+    """Once a day, in the small hours, free disk space (cleanup.py: gray frames, image cache, index, logs) in the background.
+    Never stops the watcher. It never deletes merged-away frames unless you set a trash age."""
+    try:
+        if time.time() - _ctry[0] < 3600 or not WCFG["cleanup_days"] > 0:
+            return
+        if CL.due(WCFG["cleanup_days"], _config.home(CFG)):
+            _ctry[0] = time.time()
+            subprocess.Popen([sys.executable, "-m", "lpr_dav_ocr.cleanup", "--apply", "--trash-days", str(WCFG["trash_keep_days"]), "--cache-mb", str(WCFG["cache_mb"]), "--max-seconds", "3000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             preexec_fn=lambda: os.nice(10), start_new_session=True)
+            log("disk cleanup started in the background")
+    except Exception as ex:
+        log(f"cleanup skipped: {ex}")
+
+
 def cycle(cam, a, state):
     now = datetime.now()
     for day in (now.date(), now.date() - timedelta(days=1)):
@@ -221,6 +240,7 @@ def main(argv=None):
                 state["down_since"] = None
                 cycle(cam, a, state)
                 maybe_refresh_vehicles()
+                maybe_cleanup()
             else:
                 state["down_since"] = state["down_since"] or time.time()
                 if time.time() - state["down_since"] > 1800 and time.time() - state["down_alert"] > 21600 and not a.dry_run:

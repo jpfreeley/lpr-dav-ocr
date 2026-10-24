@@ -92,6 +92,37 @@ car chip, or **Mark verified stale** on the history page. Nothing else changes: 
 and the mark is kept in `<data_root>/labels/vehicle_flags.jsonl` with the record you saw. If a refresh later changes the
 record, the page says it was marked stale before the record changed. **undo** removes the mark.
 
+### Freeing disk space
+
+```bash
+lpr cleanup                              # report what could be freed (changes nothing)
+lpr cleanup --apply                      # do the safe steps
+lpr cleanup --apply --only trash --trash-days 30    # also delete merged-away frames older than 30 days
+```
+
+What it does, and what it never does:
+
+| Step | What | Loss? |
+|---|---|---|
+| frames | Saved frames are gray (an infrared camera) but stored as three identical color channels. They are rewritten as single-channel PNGs: same pixels, same file name, about 37% of the size. Each new file is decoded and compared with the original first. New frames are saved this way from the start. | none |
+| cache | The review page's image cache (`<home>/imgcache`) is trimmed to `--cache-mb` (default 1024) and 14 days, oldest first. The page refetches from the share when it needs a frame again. | none |
+| vacuum | The vehicle index is compacted when more than 15% of it is free space. | none |
+| logs | Logs over 10 MB keep their last megabyte. | old log lines |
+| trash | Merged-away frames older than `--trash-days`. Only when you ask. | **yes** |
+
+On the author's data, about 5.4 GB of frames and 4.3 GB of cache could be freed from a 8.9 GB frame folder and a 5.3 GB cache,
+and new frames save about 1.3 GB a day.
+
+The watcher runs the safe steps once a day between 02:00 and 06:00 at low priority (`watch.cleanup_days`). Or use cron:
+
+```
+30 3 * * *  /path/to/venv/bin/lpr cleanup --apply --max-seconds 3000
+```
+
+A run stops after `--max-seconds` and continues next time; two runs never overlap. It does not touch the camera's own clips.
+An option this does not take, because it loses pixels: replacing old full frames with JPEGs would save another 60% but
+makes re-reading and reviewing them worse.
+
 ### Pausing and stopping
 
 ```bash

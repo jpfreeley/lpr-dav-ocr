@@ -73,6 +73,12 @@ DEFAULTS = {
         # About this often, refresh the current fiscal year of the local vehicle index (`lpr vehicles`) in the background,
         # if the index exists. 0 switches it off.
         "vehicles_refresh_days": 7,
+        # Once a day (02:00 to 06:00), free disk space in the background: rewrite color-channel frames as gray (lossless),
+        # trim the image cache and logs, compact the vehicle index. 0 switches it off. See `lpr cleanup`.
+        "cleanup_days": 1,
+        "cache_mb": 1024,
+        # Delete frames that `lpr dedupe` merged away once they are this many days old. 0 keeps them until you purge them.
+        "trash_keep_days": 0,
     },
     "ntfy": {
         "enabled": True,

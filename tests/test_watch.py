@@ -140,3 +140,24 @@ class VehicleRefreshTests(unittest.TestCase):
         finally:
             WT.V.refresh_due, WT.V.start_refresh = real_due, real_start
             WT._vtry[0] = 0.0
+
+
+class CleanupScheduleTests(unittest.TestCase):
+    def test_cleanup_starts_when_due_not_twice_in_an_hour_and_never_raises(self):
+        started = []
+        real_due, real_popen = WT.CL.due, WT.subprocess.Popen
+        WT.CL.due = lambda days, home, now=None, **k: True
+        WT.subprocess.Popen = lambda argv, **kw: started.append(argv) or object()
+        try:
+            WT._ctry[0] = 0.0
+            WT.maybe_cleanup()
+            self.assertEqual(len(started), 1)
+            self.assertIn("--apply", started[0])
+            WT.maybe_cleanup()
+            self.assertEqual(len(started), 1)
+            WT._ctry[0] = 0.0
+            WT.CL.due = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+            WT.maybe_cleanup()
+        finally:
+            WT.CL.due, WT.subprocess.Popen = real_due, real_popen
+            WT._ctry[0] = 0.0
