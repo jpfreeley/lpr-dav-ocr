@@ -89,7 +89,7 @@
 <header class="top">
   <h1>Plate reports</h1>
   <nav class="main"><a href="/">Review</a><a href="/history">History</a><a href="/reports" class="on">Reports</a></nav>
-  <nav class="sections" aria-label="Sections"><a href="#traffic">Traffic</a><a href="#visitors">Visitors</a><a href="#mix">Plate mix</a><a href="#watch">Watched</a><a href="#regulars">Regulars</a><a href="#effort">Review effort</a></nav>
+  <nav class="sections" aria-label="Sections"><a href="#traffic">Traffic</a><a href="#visitors">Visitors</a><a href="#mix">Plate mix</a><a href="#vehicles">Vehicles</a><a href="#watch">Watched</a><a href="#regulars">Regulars</a><a href="#effort">Review effort</a></nav>
 </header>
 <main>
   <div class="filters">
@@ -111,6 +111,13 @@
     <section class="card"><div class="bar"><div><h2>Day-to-day overlap</h2><p class="sub">Of the plates seen on the row day, the share also seen on the column day. The grey diagonal is a day against itself.</p></div><button class="tbtn" data-t="overlap" aria-pressed="false">Table</button></div><div class="body" id="c-overlap"></div></section>
     <section class="card" id="mix"><div class="bar"><div><h2>Plate type by day</h2><p class="sub">Standard is three letters and four digits. TLC is the NYC taxi pattern. NJ is a letter, two digits and three letters. NY commercial is five digits and two letters. NY moped is three digits, two letters and a digit. Other covers everything else.</p></div><button class="tbtn" data-t="types" aria-pressed="false">Table</button></div><div class="body" id="c-types"></div></section>
     <section class="card"><div class="bar"><div><h2>State by sighting</h2><p class="sub">Sightings whose plate has a state. A state you set on any sighting of a plate counts for all of them.</p></div><button class="tbtn" data-t="states" aria-pressed="false">Table</button></div><div class="body" id="c-states"></div></section>
+    <section class="card" id="vehicles"><div class="bar"><div><h2>Fleet mix: makes</h2><p class="sub">Top 10 makes among plates with a ticket record. Records come from the local NYC parking-ticket index, so they can be old or wrong.</p></div><button class="tbtn" data-t="fmakes" aria-pressed="false">Table</button></div><div class="body" id="c-fmakes"></div></section>
+    <section class="card"><div class="bar"><div><h2>Fleet mix: body types</h2><p class="sub">Body type as written on tickets.</p></div><button class="tbtn" data-t="fbody" aria-pressed="false">Table</button></div><div class="body" id="c-fbody"></div></section>
+    <section class="card"><div class="bar"><div><h2>Fleet mix: colors</h2><p class="sub">Vehicle color as written on tickets.</p></div><button class="tbtn" data-t="fcolor" aria-pressed="false">Table</button></div><div class="body" id="c-fcolor"></div></section>
+    <section class="card"><div class="bar"><div><h2>Fleet mix: vehicle age</h2><p class="sub">Model year in 5-year bands.</p></div><button class="tbtn" data-t="fage" aria-pressed="false">Table</button></div><div class="body" id="c-fage"></div></section>
+    <section class="card wide"><div class="bar"><div><h2>Vehicle kind by hour</h2><p class="sub">Confirmed sightings with a ticket record, by CamTime hour. A taxi is told by its TLC plate pattern.</p></div><button class="tbtn" data-t="kindhour" aria-pressed="false">Table</button></div><div class="body" id="c-kindhour"></div></section>
+    <section class="card"><div class="bar"><div><h2>Regulars by vehicle kind</h2><p class="sub">Share of each visitor group by vehicle kind. Regulars are plates seen on 3 or more days.</p></div><button class="tbtn" data-t="vgroups" aria-pressed="false">Table</button></div><div class="body" id="c-vgroups"></div></section>
+    <section class="card"><div class="bar"><div><h2>Record coverage</h2><p class="sub">Share of plates that have a ticket record, by plate type. Out-of-state and commercial plates are matched less often.</p></div><button class="tbtn" data-t="cover" aria-pressed="false">Table</button></div><div class="body" id="c-cover"></div></section>
     <section class="card wide" id="watch"><div class="bar"><div><h2>Watched plates</h2><p class="sub">One row per watchlist entry, one dot per sighting. Rows show the nickname only.</p></div><button class="tbtn" data-t="watch" aria-pressed="false">Table</button></div><div class="body" id="c-watch"></div></section>
     <section class="card wide" id="regulars"><div class="bar"><div><h2>Regulars</h2><p class="sub">Plates seen on 2 or more days. Steady means 3 or more days with the first sighting inside a 90-minute window. Plate text is hidden until you tick "show plate text" here or at the top of the page.</p></div></div><div class="body" id="c-regulars"></div></section>
     <section class="card wide" id="effort"><div class="bar"><div><h2>Review effort by day</h2><p class="sub">What happened to every read: labeled by you, approved or rejected automatically, or still waiting for review.</p></div><button class="tbtn" data-t="quality" aria-pressed="false">Table</button></div><div class="body" id="c-quality"></div></section>
@@ -330,12 +337,41 @@ const PAINT = {
     TABLES.watch = { cols: ["Nickname", "Day", "Time (CamTime)", "Basis"], rows: d.watch.flatMap(w => w.sightings.length ? w.sightings.map(s => [w.nickname, s.day, s.time, s.basis]) : [[w.nickname, "not seen", "", ""]]) };
     dotStrip(h, { rows, ticks: tick, aria: "Watched plate sightings over time" });
   },
+  fmakes(h) { vcount(h, "fmakes", "makes", "Makes", "Plates by vehicle make"); },
+  fbody(h) { vcount(h, "fbody", "bodies", "Body types", "Plates by body type"); },
+  fcolor(h) { vcount(h, "fcolor", "colors", "Colors", "Plates by vehicle color"); },
+  fage(h) {
+    const v = DATA.vehicles; if (!v.available) return noIndex(h); if (!v.ages.length) return empty(h, "No model years yet.");
+    TABLES.fage = { cols: ["Model years", "Plates"], rows: v.ages.map(a => [a.band, a.count]) };
+    columns(h, { labels: v.ages.map(a => a.band), series: [{ name: "Plates", c: "--s1", values: v.ages.map(a => a.count) }], labelW: 60, aria: "Plates by vehicle age", xTitle: "model year", tipLabel: i => v.ages[i].band, tipValue: i => fmt(v.ages[i].count) + " plates" });
+    html("div", { class: "note" }, h, fmt(v.matched) + " of " + fmt(v.plates) + " plates have a record.");
+  },
+  kindhour(h) {
+    const v = DATA.vehicles; if (!v.available) return noIndex(h);
+    const slots = ["--s1", "--s2", "--s3", "--s4", "--other"], labs = Array.from({ length: 24 }, (_, i) => HOUR(i));
+    TABLES.kindhour = { cols: ["Hour (CamTime)", ...v.kinds], rows: labs.map((l, i) => [l, ...v.kind_hours.map(k => k.hours[i])]) };
+    columns(h, { labels: labs, stacked: true, series: v.kind_hours.map((k, i) => ({ name: k.kind, c: slots[i], values: k.hours })), aria: "Sightings by vehicle kind and hour", xTitle: "hour (CamTime)", tipLabel: i => labs[i] + ":00 CamTime" });
+  },
+  vgroups(h) {
+    const v = DATA.vehicles; if (!v.available) return noIndex(h);
+    const slots = ["--s1", "--s2", "--s3", "--s4", "--other"], g = v.by_group, pct = (n, t) => t ? Math.round(1000 * n / t) / 10 : 0;
+    TABLES.vgroups = { cols: ["Group", "Plates", ...v.kinds.map(k => k + " (%)")], rows: g.map(x => [x.group, x.total, ...v.kinds.map(k => pct(x.kinds[k], x.total) + " (" + x.kinds[k] + ")")]) };
+    hbars(h, { labels: g.map(x => x.group), stacked: true, left: 120, rowH: 40, series: v.kinds.map((k, i) => ({ name: k, c: slots[i], values: g.map(x => pct(x.kinds[k], x.total)) })), aria: "Vehicle kind share by visitor group" });
+    html("div", { class: "note" }, h, "Bars show the percent of plates in each group. The table view adds the plate counts.");
+  },
+  cover(h) {
+    const v = DATA.vehicles; if (!v.available) return noIndex(h);
+    const names = { standard: "Standard", TLC: "TLC (taxi)", NJ: "NJ", commercial: "NY commercial", moped: "NY moped", other: "Other" }, c = v.coverage;
+    TABLES.cover = { cols: ["Plate type", "Plates", "With record", "Share"], rows: c.map(x => [names[x.type] || x.type, x.total, x.matched, x.total ? Math.round(100 * x.matched / x.total) + "%" : ""]) };
+    hbars(h, { labels: c.map(x => names[x.type] || x.type), stacked: true, left: 100, rowH: 32, series: [{ name: "With record", c: "--s1", values: c.map(x => x.matched) }, { name: "No record", c: "--other", values: c.map(x => x.total - x.matched) }], aria: "Plates with a ticket record, by plate type" });
+    html("div", { class: "note" }, h, fmt(v.matched) + " of " + fmt(v.plates) + " plates match a record (" + Math.round(100 * v.matched / Math.max(1, v.plates)) + "%)." + (v.stale ? " " + v.stale + " record(s) you marked as not matching are counted as matched." : ""));
+  },
   regulars(h) {
     const d = DATA; if (!d.regulars.length) return empty(h, "No plate has been seen on 2 or more days yet.");
     const sw = html("label", { class: "opt", style: "margin:0 0 6px" }, h), cb = html("input", { type: "checkbox" }, sw); cb.checked = PLATES; sw.appendChild(document.createTextNode("show plate text"));
     cb.onchange = () => { PLATES = cb.checked; $("plates").checked = PLATES; paint("regulars"); };
     const note = html("div", { class: "note" }, h, d.regulars_total + " plates seen on 2 or more days" + (d.regulars_total > d.regulars.length ? "; the top " + d.regulars.length + " are listed" : "") + ".");
-    const cols = ["#", "Plate", "Days", "Sightings", "Usual first arrival (CamTime)", "Last seen", "State", "Type", ""];
+    const cols = ["#", "Plate", "Days", "Sightings", "Usual first arrival (CamTime)", "Last seen", "State", "Type", "Vehicle", ""];
     const tb = html("table", { class: "t" }), hd = html("tr", {}, html("thead", {}, tb)); cols.forEach((c, i) => html("th", i === 2 || i === 3 ? { class: "n" } : {}, hd, c));
     const body = html("tbody", {}, tb), hm = m => m == null ? "" : HOUR(Math.floor(m / 60)) + ":" + HOUR(m % 60);
     d.regulars.forEach((r, i) => {
@@ -344,7 +380,7 @@ const PAINT = {
       if (PLATES) html("a", { href: "/history?q=" + encodeURIComponent(r.plate), title: "Open this plate's history" }, td, r.plate); else td.textContent = "•••••••";
       html("td", { class: "n" }, tr, String(r.days)); html("td", { class: "n" }, tr, String(r.sightings));
       html("td", {}, tr, r.win_from == null ? "" : hm(r.win_from) + (r.win_to !== r.win_from ? " to " + hm(r.win_to) : ""));
-      html("td", {}, tr, r.last); html("td", {}, tr, r.state || ""); html("td", {}, tr, r.type);
+      html("td", {}, tr, r.last); html("td", {}, tr, r.state || ""); html("td", {}, tr, r.type); html("td", {}, tr, r.vehicle || "");
       const last = html("td", {}, tr); if (r.steady) html("span", { class: "tag", title: "3 or more days, first sighting within a 90-minute window" }, last, "steady");
     });
     const wrap = html("div", { class: "scroll" }, h); wrap.appendChild(tb);
@@ -362,6 +398,12 @@ const PAINT = {
     columns(h, { labels: a.map((_, i) => HOUR(i)), series: [{ name: "First read right (%)", c: "--s1", values: pct }], height: 190, aria: "First-pass accuracy by hour", xTitle: "hour (CamTime)", dim: i => a[i].total < 15, tipLabel: i => HOUR(i) + ":00 CamTime", tipValue: i => a[i].total ? pct[i] + "% right" : "no labels", tipRows: i => [{ k: "Labeled plates", v: String(a[i].total) }] });
   },
 };
+const noIndex = h => empty(h, "No vehicle index yet. Run: lpr vehicles import");
+function vcount(h, id, key, title, aria) {
+  const v = DATA.vehicles; if (!v.available) return noIndex(h); const rows = v[key]; if (!rows.length) return empty(h);
+  TABLES[id] = { cols: [title, "Plates", "Share"], rows: rows.map(r => [r.name, r.count, Math.round(1000 * r.count / v.matched) / 10 + "%"]) };
+  hbars(h, { labels: rows.map(r => r.name), series: [{ name: "Plates", c: "--s1", values: rows.map(r => r.count) }], left: 100, rowH: 26, aria });
+}
 function empty(h, msg) { html("div", { class: "empty" }, h, msg || "No sightings for this selection."); }
 
 function paintAll() { Object.keys(PAINT).forEach(paint); }

@@ -620,6 +620,32 @@ class ReportsTests(unittest.TestCase):
         self.assertEqual(r["watch"][0]["nickname"], "Taxi")
         self.assertEqual(len(r["watch"][0]["sightings"]), 1)
 
+    def test_vehicle_reports(self):
+        from tests.test_vehicles import make_db
+        store = S.Store(self.root)
+        real = S._veh.open_db
+        try:
+            S._veh.open_db = lambda home=None: None
+            store._vdb = None
+            self.assertEqual(S._reports.build(store)["vehicles"], {"available": False})      # no index imported yet
+            d, db = make_db([("ABC1234", "NY", "TOYOT", "SUBN", 2019, "WH", 4, 2027),
+                             ("T123456C", "NY", "TOYOT", "4DSD", 2021, "BK", 4, 2027),
+                             ("ZZZ0000", "NY", "FORD", "VAN", 2005, "BL", 2, 2027)])
+            store._vdb = db
+            v = S._reports.build(store)["vehicles"]
+            d.cleanup()
+        finally:
+            S._veh.open_db = real
+        self.assertEqual((v["plates"], v["matched"], v["stale"]), (4, 3, 0))                # QRS5678 has no record
+        self.assertEqual(v["makes"][0], {"name": "Toyota", "count": 2})
+        kinds = {k["kind"]: k["hours"] for k in v["kind_hours"]}
+        self.assertEqual(kinds["Taxi (TLC plate)"][9], 1)                                    # taxi is told by plate pattern
+        self.assertEqual(kinds["SUV or wagon"][6], 3)                                        # ABC1234 at 06:10, 06:12 and 06:20
+        self.assertEqual(kinds["Van, truck or pickup"][10], 1)
+        cover = {c["type"]: (c["matched"], c["total"]) for c in v["coverage"]}
+        self.assertEqual(cover["standard"], (2, 3))
+        self.assertEqual({g["group"]: g["total"] for g in v["by_group"]}["Seen on 2 days"], 1)
+
     def test_routes(self):
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), S.make_handler(self.store))
         threading.Thread(target=httpd.serve_forever, daemon=True).start()

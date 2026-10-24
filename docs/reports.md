@@ -22,8 +22,9 @@ All hours and times are **CamTime**: the camera's clock, taken from the clip fil
 | Traffic | heatmap of hour by day; average by hour | when the camera is busy, and which days differ |
 | Visitors | new and returning per day; days each plate was seen; arrival time of regulars; time between repeat sightings; day-to-day overlap | how many vehicles come back, when regulars arrive, and how a day's plates carry into the next |
 | Plate mix | plate type by day; state by sighting | standard versus taxi (TLC) versus other plates, and the states you recorded |
+| Vehicles | fleet mix (makes, body types, colors, model-year bands); vehicle kind by hour; regulars by vehicle kind; record coverage by plate type | what the traffic is made of, using the local NYC ticket index (`lpr vehicles import`). Taxi is told by the TLC plate pattern. Shown only when the index exists. Records can be old or wrong, so coverage is shown next to the mix |
 | Watched | one dot per sighting of each watchlist entry | when a watched plate passed. Rows show the nickname only |
-| Regulars | table | plates on 2 or more days, their usual first arrival and last sighting. "Steady" means 3 or more days with the first sighting inside a 90-minute window |
+| Regulars | table | plates on 2 or more days, their usual first arrival, last sighting and vehicle (from the ticket record, when there is one). "Steady" means 3 or more days with the first sighting inside a 90-minute window |
 | Review effort | what happened to each read, per day; first-pass accuracy by hour | how much work is left, how much was automatic, and where the first read is weakest |
 
 Every chart has a **Table** button that shows the same numbers as a table. Hover or tab to a bar, cell or dot for a tooltip.

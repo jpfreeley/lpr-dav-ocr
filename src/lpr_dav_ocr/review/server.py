@@ -133,10 +133,8 @@ class Store:
         if c is None:
             try:
                 rows = self._load(path, kind)
-            except FileNotFoundError:
-                return []
-            except json.JSONDecodeError:
-                return []
+            except (FileNotFoundError, json.JSONDecodeError):
+                rows = []                                # remembered, so a missing file is not re-opened on every call
             self._cache[path] = (now, rows)
             return rows
         if now - c[0] >= 2 and path not in self._busy:
@@ -330,6 +328,15 @@ class Store:
                     out[t] = dict(plate=t, n=n, d=min(d, out.get(t, {}).get("d", 9)), state=self.state_of(t))
         return sorted(out.values(), key=lambda e: (e["d"], -e["n"], e["plate"]))[:limit]
 
+    def _vflags(self):
+        """plate -> latest stale-mark record. Rebuilt only when the cached row list changes (it is appended to in place)."""
+        rows = self._read(self.vflags_path, "jsonl")
+        key = (id(rows), len(rows))
+        if getattr(self, "_vflags_key", None) != key:
+            self._vflags_map = {r["plate"]: r for r in rows if r.get("plate")}
+            self._vflags_key = key
+        return self._vflags_map
+
     def vehicle(self, plate, state=None):
         """What the local NYC ticket index says about a plate (see vehicles.py): {available, make, body, year, color, ...}."""
         db = getattr(self, "_vdb", None)
@@ -341,7 +348,7 @@ class Store:
         if not v:
             return dict(available=True, none=True)
         out = dict(available=True, text=_veh.describe(v), **v)
-        flag = {r["plate"]: r for r in self._read(self.vflags_path, "jsonl") if r.get("plate")}.get(plate)
+        flag = self._vflags().get(plate)
         if flag and flag.get("stale"):          # you looked at the car and the record did not match
             out["stale"] = dict(ts=flag["ts"], same_record=flag.get("record") == out["text"], record=flag.get("record"))
         return out

@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Reports: a Vehicles section (fleet mix, vehicle kind by hour, regulars by vehicle kind, record coverage by plate type) and a Vehicle column in the regulars table, from the local ticket index. The report build reuses one stale-mark map and remembers a missing file, so it takes about a second.
 - Second pass ladder (un-rotated 960 px, rotated 960 px, rotated 640 px outline-only) and `--retry-empty`.
 - Crop read: when the two passes disagree, a third read of a tight, enlarged crop around the outline breaks the tie.
   Stored as `plate3` and `conf3`; it never changes `plate2` or auto-accept. `--fill-crop` adds it to existing rows.

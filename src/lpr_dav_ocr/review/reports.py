@@ -32,6 +32,63 @@ def plate_type(p):
             else "commercial" if COM_RX.fullmatch(p) else "moped" if MOP_RX.fullmatch(p) else "other")
 
 
+KINDS = ["SUV or wagon", "Sedan or coupe", "Van, truck or pickup", "Taxi (TLC plate)", "Other"]
+
+
+def vehicle_kind(plate, v):
+    """A coarse vehicle kind from the ticket record's body type. A taxi is told by its plate pattern, because ticket
+    writers record taxis under many different body types."""
+    if TLC_RX.fullmatch(plate):
+        return KINDS[3]
+    b = ((v or {}).get("body") or "").lower()
+    if any(x in b for x in ("suv", "wagon", "sport utility")):
+        return KINDS[0]
+    if any(x in b for x in ("sedan", "coupe", "hatchback", "convertible")):
+        return KINDS[1]
+    if any(x in b for x in ("van", "truck", "pickup", "delivery", "utility", "flatbed", "tractor", "bus")):
+        return KINDS[2]
+    return KINDS[4]
+
+
+def vehicle_section(store, by_plate, ndays_by_plate, S):
+    """Fleet mix, vehicle kind by hour, regulars versus one-time visitors, and how many plates have a ticket record."""
+    probe = store.vehicle("ZZZ0000")
+    if not probe.get("available"):
+        return dict(available=False)
+    rec, stale = {}, 0
+    for p in by_plate:
+        v = store.vehicle(p, store.state_of(p))
+        if v.get("available") and not v.get("none"):
+            rec[p] = v
+            stale += bool(v.get("stale"))
+    top = lambda key, n: collections.Counter(v[key] for v in rec.values() if v.get(key)).most_common(n)
+    makes = collections.Counter(v["make"] for v in rec.values() if v.get("make"))
+    other_makes = sum(n for _, n in makes.most_common()[10:])
+    ages = collections.Counter((v["year"] // 5) * 5 for v in rec.values() if v.get("year"))
+    kind_of = {p: vehicle_kind(p, v) for p, v in rec.items()}
+    hours = {k: [0] * 24 for k in KINDS}
+    for t, b, i in S:
+        if t in kind_of:
+            m = minutes(i["time"])
+            if m is not None:
+                hours[kind_of[t]][m // 60] += 1
+    groups = {"Regulars (3+ days)": [p for p in rec if ndays_by_plate.get(p, 0) >= 3],
+              "Seen on 2 days": [p for p in rec if ndays_by_plate.get(p, 0) == 2],
+              "Seen on one day": [p for p in rec if ndays_by_plate.get(p, 0) == 1]}
+    by_group = [dict(group=g, total=len(ps), kinds={k: sum(1 for p in ps if kind_of[p] == k) for k in KINDS}) for g, ps in groups.items()]
+    cov = collections.defaultdict(lambda: [0, 0])
+    for p in by_plate:
+        t = plate_type(p)
+        cov[t][1] += 1
+        cov[t][0] += p in rec
+    cover = [dict(type=t, matched=m, total=n) for t, (m, n) in sorted(cov.items(), key=lambda x: -x[1][1])]
+    return dict(available=True, plates=len(by_plate), matched=len(rec), stale=stale,
+                makes=[dict(name=k, count=n) for k, n in makes.most_common(10)] + ([dict(name="Other makes", count=other_makes)] if other_makes else []),
+                bodies=[dict(name=k, count=n) for k, n in top("body", 8)], colors=[dict(name=k, count=n) for k, n in top("color", 8)],
+                ages=[dict(band=f"{b}-{b + 4}", count=ages[b]) for b in sorted(ages) if b >= 1980], kinds=KINDS,
+                kind_hours=[dict(kind=k, hours=hours[k]) for k in KINDS], by_group=by_group, coverage=cover)
+
+
 def build(store, days=None, unverified=False, watch=()):
     allreads = [(t, b, i) for t, b, i in store.reads(unverified)]
     all_days = store._day_names()
@@ -93,8 +150,12 @@ def build(store, days=None, unverified=False, watch=()):
         states.pop(None, None)
         last = max((i["day"], i["time"]) for i in its)
         regulars.append(dict(plate=t, days=len(dset), sightings=len(its), win_from=win[0], win_to=win[1], steady=steady,
+                             vehicle=None,
                              last=f"{last[0]} {last[1]}", state=states.most_common(1)[0][0] if states else None, type=plate_type(t)))
     regulars.sort(key=lambda r: (-r["days"], -r["sightings"], r["plate"]))
+    for r in regulars[:MAX_REGULARS]:
+        v = store.vehicle(r["plate"], r["state"])
+        r["vehicle"] = v["text"].rsplit(" (", 1)[0] if v.get("available") and not v.get("none") else None
 
     # -- gaps between repeat sightings on the same day
     gaps = [0] * len(GAP_BINS)
@@ -176,6 +237,6 @@ def build(store, days=None, unverified=False, watch=()):
         gaps=dict(labels=[n for _, n in GAP_BINS], counts=gaps), overlap=dict(days=sel, rows=overlap),
         mix=dict(types=[dict(day=d, **{k: types_by_day[d].get(k, 0) for k in ("standard", "TLC", "NJ", "commercial", "moped", "other")}) for d in sel],
                  states=[dict(state=s, count=n) for s, n in state_counts.most_common(7)], state_total=state_total),
-        watch=w_rows, quality=quality,
+        watch=w_rows, quality=quality, vehicles=vehicle_section(store, by_plate, ndays, S),
         accuracy=[dict(hour=h, right=r, total=n) for h, (r, n) in enumerate(acc)],
     )
