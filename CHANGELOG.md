@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- History page: the plate links to How's My Driving NY (copies the plate, opens the site without a referrer).
 - Pattern badges for NJ (A12BCD), NY commercial (12345AB) and NY moped (123AB4) plates, with one-click state buttons; the TLC hint also selects NY. The Reports plate-mix chart counts both.
 - The watcher runs the duplicate merge after each batch (`watch.dedupe`, `watch.dedupe_window`).
 - `lpr dedupe`: merges duplicate sightings (same plate within 30 s, or a misread of it in the same clip), keeping the frame you verified, then the complete, sharper one. Extra frames go to a trash folder; `--purge` deletes them.

@@ -32,6 +32,8 @@ Nothing is written outside `<home>`, `<data_root>` and the config file.
   The public ntfy.sh service may log or cache messages and the topic name is the only access control. See
   [watcher-and-alerts.md](watcher-and-alerts.md#read-this-first-what-leaves-your-machine) for how to keep alerts
   inside your network (your own ntfy server) or switch them off (`ntfy.enabled = false`).
+- **The "How's My Driving NY" link on the history page.** Clicking it opens a public website in a new tab and copies the
+  plate to your clipboard. The program sends nothing: the plate only leaves your computer if you paste it into that site.
 - Nothing else. The review page is loopback-only and uses no external scripts, fonts or analytics.
   At run time the program also sets offline flags so a model library cannot download anything silently.
 

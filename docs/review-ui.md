@@ -215,6 +215,13 @@ text), or the auto-accept rule passed it. Plates marked not a plate, obstructed 
 (`verified`, `fixed`, `auto` or `unverified`) so you can tell them apart. The search box suggests plates that contain
 what you typed, with counts.
 
+The plate name at the top of a plate's history is a link to [How's My Driving NY](https://howsmydrivingny.nyc/), a public
+site that looks up NYC parking and camera violations by plate. Clicking it copies the plate to the clipboard and opens the
+site in a new tab; paste the plate into its search box (the toast also names the state when you set one). The site has no
+link that opens a given plate, so the plate is not put in the address. The link is sent without a referrer, so the page
+address (which contains the plate) does not go to that site either. Nothing about the plate leaves your computer until you
+paste it there yourself.
+
 Watching: a watched plate shows **Watching as <nickname>** with a **Stop watching** button in its summary, and a plate
 you are not watching has a **Watch** button with an optional nickname. The suggestion chips carry a star (filled when
 watched; click to watch with a nickname, or to stop). With no search, the page lists the plates you are watching.
