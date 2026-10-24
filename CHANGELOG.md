@@ -20,6 +20,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 - "Verified stale" mark for a vehicle record that does not match what you see (car chip button, history page), kept per plate with the record you saw.
 - Review page layout: the lookup lines (seen count, vehicle, live check) take a full line each, the right column scrolls when it is taller than the window, and the Correct / Save fix / verdict buttons stay pinned at the bottom of it.
 - `lpr cleanup` frees disk space safely (lossless gray frames, image cache, merged-away frames on request, vehicle index, logs); the watcher runs the safe steps nightly (`watch.cleanup_days`). New frames are saved single-channel.
+- The state chip is picked from the NYC ticket record when the plate has one and no chip is chosen.
 - `lpr vehicles refresh` re-downloads the current fiscal year and swaps it in; the watcher starts one about weekly (`watch.vehicles_refresh_days`).
 - `lpr vehicles`: a local index of make, body type, year and color by plate built from NYC's public parking-ticket data; shown on the review page and the history page. No plate of yours is sent anywhere.
 - History page: the plate links to How's My Driving NY (copies the plate, opens the site without a referrer).

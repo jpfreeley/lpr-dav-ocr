@@ -328,6 +328,8 @@ function render() {
   orig = it.plate.split("");
   const lb = it.label;
   setState(lb ? lb.state : "UNKN");
+  autoStateVal = null;
+  stateFromRecord(it.vehicle);
   buildCells(lb && lb.verdict === "fix" && lb.truth ? lb.truth.split("") : orig.slice());
   $("prev").disabled = !D.prev; $("next").disabled = !D.next;
   $("last").disabled = !D.last_reviewed || D.last_reviewed === it.image;
@@ -388,12 +390,12 @@ function liveRefresh() {
   liveT = setTimeout(async () => {
     updateSeen();
     const chk = $("editchk");
-    if (!edited()) { chk.hidden = true; renderLike(it.like); renderNear(it.recent); liveWatch = null; renderWatch(); showVehicle(it.vehicle); return; }
+    if (!edited()) { chk.hidden = true; renderLike(it.like); renderNear(it.recent); liveWatch = null; renderWatch(); showVehicle(it.vehicle); stateFromRecord(it.vehicle); return; }
     const p = value();
     try {
       const r = await api(`/api/lookup?q=${encodeURIComponent(p)}&image=${encodeURIComponent(it.image)}`);
       if (!it || !edited() || value() !== p) return;            // edited again while waiting
-      renderLike(r.like); renderNear(r.recent); liveWatch = r.watch; renderWatch(); showVehicle(r.vehicle);
+      renderLike(r.like); renderNear(r.recent); liveWatch = r.watch; renderWatch(); showVehicle(r.vehicle); stateFromRecord(r.vehicle);
       const bits = [];
       if (r.fits) bits.push(`fits the ${FIT[r.fits].name} pattern`);
       if (r.recent && r.recent.exact) bits.push(`you verified it ${r.recent.n} other time${r.recent.n === 1 ? "" : "s"} nearby`);
@@ -404,6 +406,17 @@ function liveRefresh() {
   }, 250);
 }
 /* what NYC parking tickets say this plate is (local index, see docs/usage.md); shows nothing until it is built */
+/* If the plate has a NYC ticket record and no state chip is picked, pick the record's state. A chip you chose yourself is never changed;
+   one this function set is replaced when you edit the plate to something with a different record. A record marked stale is ignored. */
+let autoStateVal = null;
+function stateFromRecord(v) {
+  if (!v || !v.available || v.none || !v.state || (v.stale && v.stale.same_record)) return;
+  const cur = getState();
+  if (cur === "UNKN" || cur === autoStateVal) {
+    if (cur !== v.state) toast("State set to " + v.state + " (from NYC ticket data)");
+    setState(v.state); autoStateVal = v.state;
+  }
+}
 function showVehicle(v) {
   const el = $("veh");
   if (!v || !v.available || v.none) { el.hidden = !(v && v.available); el.textContent = v && v.none ? "no NYC ticket on record" : ""; el.title = "Vehicle make, body, year and color from NYC parking tickets (local index). None found for this plate."; return; }

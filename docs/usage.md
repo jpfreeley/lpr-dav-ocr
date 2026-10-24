@@ -83,6 +83,10 @@ The first import takes a while (the city's data is large and the download is pol
 `<home>/vehicles.sqlite`. The download asks the city for aggregate rows by two-character plate prefix: it contains none of
 your plates and sends none. After that every lookup is a local query.
 
+When a plate has a record and no state chip is picked, the review page picks the record's state for you ("State set to NY
+(from NYC ticket data)"). A chip you chose is never changed, a record marked stale is ignored, and a plate with no record
+leaves the chip alone.
+
 Know the limits. Only vehicles ticketed in New York City in the imported years appear, so many plates have no entry. The
 values are what a ticket writer typed: typos and old registrations happen, and the answer is the most common record with
 the number of tickets behind it. The city records no model and no trim.
