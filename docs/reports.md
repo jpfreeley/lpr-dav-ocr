@@ -4,6 +4,8 @@
 up to. Everything is computed on your computer from the frames, indexes and labels in the data root. Nothing is sent
 anywhere, and the page loads no outside scripts or fonts.
 
+![Reports page on demo data](images/reports-demo.png)
+
 ## What is counted
 
 The same confirmed sightings as the [history page](review-ui.md): plates you marked Correct or fixed, and auto-accepted

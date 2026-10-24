@@ -11,6 +11,12 @@ network use is a one-time download of the OCR models and, if you turn it on, pus
 
 *Every plate in this repository's screenshots, tests and demo data is made up.*
 
+| Reports | Operations |
+|---|---|
+| [![Reports page: traffic by hour and day, new and returning plates](docs/images/reports-demo.png)](docs/reports.md) | [![Operations page: watcher, jobs, storage, accuracy](docs/images/operations-demo.png)](docs/operations.md) |
+
+*Both pages run on made-up data from `lpr demo results --days 7`.*
+
 ## What it does
 
 - **Reads plates from clips.** It finds the moments of motion in each clip, reads only those frames,

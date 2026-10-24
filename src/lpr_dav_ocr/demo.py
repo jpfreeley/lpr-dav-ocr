@@ -76,8 +76,9 @@ def _mutate(text, rng):
     return text[:i] + look.get(text[i], "X") + text[i + 1:]
 
 
-def make_results(root, day="2026-01-01", n=40, seed=7):
-    """Write fake processed results under root/frames/<day>/. Returns the frames folder."""
+def make_results(root, day="2026-01-01", n=40, seed=7, pool=None, gap=(3, 21)):
+    """Write fake processed results under root/frames/<day>/. Returns the frames folder.
+    `pool` is a list of made-up plate texts to draw from, so several days can share plates (regulars)."""
     cv2 = _cv2()
     rng = random.Random(seed)
     frames = Path(root) / "frames" / day
@@ -85,10 +86,10 @@ def make_results(root, day="2026-01-01", n=40, seed=7):
     idx_rows, sp_rows = [], []
     minute = 5
     for k in range(n):
-        minute += rng.randint(3, 21)
+        minute += rng.randint(*gap)
         hh, mm, ss = (minute // 60) % 24, minute % 60, rng.randint(0, 40)
         clip = f"{hh:02d}.{mm:02d}.{ss:02d}-{hh:02d}.{mm:02d}.{ss + 18:02d}[M][0@0][0].dav"
-        true = f"DEMO{k + 1:03d}"
+        true = rng.choice(pool) if pool else f"DEMO{k + 1:03d}"
         kind = rng.choices(["good", "slip", "lowconf", "sign", "nosecond"], [58, 18, 8, 8, 8])[0]
         p1, c1, p2, c2 = true, round(rng.uniform(0.992, 1.0), 4), true, round(rng.uniform(0.97, 1.0), 4)
         if kind == "slip":
@@ -161,9 +162,18 @@ def main(argv=None):
     ap.add_argument("what", choices=["results", "clips"])
     ap.add_argument("--out", required=True, help="folder to create")
     ap.add_argument("--day", default="2026-01-01")
+    ap.add_argument("--days", type=int, default=1, help="results: write this many days ending at --day, sharing some plates (for the reports page)")
     a = ap.parse_args(argv)
     if a.what == "results":
-        p = make_results(a.out, a.day)
+        if a.days > 1:
+            from datetime import date, timedelta
+            end = date.fromisoformat(a.day)
+            pool = [f"DEMO{i:03d}" for i in range(1, 61)]
+            for i in range(a.days):
+                d = (end - timedelta(days=a.days - 1 - i)).isoformat()
+                p = make_results(a.out, d, n=60, seed=7 + i, pool=pool, gap=(8, 52))
+        else:
+            p = make_results(a.out, a.day)
         print(f"fake results in {p}\nopen them with:  lpr review --root {a.out} --day {a.day}")
     else:
         p = make_clips(a.out, a.day)

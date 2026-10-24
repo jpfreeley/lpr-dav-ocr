@@ -72,7 +72,7 @@ def watcher(home, now=None):
     merges = sum(int(m[1]) for t, x in ev if t >= day and (m := re.search(r"merged (\d+) duplicate", x)))
     alerts = [t for t, x in ev if x.startswith("ALERT sent")]
     last = ev[-1][0] if ev else None
-    return dict(last_line=last, idle_s=round(now - last) if last else None, errors_24h=len(errs),
+    return dict(last_line=last, idle_s=max(0, round(now - last)) if last else None, errors_24h=len(errs),
                 recent_errors=[dict(t=t, text=x[:160]) for t, x in errs[-6:]], clips_24h=sum(n for t, n in clips if t >= day),
                 clips_per_hour=per_hour, merged_24h=merges, alerts_24h=sum(1 for t in alerts if t >= day),
                 workers=_int(Path(home) / "watch_workers", 2))

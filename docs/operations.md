@@ -3,6 +3,8 @@
 `http://localhost:8770/ops` shows whether the pipeline is healthy. It is read-only apart from one button (recompute accuracy).
 The page rebuilds its numbers in the background every 30 seconds and answers from the last build, so it opens fast.
 
+![Operations page on demo data](images/operations-demo.png)
+
 | Panel | What it shows | Where the numbers come from |
 |---|---|---|
 | Needs attention | a short list, worst first: watcher quiet over 10 minutes, watcher errors in 24 h, more than 15 clips waiting, under 20 GB free, a job late, machine overloaded | computed from the panels below |

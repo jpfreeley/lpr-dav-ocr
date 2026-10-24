@@ -291,10 +291,9 @@ const span = (level, word) => { const s = document.createElement("span"); status
 const PAINT = {
   pipe(h) {
     const d = DATA, w = d.watcher, lg = d.lag;
-    kv(h, [["Watcher log", w.idle_s == null ? span("bad", "no log") : w.idle_s > 600 ? span("bad", "quiet " + ago(w.idle_s)) : span("good", "active, last line " + ago(w.idle_s))],
-      ["Clips on the share today", lg && lg.available ? lg.on_share + " (newest " + (lg.newest_clip || "none") + " CamTime)" : "unavailable"],
-      ["Read so far", lg && lg.available ? lg.processed + " of " + lg.on_share : "unavailable"],
-      ["Waiting", lg && lg.available ? (lg.waiting ? span(lg.waiting > 15 ? "warn" : "good", lg.waiting + " clip(s), oldest " + lg.oldest_waiting) : span("good", "none")) : "unavailable"],
+    const share = lg && lg.available ? [["Clips on the share today", lg.on_share + " (newest " + (lg.newest_clip || "none") + " CamTime)"], ["Read so far", lg.processed + " of " + lg.on_share],
+      ["Waiting", lg.waiting ? span(lg.waiting > 15 ? "warn" : "good", lg.waiting + " clip(s), oldest " + lg.oldest_waiting) : span("good", "none")]] : [];
+    kv(h, [["Watcher log", w.idle_s == null ? span("bad", "no log") : w.idle_s > 600 ? span("bad", "quiet " + ago(w.idle_s)) : span("good", "active, last line " + ago(w.idle_s))], ...share,
       ["Clips in the last 24 h", String(w.clips_24h)], ["Duplicates merged in 24 h", String(w.merged_24h)], ["Workers per batch", String(w.workers)],
       ["Errors in 24 h", w.errors_24h ? span("warn", w.errors_24h + " error(s)") : span("good", "none")]]);
     if (w.recent_errors.length) table(h, ["When", "Recent error"], w.recent_errors.map(e => [new Date(e.t * 1000).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }), e.text]));
