@@ -64,6 +64,9 @@
   .alt.agree { cursor:default; }
   #watchbtn.watching { color:#f5c518; border-color:#f5c518; font-weight:600; }
   .camt { font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:3px; }
+  #veh .vbtn { font: inherit; font-size: 11.5px; margin-left: 8px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+  #veh .vbtn:hover { color: var(--text); border-color: var(--muted); }
+  #veh.stale .vt { text-decoration: line-through; opacity: .7; }
   .cropuse { cursor:pointer; text-decoration:underline dotted; }
   .cropuse:hover { color:var(--accent); }
 
@@ -398,7 +401,19 @@ function liveRefresh() {
 function showVehicle(v) {
   const el = $("veh");
   if (!v || !v.available || v.none) { el.hidden = !(v && v.available); el.textContent = v && v.none ? "no NYC ticket on record" : ""; el.title = "Vehicle make, body, year and color from NYC parking tickets (local index). None found for this plate."; return; }
-  el.hidden = false; el.textContent = "\u{1F697} " + v.text; el.title = "From NYC parking tickets (" + v.state + ", up to fiscal year " + v.last_fy + "). A ticket writer typed it, so it can be wrong or out of date.";
+  el.hidden = false; el.classList.toggle("stale", !!v.stale); el.replaceChildren();
+  const t = document.createElement("span"); t.className = "vt"; t.textContent = "\u{1F697} " + v.text; el.appendChild(t);
+  if (v.stale) { const m = document.createElement("span"); m.textContent = v.stale.same_record ? " \u00b7 verified stale" : " \u00b7 was marked stale, record has since changed"; el.appendChild(m); }
+  const b = document.createElement("button"); b.className = "vbtn"; b.textContent = v.stale && v.stale.same_record ? "undo" : "doesn't match";
+  b.title = v.stale && v.stale.same_record ? "Remove the stale mark" : "Mark this record verified stale: the vehicle you see does not match it. Nothing else changes.";
+  b.onclick = async () => {
+    const stale = !(v.stale && v.stale.same_record);
+    try { await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale, image: it && it.image }) });
+      const fresh = await api("/api/lookup?q=" + encodeURIComponent(v.plate) + "&image=" + encodeURIComponent(it ? it.image : "")); it.vehicle = fresh.vehicle; showVehicle(fresh.vehicle);
+      toast(stale ? "Marked verified stale" : "Stale mark removed"); } catch (e) { toast("Could not save the mark"); }
+  };
+  el.appendChild(b);
+  el.title = "From NYC parking tickets (" + v.state + ", up to fiscal year " + v.last_fy + "). A ticket writer typed it, so it can be wrong or out of date.";
 }
 const seenPlate = () => (edited() ? value() : ((it.label && it.label.truth) || it.plate));
 let seenDays = 30;

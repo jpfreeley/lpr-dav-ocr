@@ -70,6 +70,9 @@ DEFAULTS = {
         # misread of it in the same clip): the clearer frame is kept, the others go to <data_root>/trash. See `lpr dedupe`.
         "dedupe": True,
         "dedupe_window": 30,
+        # About this often, refresh the current fiscal year of the local vehicle index (`lpr vehicles`) in the background,
+        # if the index exists. 0 switches it off.
+        "vehicles_refresh_days": 7,
     },
     "ntfy": {
         "enabled": True,

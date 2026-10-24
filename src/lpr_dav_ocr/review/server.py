@@ -109,6 +109,7 @@ class Store:
         (root / "crops").mkdir(parents=True, exist_ok=True)
         self.labels_path = root / "labels" / "labels.jsonl"
         self.dups_path = root / "labels" / "duplicates.jsonl"          # frames merged into another by `dedupe`
+        self.vflags_path = root / "labels" / "vehicle_flags.jsonl"      # plates whose NYC ticket record you saw is stale
         self.states_path = root / "labels" / "plate_states.jsonl"      # one state per plate, applied to every sighting of it
         self.write_lock = threading.Lock()
         self._cache = {}
@@ -337,7 +338,28 @@ class Store:
         if db is None:
             return dict(available=False)
         v = _veh.lookup(db, plate, state)
-        return dict(available=True, text=_veh.describe(v), **v) if v else dict(available=True, none=True)
+        if not v:
+            return dict(available=True, none=True)
+        out = dict(available=True, text=_veh.describe(v), **v)
+        flag = {r["plate"]: r for r in self._read(self.vflags_path, "jsonl") if r.get("plate")}.get(plate)
+        if flag and flag.get("stale"):          # you looked at the car and the record did not match
+            out["stale"] = dict(ts=flag["ts"], same_record=flag.get("record") == out["text"], record=flag.get("record"))
+        return out
+
+    def set_vehicle_stale(self, plate, stale, image=None):
+        """Mark (or unmark) the ticket record for a plate as verified stale: you saw the vehicle and it does not match.
+        Nothing about the plate or its sightings changes; the record you saw is kept with the mark."""
+        v = self.vehicle(plate)
+        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, stale=bool(stale),
+                   image=image, record=v.get("text") if v.get("available") and not v.get("none") else None)
+        with self.write_lock, self.vflags_path.open("a") as fh:
+            fh.write(json.dumps(rec) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        c = self._cache.get(self.vflags_path)
+        if c:
+            c[1].append(rec)
+        return rec
 
     @staticmethod
     def _time(img, frame):
@@ -589,6 +611,14 @@ def make_handler(store):
             path = urlparse(self.path).path
             if self.headers.get("X-Requested-With") != "lpr-review":
                 return self._send(403, {"error": "forbidden"})
+            if path == "/api/vehicle/flag":
+                try:
+                    d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                    plate = re.sub(r"[^A-Z0-9]", "", str(d["plate"]).upper())[:10]
+                    assert len(plate) >= 2
+                    return self._send(200, store.set_vehicle_stale(plate, bool(d.get("stale", True)), d.get("image")) | {"ok": True})
+                except (KeyError, ValueError, TypeError, AssertionError):
+                    return self._send(400, {"error": "bad vehicle flag"})
             if path in ("/api/watch", "/api/watch/remove"):
                 try:
                     d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))

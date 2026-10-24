@@ -119,3 +119,24 @@ class MergeDuplicatesTests(unittest.TestCase):
             self.assertEqual(len(list((root / "trash" / "2026-01-01").glob("*.png"))), 1)
             self.assertEqual(len(list(frames.glob("*.png"))), 1)
             WT.merge_duplicates(root / "no" / "such" / "day", date(2026, 1, 1), 30)      # must not raise
+
+
+class VehicleRefreshTests(unittest.TestCase):
+    def test_refresh_starts_only_when_due_and_never_raises(self):
+        started = []
+        real_due, real_start = WT.V.refresh_due, WT.V.start_refresh
+        WT.V.refresh_due = lambda days, home=None, now=None: True
+        WT.V.start_refresh = lambda argv, home=None: started.append(argv) or object()
+        try:
+            WT._vtry[0] = 0.0
+            WT.maybe_refresh_vehicles()
+            self.assertEqual(len(started), 1)
+            self.assertIn("refresh", started[0])
+            WT.maybe_refresh_vehicles()                              # within the hour: not again
+            self.assertEqual(len(started), 1)
+            WT._vtry[0] = 0.0
+            WT.V.refresh_due = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+            WT.maybe_refresh_vehicles()                              # an error is logged, not raised
+        finally:
+            WT.V.refresh_due, WT.V.start_refresh = real_due, real_start
+            WT._vtry[0] = 0.0

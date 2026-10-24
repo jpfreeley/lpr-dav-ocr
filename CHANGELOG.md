@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
   review page shows "seen N other times within 7 / 30 / 90 days / all time"; the number opens a montage of the earlier
   sightings. Search suggestions show how often each plate was seen.
 
+- "Verified stale" mark for a vehicle record that does not match what you see (car chip button, history page), kept per plate with the record you saw.
+- `lpr vehicles refresh` re-downloads the current fiscal year and swaps it in; the watcher starts one about weekly (`watch.vehicles_refresh_days`).
 - `lpr vehicles`: a local index of make, body type, year and color by plate built from NYC's public parking-ticket data; shown on the review page and the history page. No plate of yours is sent anywhere.
 - History page: the plate links to How's My Driving NY (copies the plate, opens the site without a referrer).
 - Pattern badges for NJ (A12BCD), NY commercial (12345AB) and NY moped (123AB4) plates, with one-click state buttons; the TLC hint also selects NY. The Reports plate-mix chart counts both.

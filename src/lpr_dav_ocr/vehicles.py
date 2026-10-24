@@ -18,7 +18,10 @@ The answer for a plate is the most common record, with how many tickets it rests
 """
 import argparse
 import csv
+import datetime
+import fcntl
 import io
+import json
 import os
 import re
 import sqlite3
@@ -64,6 +67,27 @@ MAKE = {"TOYOT": "Toyota", "NISSA": "Nissan", "CHEVR": "Chevrolet", "HYUND": "Hy
         "ROLLS": "Rolls-Royce", "IC": "IC Bus"}
 
 
+def current_fy(today=None):
+    """The NYC fiscal year (July to June, named for the year it ends) that today falls in."""
+    t = today or datetime.date.today()
+    return t.year + (1 if t.month >= 7 else 0)
+
+
+def dataset_id(fy):
+    """NYC Open Data dataset id for a fiscal year: from the table above, else looked up by name in the public catalog."""
+    if fy in DATASETS:
+        return DATASETS[fy]
+    url = "https://api.us.socrata.com/api/catalog/v1?" + urllib.parse.urlencode(
+        {"domains": "data.cityofnewyork.us", "q": f"Parking Violations Issued - Fiscal Year {fy}", "only": "datasets", "limit": "10"})
+    with urllib.request.urlopen(url, timeout=60) as r:
+        found = json.load(r)["results"]
+    for x in found:
+        if x["resource"]["name"] == f"Parking Violations Issued - Fiscal Year {fy}":
+            DATASETS[fy] = x["resource"]["id"]
+            return DATASETS[fy]
+    raise SystemExit(f"could not find the parking-violations dataset for fiscal year {fy}")
+
+
 def default_home():
     try:
         from . import config as _config
@@ -92,7 +116,7 @@ def connect(path):
 
 
 def _soql(fy, prefix, states, offset=0, timeout=120):
-    ds = DATASETS[fy]
+    ds = dataset_id(fy)
     st = ",".join("'" + s + "'" for s in states)
     q = {"$select": "plate_id,registration_state,vehicle_make,vehicle_body_type,vehicle_year,vehicle_color,count(*) as n",
          "$where": f"plate_id like '{prefix}%' and registration_state in({st})",
@@ -130,20 +154,23 @@ def _fetch_prefix(fy, prefix, states):
         off += PAGE
 
 
-def import_fy(db, fy, states=DEFAULT_STATES, threads=3, log=print, prefixes=None):
-    """Download one fiscal year. Resumable: finished prefixes are skipped. Returns the number of rows stored."""
-    if fy not in DATASETS:
-        raise SystemExit(f"fiscal year {fy} is not in the table of dataset ids ({sorted(DATASETS)})")
+def import_fy(db, fy, states=DEFAULT_STATES, threads=3, log=print, prefixes=None, replace=False):
+    """Download one fiscal year into the index. Resumable: finished prefixes are skipped.
+
+    replace=True is a refresh: the new rows are collected beside the old ones (under the key -fy) and swapped in with
+    one transaction when every prefix is done, so lookups keep working on the old data meanwhile and an interrupted
+    refresh loses nothing. Returns the number of rows stored for the year."""
+    key = -fy if replace else fy
     todo = [a + b for a in PREFIX_CHARS for b in PREFIX_CHARS] if prefixes is None else list(prefixes)
-    have = {p for (p,) in db.execute("SELECT prefix FROM done WHERE fy=?", (fy,))}
+    have = {p for (p,) in db.execute("SELECT prefix FROM done WHERE fy=?", (key,))}
     todo = [p for p in todo if p not in have]
     lock, total, t0 = threading.Lock(), [0, 0], time.time()
 
     def work(p):
-        rows = _fetch_prefix(fy, p, states)
+        rows = [r[:7] + (key,) for r in _fetch_prefix(fy, p, states)]
         with lock:
             db.executemany("INSERT INTO v VALUES (?,?,?,?,?,?,?,?)", rows)
-            db.execute("INSERT OR REPLACE INTO done VALUES (?,?,?)", (fy, p, len(rows)))
+            db.execute("INSERT OR REPLACE INTO done VALUES (?,?,?)", (key, p, len(rows)))
             db.commit()
             total[0] += len(rows)
             total[1] += 1
@@ -154,6 +181,14 @@ def import_fy(db, fy, states=DEFAULT_STATES, threads=3, log=print, prefixes=None
     if todo:
         with ThreadPoolExecutor(max_workers=max(1, threads)) as ex:
             list(ex.map(work, todo))
+    if replace:
+        with lock:
+            db.execute("BEGIN")
+            db.execute("DELETE FROM v WHERE fy=?", (fy,))
+            db.execute("UPDATE v SET fy=? WHERE fy=?", (fy, key))
+            db.execute("DELETE FROM done WHERE fy=?", (fy,))
+            db.execute("UPDATE done SET fy=? WHERE fy=?", (fy, key))          # the year now counts as fully imported
+            db.commit()
     return db.execute("SELECT COUNT(*) FROM v WHERE fy=?", (fy,)).fetchone()[0]
 
 
@@ -163,7 +198,7 @@ def lookup(db, plate, state=None):
     if not plate or db is None:
         return None
     args = [plate] + ([state.upper()] if state else [])
-    rows = db.execute("SELECT state, make, body, year, color, SUM(n), MAX(fy) FROM v WHERE plate=?"
+    rows = db.execute("SELECT state, make, body, year, color, SUM(n), MAX(fy) FROM v WHERE plate=? AND fy > 0"
                       + (" AND state=?" if state else "") + " GROUP BY state, make, body, year, color", args).fetchall()
     if not rows:
         return None
@@ -194,6 +229,44 @@ def describe(v):
     return (bits or "unknown vehicle") + (f", {v['color']}" if v["color"] else "") + f" ({v['tickets']} ticket{'s' if v['tickets'] != 1 else ''})"
 
 
+def stamp_path(home=None):
+    return Path(home or default_home()) / "vehicles_refreshed.txt"
+
+
+def mark_refreshed(home=None):
+    stamp_path(home).write_text(datetime.datetime.now().astimezone().isoformat(timespec="seconds") + "\n")
+
+
+def refresh_due(days, home=None, now=None):
+    """True when an index exists and was last built or refreshed more than `days` days ago (days <= 0: never due)."""
+    if days <= 0 or not db_path(home).is_file():
+        return False
+    st = stamp_path(home)
+    if not st.is_file():
+        return True
+    try:
+        last = datetime.datetime.fromisoformat(st.read_text().strip())
+    except ValueError:
+        return True
+    return (now or datetime.datetime.now().astimezone()) - last > datetime.timedelta(days=days)
+
+
+def start_refresh(argv, home=None):
+    """Run `refresh` in the background at low priority, unless one is already running. Returns the process or None."""
+    lockf = Path(home or default_home()) / "vehicles.lock"
+    lockf.parent.mkdir(parents=True, exist_ok=True)
+    probe = open(lockf, "w")
+    try:
+        fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        probe.close()
+        return None
+    fcntl.flock(probe, fcntl.LOCK_UN)
+    probe.close()
+    import subprocess
+    return subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=lambda: os.nice(10), start_new_session=True)
+
+
 def open_db(home=None):
     """A read-only handle on the index, or None when it has not been built."""
     p = db_path(home)
@@ -209,11 +282,15 @@ def main(argv=None):
     im.add_argument("--fy", type=int, action="append", help="fiscal year to import; repeat for several (default 2027, 2026, 2025)")
     im.add_argument("--states", default=",".join(DEFAULT_STATES), help="registration states to keep (default %(default)s)")
     im.add_argument("--threads", type=int, default=3, help="parallel requests (default 3; be polite to the city's servers)")
+    rf = sub.add_parser("refresh", help="re-download the current fiscal year (new tickets) and swap it in; keeps the old data meanwhile")
+    rf.add_argument("--fy", type=int, action="append", help="fiscal year to refresh (default: the current one)")
+    rf.add_argument("--states", default=",".join(DEFAULT_STATES))
+    rf.add_argument("--threads", type=int, default=2)
     lk = sub.add_parser("lookup", help="what the index knows about a plate")
     lk.add_argument("plate")
     lk.add_argument("--state")
     sub.add_parser("stats", help="size of the index")
-    for p in (im, lk, ap):
+    for p in (im, rf, lk, ap):
         p.add_argument("--home", help=argparse.SUPPRESS)
     a = ap.parse_args(argv)
     home = getattr(a, "home", None)
@@ -224,7 +301,23 @@ def main(argv=None):
             print(f"FY{fy}: downloading plates in {', '.join(states)} ...", flush=True)
             n = import_fy(db, fy, states, a.threads)
             print(f"FY{fy}: {n:,} rows in the index")
+        mark_refreshed(home)
         print(f"done: {db_path(home)} ({db_path(home).stat().st_size / 1e6:.0f} MB)")
+    elif a.cmd == "refresh":
+        Path(home or default_home()).mkdir(parents=True, exist_ok=True)
+        with open(Path(home or default_home()) / "vehicles.lock", "w") as lk_:
+            try:
+                fcntl.flock(lk_, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                sys.exit("another vehicles import or refresh is already running")
+            db = connect(db_path(home))
+            states = tuple(s.strip().upper() for s in a.states.split(",") if s.strip())
+            for fy in a.fy or [current_fy()]:
+                print(f"FY{fy}: refreshing ...", flush=True)
+                n = import_fy(db, fy, states, a.threads, replace=True)
+                print(f"FY{fy}: {n:,} rows now in the index")
+            mark_refreshed(home)
+            print("refreshed", flush=True)
     elif a.cmd == "lookup":
         db = open_db(home)
         if db is None:
@@ -237,7 +330,7 @@ def main(argv=None):
         db = open_db(home)
         if db is None:
             sys.exit("no vehicle index yet: run `lpr vehicles import`")
-        for fy, n, plates in db.execute("SELECT fy, COUNT(*), COUNT(DISTINCT plate || state) FROM v GROUP BY fy ORDER BY fy DESC"):
+        for fy, n, plates in db.execute("SELECT fy, COUNT(*), COUNT(DISTINCT plate || state) FROM v WHERE fy > 0 GROUP BY fy ORDER BY fy DESC"):
             print(f"FY{fy}: {n:,} rows, {plates:,} plates")
 
 

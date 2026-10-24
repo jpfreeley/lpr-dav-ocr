@@ -12,6 +12,7 @@ retaining plate data and sharing it differ by country and region. Find out which
 | Recordings (`.dav`) | the camera share | high | Not created by this project. It only reads them. |
 | Saved frames with the plate in the file name | `<data_root>/frames/` | high | One full frame per plate, plus the plate text in the name and in `index.csv`. |
 | `index.csv`, `second_pass.csv` | `<data_root>/frames/` | high | A timestamped list of plates seen. |
+| Vehicle stale marks | `<data_root>/labels/vehicle_flags.jsonl` | high | Plates whose ticket record you marked stale. |
 | Plate states | `<data_root>/labels/plate_states.jsonl` | high | The state you set on each plate. |
 | Merged duplicates | `<data_root>/labels/duplicates.jsonl`, `<data_root>/trash/` | high | Which frames were merged away, and the frames themselves until you purge them. |
 | Your labels and crops | `<data_root>/labels/`, `<data_root>/crops/` | high | Confirmed plate text and plate images. |

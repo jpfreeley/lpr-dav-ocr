@@ -66,6 +66,7 @@ settle_seconds = 45       # a clip must have ended this long ago and stopped gro
 cooldown_seconds = 600    # minimum time between alerts for the same watched plate
 dedupe = true             # after each batch, merge duplicate sightings (keeps the clearer frame; extras go to <data_root>/trash)
 dedupe_window = 30        # seconds: reads of one plate this close are one sighting
+vehicles_refresh_days = 7 # refresh the local vehicle index (lpr vehicles) this often, in the background; 0 = off
 workers = 1               # keep low: the watcher runs next to everything else
 
 [ntfy]

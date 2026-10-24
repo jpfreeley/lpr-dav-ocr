@@ -68,13 +68,29 @@ lpr vehicles lookup ABC1234 --state NY
 lpr vehicles stats
 ```
 
-It takes a while (the city's data is large and the download is polite, three requests at a time) and creates
+New tickets keep arriving, so refresh the index now and then:
+
+```bash
+lpr vehicles refresh                     # re-downloads the current fiscal year and swaps it in when it is complete
+lpr vehicles refresh --fy 2026           # a specific year (for example right after a fiscal year ends)
+```
+
+A refresh keeps answering lookups from the old data until the new year is complete, so an interrupted refresh loses
+nothing. The watcher also starts one in the background about every 7 days when the index exists (`watch.vehicles_refresh_days`).
+A new fiscal year (every July) needs no change: its dataset is found by name in the city's public catalog.
+
+The first import takes a while (the city's data is large and the download is polite, three requests at a time) and creates
 `<home>/vehicles.sqlite`. The download asks the city for aggregate rows by two-character plate prefix: it contains none of
 your plates and sends none. After that every lookup is a local query.
 
 Know the limits. Only vehicles ticketed in New York City in the imported years appear, so many plates have no entry. The
 values are what a ticket writer typed: typos and old registrations happen, and the answer is the most common record with
 the number of tickets behind it. The city records no model and no trim.
+
+Seen a vehicle that does not match its record (the plate may have moved to another car)? Press **doesn't match** on the
+car chip, or **Mark verified stale** on the history page. Nothing else changes: the record stays, marked "verified stale",
+and the mark is kept in `<data_root>/labels/vehicle_flags.jsonl` with the record you saw. If a refresh later changes the
+record, the page says it was marked stale before the record changed. **undo** removes the mark.
 
 ### Pausing and stopping
 

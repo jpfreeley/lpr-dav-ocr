@@ -18,6 +18,7 @@ from pathlib import Path
 
 from . import config as _config
 from . import dedupe as DD
+from . import vehicles as V
 from . import watchlist as W
 from .util import read_csv
 
@@ -122,6 +123,24 @@ def merge_duplicates(frames, day, window):
         log(f"duplicate merge skipped: {ex}")
 
 
+_vtry = [0.0]
+
+
+def maybe_refresh_vehicles():
+    """About weekly, refresh the current fiscal year of the local vehicle index in the background (vehicles.py).
+    Never stops the watcher; a failed start is retried after an hour."""
+    try:
+        if time.time() - _vtry[0] < 3600 or not WCFG["vehicles_refresh_days"] > 0:
+            return
+        if V.refresh_due(WCFG["vehicles_refresh_days"]):
+            _vtry[0] = time.time()
+            p = V.start_refresh([sys.executable, "-m", "lpr_dav_ocr.vehicles", "refresh"])
+            if p:
+                log("vehicle index refresh started in the background (new NYC tickets)")
+    except Exception as ex:
+        log(f"vehicle refresh skipped: {ex}")
+
+
 def cycle(cam, a, state):
     now = datetime.now()
     for day in (now.date(), now.date() - timedelta(days=1)):
@@ -201,6 +220,7 @@ def main(argv=None):
                     log("share is back")
                 state["down_since"] = None
                 cycle(cam, a, state)
+                maybe_refresh_vehicles()
             else:
                 state["down_since"] = state["down_since"] or time.time()
                 if time.time() - state["down_since"] > 1800 and time.time() - state["down_alert"] > 21600 and not a.dry_run:

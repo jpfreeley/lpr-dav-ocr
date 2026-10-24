@@ -153,9 +153,16 @@ function render() {
     <p class="hint">CamTime is the camera clock, taken from the clip file names. It may run behind the computer clock.</p></div>`;
   wireWatch(d.plate);
   const v = d.vehicle, ve = $("veh");
+  ve.replaceChildren();
   ve.textContent = !v || !v.available ? "Vehicle lookup is off. Build the local NYC ticket index with: lpr vehicles import"
     : v.none ? "No NYC parking ticket on record for this plate in the imported years, so make and model are unknown."
     : "Vehicle on NYC tickets: " + v.text + ". Last in fiscal year " + v.last_fy + (v.others ? "; " + v.others + " other recorded variant(s)" : "") + ". A ticket writer typed it: it can be wrong or out of date, and the city records no model or trim.";
+  if (v && v.available && !v.none) {
+    const st = v.stale && v.stale.same_record;
+    if (v.stale) ve.appendChild(document.createTextNode(st ? " Marked verified stale on " + v.stale.ts.slice(0, 10) + ": the vehicle you saw did not match." : " It was marked stale on " + v.stale.ts.slice(0, 10) + ", but the record has changed since."));
+    const b = html("button", { class: "tbtn", style: "margin-left:8px" }, ve, st ? "Undo stale mark" : "Mark verified stale");
+    b.onclick = async () => { await fetch("/api/vehicle/flag", { method: "POST", headers: HDR, body: JSON.stringify({ plate: v.plate, stale: !st }) }); search(d.plate); };
+  }
   shown = PAGE;
   $("more").onclick = () => { $("tb").insertAdjacentHTML("beforeend", rows(shown, shown + PAGE)); shown += PAGE; if (shown >= d.count) $("more").hidden = true; };
 }
