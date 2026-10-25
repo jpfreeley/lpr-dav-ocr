@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate Review</title>
+<style>
+  :root {
+    --bg: #101216; --panel: #181b21; --panel2: #1f232b; --line: #2b303a;
+    --text: #e8eaee; --muted: #8b93a1; --accent: #4c9eff;
+    --ok: #3ecf8e; --warn: #f5b942; --bad: #ff6b6b;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f3f4f7; --panel:#fff; --panel2:#f0f2f6; --line:#d9dde5; --text:#1b1f27; --muted:#667085; --accent:#1f6feb; --ok:#13a36a; --warn:#b9770e; --bad:#d63b3b; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display:none !important; }
+  html, body { height: 100%; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; display:flex; flex-direction:column; overflow:hidden; }
+  .mockbanner { background:var(--warn); color:#2a1c00; text-align:center; font-size:11px; padding:2px 6px; flex:none; }
+  header { display:flex; gap:6px 18px; align-items:center; padding:6px 14px; border-bottom:1px solid var(--line); background:var(--panel); flex:none; white-space:nowrap; overflow:hidden; }
+  header h1 { font-size:14px; margin:0; font-weight:600; }
+  header select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:3px 8px; font:inherit; font-size:13px; }
+  header .sp { flex:1; }
+  .stats { color:var(--muted); font-size:12.5px; }
+  .stats b { color:var(--text); font-weight:600; }
+  .url { font:12px var(--mono); color:var(--muted); }
+  .bar { height:3px; background:var(--line); flex:none; }
+  .bar i { display:block; height:100%; background:var(--accent); width:0; transition:width .2s; }
+
+  main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(420px,1fr); gap:12px; padding:12px; max-width:1700px; width:100%; margin:0 auto; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px; }
+  .left { display:flex; flex-direction:column; gap:8px; min-height:0; }
+  .frame { flex:1; min-height:0; container-type:size; background:#000; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+  .fit { position:relative; width:min(100cqw, 100cqh * 16 / 9); aspect-ratio:16/9; line-height:0; }
+  .fit img { width:100%; height:100%; display:block; }
+  .fit .box { position:absolute; border:2px solid var(--accent); border-radius:3px; box-shadow:0 0 0 1px rgba(0,0,0,.6); pointer-events:none; }
+  .cap { color:var(--muted); font-size:12.5px; display:flex; gap:4px 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cap b { color:var(--text); font-weight:500; }
+  .navrow { flex-wrap:wrap; display:flex; gap:8px; align-items:center; }
+  .queue { display:flex; flex-wrap:wrap; gap:5px; margin-left:8px; }
+  .dot { width:24px; height:24px; border-radius:6px; border:1px solid var(--line); background:var(--panel2); color:var(--muted); font:11.5px/22px var(--mono); text-align:center; cursor:pointer; }
+  .dot.cur { border-color:var(--accent); color:var(--text); }
+  .dot.s-ok { background:var(--ok); color:#06210f; border-color:transparent; }
+  .dot.s-fix { background:var(--warn); color:#2a1c00; border-color:transparent; }
+  .dot.s-notplate { background:var(--bad); color:#2b0505; border-color:transparent; }
+  .dot.s-obstructed { background:#b784f5; color:#1d0a33; border-color:transparent; }
+  .dot.s-skip { background:var(--line); }
+
+  .right { display:flex; flex-direction:column; gap:8px; min-height:0; overflow-y:auto; }
+  .right > .card:last-child { overflow:visible; }
+  .actions4 { position:sticky; bottom:0; z-index:5; background:var(--panel); padding:8px 0 2px; box-shadow:0 -8px 8px -8px rgba(0,0,0,.35); }
+  /* the lookup lines (seen count, vehicle, live check) get a full line each instead of a narrow wrapping column */
+  #watchwrap { display:flex !important; flex-wrap:wrap; gap:6px 10px; align-items:center; flex:1 1 100%; }
+  #watchwrap #seen, #watchwrap #veh, #watchwrap #editchk { flex:1 1 100%; order:5; }
+  #watchwrap #veh, #watchwrap #editchk { font-size:12px; }
+  .zoomcard { padding:6px; display:flex; justify-content:center; background:#000; }
+  canvas { height:min(30vh, 260px); width:auto; max-width:100%; display:block; }
+  .readrow { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .lbl { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+  .plate { font:600 30px/1 var(--mono); letter-spacing:.07em; }
+  .conf { font:500 14px var(--mono); }
+  .meter { height:5px; background:var(--line); border-radius:99px; overflow:hidden; margin-top:8px; }
+  .meter i { display:block; height:100%; background:var(--ok); }
+  .alt { margin-left:auto; font-size:12.5px; color:var(--muted); background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:5px 10px; cursor:pointer; text-align:left; }
+  .alt:hover { border-color:var(--accent); }
+  .alt .a { font:600 14px var(--mono); color:var(--warn); letter-spacing:.05em; }
+  .alt.agree .a { color:var(--ok); }
+  .alt.agree { cursor:default; }
+  #watchbtn.watching { color:#f5c518; border-color:#f5c518; font-weight:600; }
+  .camt { font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:3px; }
+  #veh .vbtn { font: inherit; font-size: 11.5px; margin-left: 8px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+  #veh .vbtn:hover { color: var(--text); border-color: var(--muted); }
+  #veh.stale .vt { text-decoration: line-through; opacity: .7; }
+  .cropuse { cursor:pointer; text-decoration:underline dotted; }
+  .cropuse:hover { color:var(--accent); }
+
+  .cells { display:flex; gap:5px; flex-wrap:nowrap; align-items:flex-start; }
+  .cell { display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .cell input { width:40px; height:48px; text-align:center; font:600 24px var(--mono); text-transform:uppercase; background:var(--panel2); color:var(--text); border:2px solid var(--line); border-radius:9px; padding:0; caret-color:transparent; }
+  .cell input.chg { border-color:var(--warn); background:rgba(245,185,66,.14); }
+  .cell small { font:11px var(--mono); color:var(--muted); min-height:14px; }
+  .cell small.chg { color:var(--warn); }
+  .celltools { display:flex; flex-direction:column; gap:4px; margin-left:auto; }
+  .celltools button { padding:3px 9px; font-size:12px; border-radius:7px; }
+  .editrow { display:flex; gap:10px; align-items:flex-start; margin-top:6px; }
+
+  .states { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .chip { position:relative; }
+  .chip input[type=radio] { position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+  .chip span { display:inline-flex; align-items:center; gap:5px; min-width:44px; justify-content:center; padding:4px 10px; border:1px solid var(--line); border-radius:99px; background:var(--panel2); font:600 13px var(--mono); }
+  .chip input:checked + span { background:var(--accent); border-color:transparent; color:#fff; }
+  .chip input:focus-visible + span { outline:2px solid var(--accent); outline-offset:2px; }
+  .chip.unkn input:checked + span { background:var(--panel2); border-color:var(--muted); color:var(--text); }
+  .chip input.other { position:relative; z-index:2; opacity:1; width:38px; height:22px; text-align:center; text-transform:uppercase; font:600 13px var(--mono); background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:0; }
+
+  .actions4 { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) repeat(3,minmax(0,1fr)); gap:8px; margin-top:10px; }
+  button { font:inherit; border:1px solid var(--line); background:var(--panel2); color:var(--text); padding:8px 6px; border-radius:9px; cursor:pointer; white-space:nowrap; }
+  button:hover:not(:disabled) { border-color:var(--accent); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  button.ok { background:var(--ok); color:#06210f; border-color:transparent; font-weight:600; }
+  button.fix { background:var(--warn); color:#2a1c00; border-color:transparent; font-weight:600; }
+  button.ghost { color:var(--muted); }
+  button:disabled { opacity:.35; cursor:default; }
+  kbd { font:11px var(--mono); border:1px solid rgba(128,128,128,.4); border-bottom-width:2px; border-radius:5px; padding:0 4px; background:rgba(128,128,128,.15); }
+  .toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%) translateY(20px); background:var(--panel2); border:1px solid var(--line); padding:8px 14px; border-radius:10px; opacity:0; transition:.2s; pointer-events:none; z-index:9; }
+  .toast.on { opacity:1; transform:translateX(-50%); }
+
+  @media (max-width:1150px) { .actions4 kbd { display:none; } .actions4 button { font-size:12px; padding:8px 2px; } }
+  @media (max-width:900px) {
+    body { overflow:auto; }
+    main { grid-template-columns:1fr; }
+    .frame { aspect-ratio:16/9; flex:none; }
+    .actions4 { grid-template-columns:1fr 1fr; }
+  }
+
+  .badge { font-size:11.5px; padding:2px 8px; border-radius:99px; border:1px solid var(--warn); color:var(--warn); }
+  .empty { padding:40px; color:var(--muted); text-align:center; }
+  header select { max-width:260px; }
+  .seen { font-size:12px; color:var(--muted); }
+  .seen a { color:var(--accent); font-weight:700; cursor:pointer; text-decoration:underline; }
+  #mont { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:50; display:flex; align-items:center; justify-content:center; padding:20px; }
+  #mont .in { background:var(--panel); border:1px solid var(--line); border-radius:14px; width:min(1100px,100%); max-height:100%; display:flex; flex-direction:column; }
+  #mont .hd { display:flex; gap:14px; align-items:baseline; padding:10px 16px; border-bottom:1px solid var(--line); }
+  #mont .hd b { font:700 18px var(--mono); letter-spacing:.08em; }
+  #mont .hd .sp { flex:1; } #mont .hd a { color:var(--accent); font-size:13px; cursor:pointer; }
+  #mont .grid { overflow:auto; padding:12px 16px 16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }
+  #mont .cell { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:6px; cursor:pointer; text-align:left; color:var(--text); font:inherit; }
+  #mont .cell:hover { border-color:var(--accent); }
+  #mont .cell .th { width:100%; aspect-ratio:230/86; background:#000 no-repeat; border-radius:5px; display:block; }
+  #mont .cell small { display:block; color:var(--muted); font-size:11.5px; margin-top:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Plate review</h1>
+  <a href="/reports" style="font-size:12.5px;color:var(--accent);font-weight:600" title="Traffic, repeat visitors, plate mix and review effort">Reports</a>
+  <a href="/ops" style="font-size:12.5px;color:var(--accent);font-weight:600" title="Watcher, jobs, disk space, accuracy and confusion matrix">Operations</a>
+  <select id="daysel" aria-label="Day"></select>
+  <select id="filter" aria-label="Queue">
+    <option value="need">Needs review (default)</option>
+    <option value="auto">Auto-accepted: spot check</option>
+    <option value="rejected">Auto-rejected: spot check</option>
+    <option value="recheck">Re-check: 'not a plate' that may hold a plate</option>
+    <option value="unrev">All unreviewed, incl. auto-accepted</option>
+    <option value="all">Everything, time order</option>
+    <option value="flag">Flagged: low confidence, passes disagree, odd shape</option>
+  </select>
+  <span class="url" id="pos"></span>
+  <span class="sp"></span>
+  <span class="stats" id="stats"></span>
+</header>
+<div class="bar"><i id="prog"></i></div>
+
+<div class="empty" id="empty" hidden></div>
+<main id="main">
+  <section class="card left">
+    <div class="frame"><div class="fit"><img id="img" alt="Best frame"><div class="box" id="box" hidden></div></div></div>
+    <div class="cap" id="cap"></div>
+    <div class="navrow">
+      <button id="prev" class="ghost">&larr; Prev <kbd>Alt+&larr;</kbd></button>
+      <button id="next" class="ghost">Next <kbd>Alt+&rarr;</kbd></button>
+      <button id="last" class="ghost" title="Jump to the furthest plate you have reviewed, in time order (Alt+L)">Last reviewed <kbd>Alt+L</kbd></button>
+      <button id="nextun" class="ghost" title="Jump to the next plate with no verdict (Alt+U)">Next unreviewed <kbd>Alt+U</kbd></button>
+      <div class="queue" id="queue"></div>
+    </div>
+  </section>
+
+  <section class="right">
+    <div class="card zoomcard"><canvas id="zoom" width="560" height="260"></canvas></div>
+
+    <div class="card">
+      <div class="readrow">
+        <span class="lbl">OCR read</span>
+        <span class="plate" id="plate"></span>
+        <span class="conf" id="conf"></span>
+        <span class="badge" id="shape" hidden></span>
+        <span id="watchwrap" style="display:inline-flex;gap:6px;align-items:center">
+          <a id="histlink" class="ghost" href="/history" style="padding:3px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;color:var(--text);text-decoration:none" title="Every time this plate was seen">History</a>
+          <span id="seen" class="seen"></span>
+          <span id="veh" class="seen" hidden></span>
+          <span id="editchk" class="seen" hidden></span>
+          <button id="watchbtn" class="ghost" style="padding:3px 10px;font-size:12px" title="Alert me when this plate is seen again">&#9734; Watch</button>
+          <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
+        </span>
+        <span class="badge" id="rechkb" hidden style="border-color:var(--warn);color:var(--warn)"></span>
+        <span class="badge" id="rejb" hidden style="border-color:var(--bad);color:var(--bad)" title="The text region is much wider than a plate. 120 of 120 such reads were not usable on the author's labels. Mark it Correct if it is a plate."></span>
+        <span class="badge" id="autob" hidden style="border-color:var(--ok);color:var(--ok)" title="Confidence 0.99 or higher, both passes agree, plate-shaped. 99.6% right on your labels.">auto-accepted</span>
+        <div id="like" hidden style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"></div>
+        <button class="alt" id="near" hidden title="This read is one character away from a plate you verified recently"></button>
+        <button class="alt" id="pick" hidden></button>
+        <button class="alt tlc" id="tlc" hidden></button>
+        <button class="alt" id="alt" hidden title="Click to copy this read into the boxes"></button>
+      </div>
+      <div class="meter"><i id="meter"></i></div>
+
+      <div class="editrow">
+        <div class="cells" id="cells"></div>
+        <div class="celltools">
+          <button id="addc" title="Insert a box after the focused one">+ box</button>
+          <button id="delc" title="Delete the focused box">&minus; box</button>
+          <button id="reset" class="ghost">Reset</button>
+        </div>
+      </div>
+
+      <div class="states" id="states" role="radiogroup" aria-label="Plate state">
+        <span class="lbl">State</span>
+        <label class="chip unkn"><input type="radio" name="st" value="UNKN" checked><span>UNKN</span></label>
+        <label class="chip"><input type="radio" name="st" value="NY"><span>NY</span></label>
+        <label class="chip"><input type="radio" name="st" value="NJ"><span>NJ</span></label>
+        <label class="chip"><input type="radio" name="st" value="CT"><span>CT</span></label>
+        <label class="chip"><input type="radio" name="st" value="MA"><span>MA</span></label>
+        <label class="chip"><input type="radio" name="st" value="FL"><span>FL</span></label>
+        <label class="chip"><input type="radio" name="st" value="PA"><span>PA</span></label>
+        <label class="chip"><input type="radio" name="st" value="__" id="stOther"><span>__ <input class="other" id="stText" maxlength="2" placeholder="TX" aria-label="Other state"></span></label>
+      </div>
+
+      <div class="actions4">
+        <button class="ok" id="btnOk">Correct <kbd>Enter</kbd></button>
+        <button class="fix" id="save">Save fix <kbd>Enter</kbd></button>
+        <button class="ghost" id="btnNot" title="No plate in the box (Alt+N)">Not a plate</button>
+        <button class="ghost" id="btnObs" title="A plate is there but cannot be read (Alt+O)">Obstructed</button>
+        <button class="ghost" id="btnSkip" title="Alt+S">Can't tell</button>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<div id="mont" hidden><div class="in"><div class="hd"><b id="montp"></b><span id="montn" class="seen"></span><span class="sp"></span><a id="montfull" href="/history">Full history</a><a id="montx">Close (Esc)</a></div><div class="grid" id="montg"></div></div></div>
+<script>
+let TILT = 20, W = 1920, H = 1080;   // replaced from /api/config at startup
+const $ = id => document.getElementById(id);
+let F = new URLSearchParams(location.search).get("f") || "need";
+let DAY = new URLSearchParams(location.search).get("day") || "";
+let D = null, it = null, orig = [], busy = false;
+const imgs = {};
+const loadImg = n => imgs[n] || (imgs[n] = new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = "/img/" + encodeURIComponent(n); }));
+function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 1500); }
+async function api(url, opt) { const r = await fetch(url, opt); if (!r.ok) throw new Error(url + " " + r.status); return r.json(); }
+
+async function go(name, push) {
+  D = await api(`/api/item?image=${encodeURIComponent(name || "")}&f=${F}&day=${DAY}`);
+  it = D.item; DAY = D.day;
+  if (push !== false && it) history.pushState(null, "", `/i/${encodeURIComponent(it.image)}` + (F ? `?f=${F}` : ""));
+  render();
+}
+
+function statsLine() {
+  const c = D.counts, dd = D.days.find(x => x.day === D.day) || { left: 0, auto: 0, waiting: 0 }, done = D.all - (c.none || 0);
+  $("stats").innerHTML = `To review <b>${dd.left}</b> &middot; reviewed <b>${done}</b> (correct <b>${c.ok || 0}</b>, fixed <b>${c.fix || 0}</b>) &middot; auto-accepted <b>${dd.auto}</b>${dd.rejected ? ` &middot; auto-rejected <b>${dd.rejected}</b>` : ""}${dd.recheck ? ` &middot; <span title="Marked not a plate, but the second pass found plate-shaped text">to re-check <b>${dd.recheck}</b></span>` : ""}${dd.waiting ? ` &middot; <span title="Held out of the queue until the second pass has run on them">waiting for 2nd pass <b>${dd.waiting}</b></span>` : ""}`;
+  const need = dd.left + done;
+  $("prog").style.width = (D.all ? Math.min(100, done / Math.max(1, need) * 100) : 0) + "%";
+}
+function render() {
+  $("filter").value = F;
+  const ds = $("daysel");
+  ds.innerHTML = D.days.map(d => `<option value="${d.day}"${d.day === D.day ? " selected" : ""}>${d.day} (${d.left} to review, ${d.auto} auto)</option>`).join("");
+  const c = D.counts, done = D.all - (c.none || 0);
+  statsLine();
+  $("empty").hidden = !!it; $("main").hidden = !it;
+  if (!it) {
+    $("empty").innerHTML = `<p><b>${F === "need" || F === "unrev" ? "All caught up." : "Nothing in this view yet."}</b> ${D.all} plates this day, ${D.all - (c.none || 0)} reviewed. New plates appear here as processing continues and their second pass completes${(D.days.find(x => x.day === D.day) || {}).waiting ? ` (${(D.days.find(x => x.day === D.day) || {}).waiting} waiting for it)` : ""}. This page checks every 30 s.</p><button id="toAll">Show everything in time order</button>`;
+    $("toAll").onclick = () => { F = "all"; go("", true); };
+    return;
+  }
+  $("pos").textContent = `${D.n} of ${D.total}`;
+  $("img").src = "/img/" + encodeURIComponent(it.image);
+  const b = $("box");
+  if (it.box) {
+    const [x0, y0, x1, y1] = it.box;
+    Object.assign(b.style, { left: x0 / W * 100 + "%", top: y0 / H * 100 + "%", width: (x1 - x0) / W * 100 + "%", height: (y1 - y0) / H * 100 + "%" });
+    b.hidden = false;
+  } else b.hidden = true;
+  $("cap").innerHTML = `<span>Clip <b>${it.clip}</b></span><span>~<b>${it.time}</b> <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></span><span>${it.image}</span>`;
+  $("plate").textContent = it.plate;
+  $("conf").textContent = it.conf.toFixed(3);
+  $("meter").style.width = it.conf * 100 + "%";
+  $("meter").style.background = it.conf >= 0.97 ? "var(--ok)" : it.conf >= 0.9 ? "var(--warn)" : "var(--bad)";
+  $("autob").hidden = !(it.auto && !it.label);
+  const rc = F === "recheck" && it.label && it.label.verdict === "notplate";
+  $("rechkb").hidden = !rc;
+  if (rc) $("rechkb").textContent = `you marked this Not a plate, but the second pass found plate-like text${it.alt ? " (" + it.alt.plate + ")" : ""}: is there a plate in the frame?`;
+  $("rejb").hidden = !(it.rejected && !it.label); $("rejb").textContent = `auto-rejected: not plate-shaped (aspect ${it.aspect})`;
+  $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : "auto-accepted";
+  renderLike(it.like);
+  renderNear(it.recent);
+  liveKey = "";
+  renderWatch();
+  const sh = $("shape");
+  sh.hidden = !(it.shape && it.shape !== "ok");
+  sh.textContent = `shape ${it.shape} (${it.aspect})`; sh.title = "US plates are 2:1. This text region is not plate-shaped, so it may not be a plate.";
+  showVehicle(it.vehicle);
+  updateSeen();
+  $("histlink").href = "/history?q=" + encodeURIComponent((it.label && it.label.truth) || it.plate);
+  const pk = $("pick");
+  if (it.pick && it.pick.plate !== it.plate) {
+    pk.hidden = false; pk.className = "alt";
+    pk.innerHTML = `best guess <span class="a">${it.pick.plate}</span> (${it.pick.why}) &middot; use`;
+    pk.title = "Chosen from the first pass, second pass and crop read. A hint: check it against the frame.";
+    pk.onclick = () => { buildCells(it.pick.plate.split("")); focusCell(cells().length - 1); };
+  } else if (it.fits && it.fits !== "TLC") {
+    const f = FIT[it.fits];
+    pk.hidden = false; pk.className = "alt agree"; pk.title = f.state ? "Click to set the state chip" : "";
+    pk.textContent = `fits the ${f.name} pattern (${f.detail})` + (f.state ? ` \u00b7 set ${f.state}` : "");
+    pk.onclick = f.state ? () => applyState(f.state, "from the plate pattern") : null;
+  } else pk.hidden = true;
+  const tl = $("tlc");
+  if (it.tlc) {
+    tl.hidden = false; tl.className = "alt tlc" + (it.tlc.shaped ? " agree" : "");
+    tl.innerHTML = it.tlc.shaped ? `fits the NYC TLC pattern &middot; set NY` : `NYC TLC pattern <span class="a">${it.tlc.plate}</span> &middot; use`;
+    tl.title = "TLC plates are T or Y, six digits, a letter. The reader often gives 1 for T and 0 for C.";
+    tl.onclick = it.tlc.shaped ? () => applyState("NY", "TLC plates are NYC taxis")
+                               : () => { buildCells(it.tlc.plate.split("")); focusCell(cells().length - 1); applyState("NY", "TLC plates are NYC taxis"); };
+  } else tl.hidden = true;
+  const alt = $("alt");
+  if (!it.alt) { alt.hidden = !it.second_pass; alt.className = "alt"; alt.textContent = "2nd pass: no read"; alt.onclick = null; }
+  else {
+    const agree = it.alt.plate === it.plate;
+    alt.hidden = false; alt.className = "alt" + (agree ? " agree" : "");
+    alt.innerHTML = agree ? `2nd pass agrees <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(3)}`
+                          : `2nd pass says <span class="a">${it.alt.plate}</span> ${it.alt.conf.toFixed(3)} &middot; use`;
+    if (it.crop && !agree) alt.innerHTML += ` &middot; <span id="cropuse" class="cropuse" title="Click to copy the crop read into the boxes">crop read <span class="a">${it.crop}</span>${it.crop === it.plate ? " (backs 1st)" : it.crop === it.alt.plate ? " (backs 2nd)" : ""} &middot; use</span>`;
+    alt.onclick = agree ? null : () => { buildCells(it.alt.plate.split("")); focusCell(cells().length - 1); };
+    const cu = $("cropuse");
+    if (cu) cu.onclick = e => { e.stopPropagation(); buildCells(it.crop.split("")); focusCell(cells().length - 1); };
+  }
+  orig = it.plate.split("");
+  const lb = it.label;
+  setState(lb ? lb.state : "UNKN");
+  autoStateVal = null;
+  stateFromRecord(it.vehicle);
+  buildCells(lb && lb.verdict === "fix" && lb.truth ? lb.truth.split("") : orig.slice());
+  $("prev").disabled = !D.prev; $("next").disabled = !D.next;
+  $("last").disabled = !D.last_reviewed || D.last_reviewed === it.image;
+  $("nextun").disabled = !D.next_unreviewed;
+  $("queue").innerHTML = "";
+  D.window.forEach(w => {
+    const d = document.createElement("div");
+    d.className = "dot" + (w.image === it.image ? " cur" : "") + (w.verdict ? " s-" + w.verdict : "");
+    d.textContent = w.n; d.title = w.plate + (w.state && w.state !== "UNKN" ? " " + w.state : "");
+    d.onclick = () => go(w.image);
+    $("queue").appendChild(d);
+  });
+  if (!lb) { const f = cells()[0]; if (f) f.focus(); }
+}
+
+
+/* "seen N times before" link and the montage of earlier sightings of this plate */
+/* hints under the OCR read; they follow the boxes while you edit (see liveRefresh) */
+/* picking a hint for a plate you already labeled with a state also sets that state */
+const FIT = {      // plate patterns you described, and the state each one usually means
+  TLC: { name: "NYC TLC", state: "NY", detail: "T, 6 digits, letter" }, NYS: { name: "NYS standard", state: "NY", detail: "3 letters, 4 digits" },
+  NJ: { name: "NJ", state: "NJ", detail: "letter, 2 digits, 3 letters" }, COM: { name: "NY commercial", state: "NY", detail: "5 digits, 2 letters" },
+  MOP: { name: "NY moped", state: "NY", detail: "3 digits, 2 letters, digit" },
+};
+function applyState(s, why) { if (s && s !== "UNKN") { setState(s); toast("State set to " + s + " (" + (why || "from your earlier label") + ")"); } }
+function renderLike(list) {
+  const lk = $("like");
+  lk.innerHTML = "";
+  if (list && list.length && !(it.label && !edited())) {
+    lk.hidden = false;
+    const lead = document.createElement("span"); lead.className = "seen"; lead.textContent = "same last 4 as a plate seen before:"; lk.appendChild(lead);
+    for (const e of list) {
+      const b = document.createElement("button"); b.className = "alt";
+      b.title = `${e.d} leading letter${e.d === 1 ? "" : "s"} differ; seen ${e.n} other time${e.n === 1 ? "" : "s"}. Click to copy into the boxes.`;
+      b.innerHTML = `<span class="a">${e.plate}</span> ${e.n}&times;`;
+      b.onclick = () => { buildCells(e.plate.split("")); focusCell(cells().length - 1); applyState(e.state); };
+      lk.appendChild(b);
+    }
+  } else lk.hidden = true;
+}
+function renderNear(rec) {
+  const nr = $("near");
+  if (rec && !rec.exact && !(it.label && !edited())) {
+    nr.hidden = false; nr.className = "alt";
+    nr.innerHTML = `one character from <span class="a">${rec.plate}</span> (verified ${rec.n}&times; within a month) &middot; use`;
+    nr.onclick = () => { buildCells(rec.plate.split("")); focusCell(cells().length - 1); applyState(rec.state); };
+  } else nr.hidden = true;
+}
+/* true once every box is filled and the text differs from the OCR read */
+const edited = () => !!it && cells().length > 0 && cells().every(x => x.value) && value().length >= 2 && value() !== it.plate;
+let liveT = null, liveKey = "", liveWatch = null;
+function liveRefresh() {
+  if (!it) return;
+  const key = it.image + "|" + (edited() ? value() : "");
+  if (key === liveKey) return;
+  liveKey = key;
+  clearTimeout(liveT);
+  liveT = setTimeout(async () => {
+    updateSeen();
+    const chk = $("editchk");
+    if (!edited()) { chk.hidden = true; renderLike(it.like); renderNear(it.recent); liveWatch = null; renderWatch(); showVehicle(it.vehicle); stateFromRecord(it.vehicle); return; }
+    const p = value();
+    try {
+      const r = await api(`/api/lookup?q=${encodeURIComponent(p)}&image=${encodeURIComponent(it.image)}`);
+      if (!it || !edited() || value() !== p) return;            // edited again while waiting
+      renderLike(r.like); renderNear(r.recent); liveWatch = r.watch; renderWatch(); showVehicle(r.vehicle); stateFromRecord(r.vehicle);
+      const bits = [];
+      if (r.fits) bits.push(`fits the ${FIT[r.fits].name} pattern`);
+      if (r.recent && r.recent.exact) bits.push(`you verified it ${r.recent.n} other time${r.recent.n === 1 ? "" : "s"} nearby`);
+      if (r.watch && r.watch.level === "exact") bits.push(`on your watchlist as ${r.watch.nickname}`);
+      chk.hidden = false; chk.className = "seen";
+      chk.innerHTML = `checking <b>${p}</b>${bits.length ? ": " + bits.join(" &middot; ") : ""}`;
+    } catch (e) { /* optional */ }
+  }, 250);
+}
+/* what NYC parking tickets say this plate is (local index, see docs/usage.md); shows nothing until it is built */
+/* If the plate has a NYC ticket record and no state chip is picked, pick the record's state. A chip you chose yourself is never changed;
+   one this function set is replaced when you edit the plate to something with a different record. A record marked stale is ignored. */
+let autoStateVal = null;
+function stateFromRecord(v) {
+  if (!v || !v.available || v.none || !v.state || (v.stale && v.stale.same_record)) return;
+  const cur = getState();
+  if (cur === "UNKN" || cur === autoStateVal) {
+    if (cur !== v.state) toast("State set to " + v.state + " (from NYC ticket data)");
+    setState(v.state); autoStateVal = v.state;
+  }
+}
+function showVehicle(v) {
+  const el = $("veh");
+  if (!v || !v.available || v.none) { el.hidden = !(v && v.available); el.textContent = v && v.none ? "no NYC ticket on record" : ""; el.title = "Vehicle make, body, year and color from NYC parking tickets (local index). None found for this plate."; return; }
+  el.hidden = false; el.classList.toggle("stale", !!v.stale); el.replaceChildren();
+  const t = document.createElement("span"); t.className = "vt"; t.textContent = "\u{1F697} " + v.text; el.appendChild(t);
+  if (v.stale) { const m = document.createElement("span"); m.textContent = v.stale.same_record ? " \u00b7 verified stale" : " \u00b7 was marked stale, record has since changed"; el.appendChild(m); }
+  const b = document.createElement("button"); b.className = "vbtn"; b.textContent = v.stale && v.stale.same_record ? "undo" : "doesn't match";
+  b.title = v.stale && v.stale.same_record ? "Remove the stale mark" : "Mark this record verified stale: the vehicle you see does not match it. Nothing else changes.";
+  b.onclick = async () => {
+    const stale = !(v.stale && v.stale.same_record);
+    try { await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale, image: it && it.image }) });
+      const fresh = await api("/api/lookup?q=" + encodeURIComponent(v.plate) + "&image=" + encodeURIComponent(it ? it.image : "")); it.vehicle = fresh.vehicle; showVehicle(fresh.vehicle);
+      toast(stale ? "Marked verified stale" : "Stale mark removed"); } catch (e) { toast("Could not save the mark"); }
+  };
+  el.appendChild(b);
+  el.title = "From NYC parking tickets (" + v.state + ", up to fiscal year " + v.last_fy + "). A ticket writer typed it, so it can be wrong or out of date.";
+}
+const seenPlate = () => (edited() ? value() : ((it.label && it.label.truth) || it.plate));
+let seenDays = 30;
+try { seenDays = +localStorage.getItem("lprSeenDays") || 30; } catch (e) { /* storage is optional */ }
+/* the OTHER sightings of this plate within the chosen window (0 = no limit) either side of this one, unreviewed reads included */
+function earlier(r) {
+  const t0 = Date.parse(it.day + "T00:00:00"), lim = seenDays * 86400000;
+  return r.sightings.filter(s => s.image !== it.image && (!seenDays || Math.abs(Date.parse(s.day + "T00:00:00") - t0) <= lim));
+}
+async function updateSeen() {
+  const el = $("seen"), me = it && it.image;
+  el.textContent = "";
+  if (!me) return;
+  try {
+    const r = await api("/api/history?unverified=1&q=" + encodeURIComponent(seenPlate()));
+    if (!it || it.image !== me) return;
+    const n = earlier(r).length, opts = [7, 30, 90, 0].map(d => `<option value="${d}"${d === seenDays ? " selected" : ""}>${d ? d + " days" : "all time"}</option>`).join("");
+    el.innerHTML = `${n ? `seen <a id="seenn" title="Show these sightings">${n}</a> other time${n === 1 ? "" : "s"}` : "not seen again"} within <select id="seeny" style="font-size:12px">${opts}</select>`;
+    if (n) $("seenn").onclick = openMontage;
+    $("seeny").onchange = e => { seenDays = +e.target.value; try { localStorage.setItem("lprSeenDays", seenDays); } catch (x) { /* ignore */ } updateSeen(); };
+  } catch (e) { /* the link is optional */ }
+}
+async function openMontage() {
+  const p = seenPlate(), me = it.image;
+  $("montp").textContent = p; $("montn").textContent = "loading..."; $("montg").innerHTML = ""; $("mont").hidden = false;
+  $("montfull").href = "/history?q=" + encodeURIComponent(p);
+  const r = await api("/api/history?unverified=1&q=" + encodeURIComponent(p));
+  const list = earlier(r).reverse();      // oldest first
+  $("montn").textContent = `${list.length} other sighting${list.length === 1 ? "" : "s"} within ${seenDays ? seenDays + " days" : "(all time)"}, oldest first. Click one to open it.`;
+  $("montg").innerHTML = list.map(s => {
+    let st = "";
+    if (s.box) {
+      const [x0, y0, x1, y1] = s.box, bw = x1 - x0, bh = y1 - y0, px = bw * 0.15, py = bh * 0.4;
+      const cx = Math.max(0, x0 - px), cy = Math.max(0, y0 - py), cw = Math.min(W, x1 + px) - cx, ch = Math.min(H, y1 + py) - cy;
+      const k = Math.min(230 / cw, 86 / ch);
+      st = `background-image:url('/img/${encodeURIComponent(s.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px`;
+    }
+    return `<button class="cell" data-i="${s.image}"><span class="th" style="${st}"></span><small>${s.day} ${s.time} CamTime &middot; ${s.basis}</small></button>`;
+  }).join("");
+}
+const closeMontage = () => { $("mont").hidden = true; };
+$("montx").onclick = closeMontage;
+$("mont").addEventListener("click", e => { if (e.target === $("mont")) closeMontage(); const c = e.target.closest(".cell"); if (c) { closeMontage(); go(c.dataset.i, false); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("mont").hidden) { closeMontage(); e.stopPropagation(); } }, true);
+
+/* watchlist: add or remove the plate shown (the boxes if you edited them) */
+const curWatch = () => (edited() ? liveWatch : it.watch);
+function renderWatch() {
+  const w = curWatch(), b = $("watchbtn");
+  $("watchform").hidden = true;
+  b.classList.toggle("watching", !!(w && w.level === "exact"));
+  if (w && w.level === "exact") { b.textContent = "\u2605 Watching: " + w.nickname; b.dataset.mode = "remove"; b.title = "On the watchlist as " + w.plate + ". Click to remove."; }
+  else if (w) { b.textContent = "\u2606 Watch (near " + w.nickname + ")"; b.dataset.mode = "add"; b.title = "One character from watched plate " + w.plate + " (" + w.nickname + "). Click to watch this exact plate too."; }
+  else { b.textContent = "\u2606 Watch"; b.dataset.mode = "add"; b.title = "Alert me when this plate is seen again"; }
+}
+function watchPlate() { const v = value(); return v.length >= 2 && cells().every(x => x.value) ? v : it.plate; }
+$("watchbtn").onclick = async () => {
+  if (!it) return;
+  if ($("watchbtn").dataset.mode === "remove") {
+    const cw = curWatch();
+    if (!confirm("Remove " + cw.plate + " (" + cw.nickname + ") from the watchlist?")) return;
+    await api("/api/watch/remove", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: cw.plate }) });
+    if (edited()) liveWatch = null; else it.watch = null;
+    renderWatch(); toast("Removed from watchlist"); return;
+  }
+  $("watchform").hidden = false; $("wnick").value = ""; $("wnick").placeholder = watchPlate(); $("wnick").focus();
+};
+async function addWatch() {
+  const plate = watchPlate(), nick = $("wnick").value.trim() || plate;
+  await api("/api/watch", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate, nickname: nick }) });
+  const nw = { plate, nickname: nick, level: "exact" };
+  if (edited()) liveWatch = nw; else it.watch = nw;
+  renderWatch(); toast("Watching " + nick + " (" + plate + ")");
+}
+$("wadd").onclick = addWatch;
+$("wnick").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addWatch(); } else if (e.key === "Escape") { $("watchform").hidden = true; } e.stopPropagation(); });
+
+/* leveled crop, with the current text under each letter */
+async function drawZoom() {
+  const cur = it, c = $("zoom"), g = c.getContext("2d");
+  g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+  if (!cur) return;
+  if (!cur.box) { g.fillStyle = "#8b93a1"; g.font = "14px system-ui"; g.textAlign = "center"; const msg = cur.second_pass ? ["The second pass ran but found no plate to outline in this frame.", "Judge it from the full frame on the left."] : ["Plate position not computed yet (second pass pending)."];
+    msg.forEach((t, i) => g.fillText(t, c.width / 2, c.height / 2 + i * 22 - (msg.length - 1) * 11)); return; }
+  const img = await loadImg(cur.image);
+  if (cur !== it) return;
+  g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+  const [x0, y0, x1, y1] = cur.box, bw = x1 - x0, bh = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const t = TILT * Math.PI / 180, cs = Math.cos(t), sn = Math.sin(t);
+  const h = Math.max(8, (bh * cs - bw * sn) / (cs * cs - sn * sn)), L = Math.max(20, (bw - h * sn) / cs);
+  const s = Math.min(c.width / (L * 1.2), c.height / (h * 2.6)), midY = c.height * 0.36;
+  g.save(); g.translate(c.width / 2, midY); g.rotate(-t); g.scale(s, s); g.translate(-cx, -cy);
+  g.imageSmoothingQuality = "high"; g.drawImage(img, 0, 0); g.restore();
+  const cl = cells(), chars = cl.map(x => x.value || "\u00b7"), n = chars.length, slot = L * s / n;
+  const fs = Math.max(15, Math.min(28, slot * 0.8));
+  g.font = `600 ${fs}px ui-monospace, Menlo, monospace`; g.textAlign = "center"; g.textBaseline = "middle";
+  const cy0 = Math.min(c.height - fs * 0.9, midY + h * s / 2 + fs * 1.6);
+  const ops = diffOps(orig, cl.map(x => x.value));
+  chars.forEach((ch, i) => {
+    const x = c.width / 2 + (i + 0.5 - n / 2) * slot, changed = ops[i].op !== "match";
+    const pw = Math.min(slot * 0.9, fs * 1.4), ph = fs * 1.5;
+    g.fillStyle = "rgba(0,0,0,.82)"; g.beginPath(); g.roundRect(x - pw / 2, cy0 - ph / 2, pw, ph, 6); g.fill();
+    g.strokeStyle = changed ? "#f5b942" : "#4c9eff"; g.lineWidth = 1.5; g.stroke();
+    g.fillStyle = changed ? "#f5b942" : "#8fc2ff"; g.fillText(ch, x, cy0 + 1);
+    g.fillStyle = changed ? "#f5b942" : "#4c9eff"; g.fillRect(x - 1, cy0 - ph / 2 - 7, 2, 7);
+  });
+}
+
+/* Align the original read with the boxes as they are now (edit distance), so an inserted or deleted
+   character does not make every later box look changed. Per box: match, sub (was X) or ins (new). */
+function diffOps(a, b) {
+  const n = a.length, m = b.length, d = Array.from({ length: n + 1 }, (_, i) => [i, ...Array(m).fill(0)]);
+  for (let j = 1; j <= m; j++) d[0][j] = j;
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  const ops = Array(m);
+  let i = n, j = m;
+  while (j > 0) {
+    if (i > 0 && d[i][j] === d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)) {
+      ops[j - 1] = a[i - 1] === b[j - 1] ? { op: "match" } : { op: "sub", was: a[i - 1] }; i--; j--;
+    } else if (d[i][j] === d[i][j - 1] + 1) { ops[j - 1] = { op: "ins" }; j--; }
+    else i--;                                  // original char with no box left: deleted
+  }
+  return ops;
+}
+
+/* one input per character; editing any box means the read was wrong */
+function buildCells(chars) {
+  sel = -1;
+  const wrap = $("cells"); wrap.innerHTML = "";
+  chars.forEach((ch, i) => {
+    const col = document.createElement("div"); col.className = "cell";
+    const inp = document.createElement("input");
+    inp.maxLength = 1; inp.value = ch; inp.autocomplete = "off"; inp.spellcheck = false;
+    inp.setAttribute("aria-label", "Character " + (i + 1));
+    inp.addEventListener("focus", () => inp.select());
+    inp.addEventListener("input", () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); if (inp.value) focusCell(i + 1); refresh(); });
+    inp.addEventListener("keydown", e => {
+      if (e.altKey) return;
+      if (e.key === "ArrowLeft") { e.preventDefault(); focusCell(i - 1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); focusCell(i + 1); }
+      else if (e.key === "Backspace" && !inp.value) { e.preventDefault(); focusCell(i - 1); }
+      else if (e.key === "Enter") { e.preventDefault(); submit(); }
+      e.stopPropagation();
+    });
+    col.append(inp, document.createElement("small")); wrap.appendChild(col);
+  });
+  refresh();
+}
+const cells = () => [...$("cells").querySelectorAll("input")];
+const focusCell = i => { const c = cells(); if (c[i]) c[i].focus(); };
+const value = () => cells().map(x => x.value).join("");
+function refresh() {
+  const ops = diffOps(orig, cells().map(x => x.value));
+  cells().forEach((inp, i) => {
+    const o = ops[i], changed = o.op !== "match";
+    inp.classList.toggle("chg", changed);
+    const sm = inp.nextSibling; sm.textContent = o.op === "sub" ? "was " + o.was : o.op === "ins" ? "new" : ""; sm.classList.toggle("chg", changed);
+  });
+  const ed = it && value() !== it.plate;
+  $("btnOk").disabled = !!ed || F === "recheck";     // in the re-check view the first read is the non-plate text
+  $("save").disabled = !ed;
+  drawZoom();
+  if (typeof liveRefresh === "function") liveRefresh();
+}
+const mutate = fn => { const v = cells().map(x => x.value); fn(v); buildCells(v); };
+
+function getState() { const r = document.querySelector("input[name=st]:checked").value; return r !== "__" ? r : ($("stText").value.trim().toUpperCase() || "UNKN"); }
+function setState(v) {
+  const known = ["UNKN", "NY", "NJ", "CT", "MA", "FL", "PA"], val = known.includes(v) ? v : "__";
+  document.querySelector(`input[name=st][value="${val}"]`).checked = true;
+  $("stText").value = known.includes(v) ? "" : v;
+}
+function submit() {
+  if (!it) return;
+  if (value() === it.plate) return decide("ok");
+  if (cells().some(x => !x.value) || value().length < 2) return toast("Fill every box first");
+  decide("fix", value());
+}
+async function decide(verdict, truth) {
+  if (!it || busy) return;
+  busy = true;
+  try {
+    const saved = await api("/api/label", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" },
+                              body: JSON.stringify({ image: it.image, verdict, truth, state: getState(), recheck: F === "recheck" }) });
+    const msg = { ok: "Correct", fix: `Fixed: ${it.plate} \u2192 ${truth}`, notplate: "Not a plate", obstructed: "Obstructed", skip: "Can't tell" }[verdict];
+    toast("Saved: " + msg + (saved && saved.applied ? ` \u00b7 state ${saved.state} also set on ${saved.applied} other sighting${saved.applied === 1 ? "" : "s"} of ${saved.plate}` : ""));
+    const nxt = D.next_unreviewed || D.next;
+    if (nxt) await go(nxt); else { await go(it.image, false); toast("Caught up. New plates appear as processing continues."); }
+  } catch (e) { toast("Save failed, not recorded"); }
+  busy = false;
+}
+
+$("stText").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ""); $("stOther").checked = true; });
+$("stText").addEventListener("focus", () => { $("stOther").checked = true; });
+$("stText").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); submit(); } e.stopPropagation(); });
+$("btnOk").onclick = () => decide("ok"); $("save").onclick = submit;
+$("btnNot").onclick = () => decide("notplate"); $("btnObs").onclick = () => decide("obstructed"); $("btnSkip").onclick = () => decide("skip");
+/* clicking a button blurs the box, so remember which box was selected last */
+let sel = -1;
+$("cells").addEventListener("focusin", e => { sel = cells().indexOf(e.target); });
+$("addc").onclick = () => { const n = cells().length, i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i + 1, 0, "")); focusCell(i + 1); };
+$("delc").onclick = () => { const n = cells().length; if (n < 2) return; const i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i, 1)); focusCell(Math.min(i, n - 2)); };
+$("reset").onclick = () => { buildCells(orig.slice()); focusCell(0); };
+$("last").onclick = () => D.last_reviewed && go(D.last_reviewed); $("nextun").onclick = () => D.next_unreviewed && go(D.next_unreviewed);
+$("prev").onclick = () => D.prev && go(D.prev); $("next").onclick = () => D.next && go(D.next);
+async function poll() {
+  if (busy || document.hidden) return;
+  try {
+    const d = await api(`/api/item?image=${encodeURIComponent(it ? it.image : "")}&f=${F}&day=${DAY}`);
+    if (!it && d.item) { D = d; it = d.item; history.replaceState(null, "", `/i/${encodeURIComponent(it.image)}` + (F ? `?f=${F}` : "")); render(); return; }
+    if (!it) { D = d; render(); return; }
+    D.prev = d.prev; D.next = d.next; D.next_unreviewed = d.next_unreviewed; D.last_reviewed = d.last_reviewed; D.counts = d.counts; D.all = d.all; D.total = d.total; D.window = d.window; D.n = d.n;
+    D.days = d.days; D.day = d.day;
+    statsLine();
+    $("pos").textContent = `${D.n} of ${D.total}`;
+    $("prev").disabled = !D.prev; $("next").disabled = !D.next;
+    $("last").disabled = !D.last_reviewed || D.last_reviewed === it.image; $("nextun").disabled = !D.next_unreviewed;
+    $("queue").innerHTML = "";
+    D.window.forEach(w => { const e = document.createElement("div"); e.className = "dot" + (w.image === it.image ? " cur" : "") + (w.verdict ? " s-" + w.verdict : ""); e.textContent = w.n; e.title = w.plate; e.onclick = () => go(w.image); $("queue").appendChild(e); });
+  } catch (e) { /* server restarting; try again next tick */ }
+}
+setInterval(poll, 30000);
+$("daysel").onchange = e => { DAY = e.target.value; go("", true); };
+$("filter").onchange = e => { F = e.target.value; go("", true); };
+document.addEventListener("keydown", e => {
+  if (!e.altKey) return;
+  if (e.code === "KeyN") { e.preventDefault(); decide("notplate"); }
+  else if (e.code === "KeyO") { e.preventDefault(); decide("obstructed"); }
+  else if (e.code === "KeyS") { e.preventDefault(); decide("skip"); }
+  else if (e.code === "KeyL") { e.preventDefault(); D.last_reviewed && go(D.last_reviewed); }
+  else if (e.code === "KeyU") { e.preventDefault(); D.next_unreviewed && go(D.next_unreviewed); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); D.prev && go(D.prev); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); D.next && go(D.next); }
+});
+window.addEventListener("popstate", () => { F = new URLSearchParams(location.search).get("f") || ""; go(decodeURIComponent(location.pathname.replace(/^\/i\//, "")), false); });
+api("/api/config").then(c => { TILT = c.tilt; W = c.w; H = c.h; }).catch(() => {})
+  .finally(() => go(decodeURIComponent(location.pathname.replace(/^\/i\//, "")), false));
+</script>
+</body>
+</html>

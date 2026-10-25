@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate Operations</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10); --wash: rgba(11,11,11,.05); --empty: #efeee9;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --other: #a8a7a0;
+    --accent: #2a78d6; --good: #006300;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --wash: rgba(255,255,255,.06); --empty: #242422;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --other: #5f5e59;
+      --accent: #3987e5; --good: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --wash: rgba(255,255,255,.06); --empty: #242422;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --other: #5f5e59;
+    --accent: #3987e5; --good: #0ca30c;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--ring); position: sticky; top: 0; z-index: 20; }
+  header.top h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  nav.main a { margin-right: 14px; color: var(--ink2); font-size: 13.5px; } nav.main a.on { color: var(--ink); font-weight: 600; }
+  nav.sections { margin-left: auto; display: flex; gap: 4px 12px; flex-wrap: wrap; font-size: 12.5px; }
+  nav.sections a { color: var(--ink2); }
+  main { max-width: 1200px; margin: 0 auto; padding: 14px 20px 60px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-bottom: 14px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--ring); background: var(--surface); color: var(--ink2); border-radius: 8px; padding: 4px 11px; font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .chip:hover { background: var(--wash); }
+  .chip[aria-pressed="true"] { color: var(--ink); border-color: var(--axis); font-weight: 600; }
+  .chip[aria-pressed="true"]::before { content: "\2713"; font-weight: 700; color: var(--accent); }
+  label.opt { color: var(--ink2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .note { color: var(--muted); font-size: 12.5px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 12px 14px; }
+  .tile .l { color: var(--ink2); font-size: 12.5px; }
+  .tile .v { font-size: 30px; font-weight: 600; letter-spacing: -.01em; margin-top: 2px; }
+  .tile .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; transition: opacity .15s; }
+  .grid.loading { opacity: .5; }
+  @media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } .card.wide { grid-column: auto; } nav.sections { display: none; } }
+  .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 14px 16px 12px; min-width: 0; scroll-margin-top: 64px; }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 { font-size: 14px; margin: 0; font-weight: 600; }
+  .card .sub { color: var(--ink2); font-size: 12.5px; margin: 2px 0 10px; max-width: 70ch; }
+  .card .bar { display: flex; align-items: flex-start; gap: 10px; }
+  .card .bar > div { flex: 1; }
+  .tbtn { border: 1px solid var(--ring); background: none; color: var(--ink2); border-radius: 7px; padding: 2px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+  .tbtn:hover { background: var(--wash); } .tbtn[aria-pressed="true"] { color: var(--ink); border-color: var(--axis); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 6px; font-size: 12.5px; color: var(--ink2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  svg text { fill: var(--muted); font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; }
+  svg text.v { fill: var(--ink2); }
+  svg .gl { stroke: var(--grid); stroke-width: 1; } svg .ax { stroke: var(--axis); stroke-width: 1; }
+  svg .hit { fill: transparent; cursor: default; outline: none; }
+  svg .hit:hover, svg .hit:focus-visible { fill: var(--wash); }
+  svg .cell:hover, svg .cell.on { stroke: var(--ink); stroke-width: 1.5; }
+  table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.t th, table.t td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
+  table.t th { color: var(--muted); font-weight: 500; font-size: 12px; position: sticky; top: 0; background: var(--surface); }
+  table.t td.n, table.t th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .scroll { max-height: 420px; overflow: auto; border-top: 1px solid var(--grid); }
+  .mono { font-family: var(--mono); letter-spacing: .04em; }
+  .tag { font-size: 11px; border: 1px solid var(--ring); color: var(--ink2); border-radius: 99px; padding: 0 7px; }
+  .empty { color: var(--muted); padding: 22px 0; text-align: center; }
+  #tip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; box-shadow: 0 4px 14px rgba(0,0,0,.18); max-width: 260px; }
+  #tip b { font-size: 14px; font-weight: 600; } #tip .k { color: var(--ink2); display: block; }
+  #tip .row { display: flex; gap: 6px; align-items: center; } #tip .row i { width: 12px; height: 2px; border-radius: 1px; display: inline-block; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 18px; max-width: 80ch; }
+
+  .st { display: inline-flex; gap: 5px; align-items: center; font-weight: 600; font-size: 12.5px; }
+  .st.good { color: var(--good); } .st.warn { color: #9a6700; } .st.bad { color: #b42318; } .st.off { color: var(--muted); }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .st.warn { color: #e0a53a; } :root:where(:not([data-theme="light"])) .st.bad { color: #f2796b; } }
+  .att { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
+  .att li { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: baseline; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 13px; margin: 0 0 8px; } .kv dt { color: var(--ink2); } .kv dd { margin: 0; }
+
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Plate operations</h1>
+  <nav class="main"><a href="/">Review</a><a href="/history">History</a><a href="/reports">Reports</a><a href="/ops" class="on">Operations</a></nav>
+  <nav class="sections" aria-label="Sections"><a href="#pipeline">Pipeline</a><a href="#jobs">Jobs</a><a href="#storage">Storage</a><a href="#accuracy">Accuracy</a><a href="#confusion">Confusions</a><a href="#review">Review</a><a href="#machine">Machine</a></nav>
+</header>
+<main>
+  <div class="filters">
+    <button class="chip" id="refresh" title="Reload the numbers now">&#8635; Refresh</button>
+    <label class="opt"><input type="checkbox" id="auto" checked> auto-refresh (30 s)</label>
+    <span class="note" id="scope"></span>
+  </div>
+  <ul class="att" id="att"></ul>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid" id="grid">
+    <section class="card" id="pipeline"><div class="bar"><div><h2>Pipeline and watcher</h2><p class="sub">Clips on the camera share versus clips read today (CamTime), and the watcher's own log.</p></div></div><div class="body" id="c-pipe"></div></section>
+    <section class="card"><div class="bar"><div><h2>Clips processed by hour</h2><p class="sub">New clips the watcher picked up in the last 24 hours, by hour of the Mac clock.</p></div><button class="tbtn" data-t="clips" aria-pressed="false">Table</button></div><div class="body" id="c-clips"></div></section>
+    <section class="card wide" id="jobs"><div class="bar"><div><h2>Scheduled jobs</h2><p class="sub">Everything that runs by itself. Late means no run in twice the usual interval. Switch a job off by creating its no_ file in the local state folder (see docs).</p></div></div><div class="body" id="c-jobs"></div></section>
+    <section class="card" id="storage"><div class="bar"><div><h2>Storage</h2><p class="sub">Size of each part at the last nightly snapshot. The image cache lives on this Mac, the rest on the share.</p></div><button class="tbtn" data-t="store" aria-pressed="false">Table</button></div><div class="body" id="c-store"></div></section>
+    <section class="card"><div class="bar"><div><h2>Storage over time</h2><p class="sub">Data root total per nightly snapshot, without the image cache.</p></div><button class="tbtn" data-t="grow" aria-pressed="false">Table</button></div><div class="body" id="c-grow"></div></section>
+    <section class="card" id="accuracy"><div class="bar"><div><h2>Does confidence mean anything?</h2><p class="sub">Share of your labeled plates the first read got exactly right, by confidence band. From the last score run.</p></div><button class="tbtn" data-t="cal" aria-pressed="false">Table</button></div><div class="body" id="c-cal"></div></section>
+    <section class="card"><div class="bar"><div><h2>Accuracy summary</h2><p class="sub">From reports/accuracy.md. Your labeled set leans toward hard reads, so these are not overall accuracy.</p></div></div><div class="body" id="c-acc"></div></section>
+    <section class="card wide" id="confusion"><div class="bar"><div><h2>Confusion matrix</h2><p class="sub">Rows are what the reader printed, columns are the true character. Only substitutions are shown. A bright cell off the diagonal is a repeated mistake.</p></div><button class="tbtn" data-t="conf" aria-pressed="false">Table</button></div><div class="body" id="c-conf"></div></section>
+    <section class="card wide" id="review"><div class="bar"><div><h2>Review and labels</h2><p class="sub">What happened to each read, per day (last 14 days).</p></div><button class="tbtn" data-t="rev" aria-pressed="false">Table</button></div><div class="body" id="c-rev"></div></section>
+    <section class="card"><div class="bar"><div><h2>Alerts</h2><p class="sub">Watchlist alerts sent per day. This page never sends one.</p></div><button class="tbtn" data-t="alerts" aria-pressed="false">Table</button></div><div class="body" id="c-alerts"></div></section>
+    <section class="card" id="machine"><div class="bar"><div><h2>Machine and data health</h2><p class="sub">This Mac right now, and counts that should stay near zero.</p></div></div><div class="body" id="c-mach"></div></section>
+  </div>
+  <footer>Numbers come from the watcher log, the local state folder, the data root and the process list on this computer. The page rebuilds them every 30 seconds in the background.</footer>
+</main>
+<div id="tip" hidden></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const api = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status); return r.json(); };
+const fmt = n => n >= 10000 ? (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + "K" : n.toLocaleString();
+const HOUR = h => String(h).padStart(2, "0");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const dark = () => document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+const RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
+const rampColor = (v, max) => {      // one hue, light to dark; on the dark surface low values sink into it and high ones lift
+  if (!v || !max) return css("--empty");
+  const t = Math.min(1, v / max), n = RAMP.length;
+  return dark() ? RAMP[n - 1 - Math.round(t * (n - 5))] : RAMP[Math.round(t * (n - 1))];
+};
+const el = (tag, attrs, parent, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+const html = (tag, attrs, parent, text) => { const e = document.createElement(tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+const SER = ["--s1", "--s2", "--s3", "--s4", "--s5"];
+
+/* ---------- tooltip: enhances, never gates (every value is also in the table view) ---------- */
+const tip = $("tip");
+function showTip(target, x, y) {
+  const d = JSON.parse(target.getAttribute("data-tip"));
+  tip.replaceChildren();
+  const b = html("b", {}, tip, d.v); html("span", { class: "k" }, tip, d.t);
+  for (const r of d.rows || []) { const row = html("div", { class: "row" }, tip); if (r.c) html("i", { style: "background:var(" + r.c + ")" }, row); html("span", {}, row, r.k + ": " + r.v); }
+  tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(innerWidth - w - 8, Math.max(8, x + 12)) + "px";
+  tip.style.top = Math.min(innerHeight - h - 8, Math.max(8, y - h - 10 < 8 ? y + 16 : y - h - 10)) + "px";
+}
+document.addEventListener("pointermove", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (t) showTip(t, e.clientX, e.clientY); else tip.hidden = true; });
+document.addEventListener("focusin", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (t) { const r = t.getBoundingClientRect(); showTip(t, r.left + r.width / 2, r.top); } });
+document.addEventListener("focusout", () => { tip.hidden = true; });
+const tipAttr = (v, t, rows) => JSON.stringify({ v, t, rows });
+
+/* ---------- chart helpers ---------- */
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return ([1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(x => f <= x + 1e-9)) * p; }
+function legend(host, items) {
+  if (items.length < 2) return;
+  const lg = html("div", { class: "legend" }, host);
+  for (const it of items) { const s = html("span", {}, lg); html("i", { style: "background:var(" + it.c + ")" }, s); s.appendChild(document.createTextNode(it.name)); }
+}
+function barPath(x, y, w, h, r, roundTop) {   // 4px rounded data end, square at the baseline
+  r = Math.max(0, Math.min(r, w / 2, h));
+  if (!roundTop || r === 0) return `M${x},${y}h${w}v${h}h${-w}z`;
+  return `M${x},${y + h}V${y + r}a${r},${r} 0 0 1 ${r},${-r}h${w - 2 * r}a${r},${r} 0 0 1 ${r},${r}V${y + h}z`;
+}
+/* columns: labels[], series[{name, c, values[]}], stacked bool */
+function columns(host, o) {
+  const W = Math.max(280, host.clientWidth), H = o.height || 200, m = { l: 38, r: 8, t: 8, b: o.xTitle ? 34 : 22 };
+  const n = o.labels.length, pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const totals = o.labels.map((_, i) => o.stacked ? o.series.reduce((a, s) => a + s.values[i], 0) : Math.max(...o.series.map(s => s.values[i])));
+  const max = niceMax(Math.max(...totals, 1));
+  legend(host, o.series.length > 1 ? o.series.map(s => ({ name: s.name, c: s.c })) : []);
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  for (let k = 0; k <= 4; k++) { const v = max * k / 4, y = m.t + ph - ph * v / max; el("line", { class: k ? "gl" : "ax", x1: m.l, x2: W - m.r, y1: y, y2: y }, svg); el("text", { x: m.l - 6, y: y + 3.5, "text-anchor": "end" }, svg, fmt(Math.round(v * 10) / 10)); }
+  const slot = pw / n, bw = Math.min(24, slot * (o.series.length > 1 && !o.stacked ? 0.8 / o.series.length : 0.7));
+  o.labels.forEach((lab, i) => {
+    const cx = m.l + slot * (i + 0.5);
+    const every = Math.ceil(n / Math.max(2, Math.floor(pw / (o.labelW || 34)))); if (i % every === 0) el("text", { x: cx, y: H - m.b + 14, "text-anchor": "middle" }, svg, lab);
+    let acc = 0;
+    o.series.forEach((s, k) => {
+      const v = s.values[i], h = ph * v / max; if (!v) return;
+      const gap = o.stacked ? 2 : 0, x = o.stacked ? cx - bw / 2 : cx - (bw * o.series.length) / 2 + k * bw;
+      const y = m.t + ph - (o.stacked ? ph * (acc + v) / max : h), hh = Math.max(1, (o.stacked ? h : h) - gap);
+      const lastSeg = !o.stacked || k === o.series.map((q, j) => q.values[i] ? j : -1).filter(j => j >= 0).pop();
+      el("path", { d: barPath(x, y, bw - (o.stacked ? 0 : 2), hh, 4, lastSeg), fill: "var(" + s.c + ")", opacity: (o.dim && o.dim(i)) ? 0.5 : 1 }, svg);
+      acc += v;
+    });
+    const rows = o.series.map(s => ({ k: s.name, v: fmt(s.values[i]), c: s.c }));
+    const r = el("rect", { class: "hit", x: m.l + slot * i, y: m.t, width: slot, height: ph, tabindex: 0, "data-tip": tipAttr(o.tipValue ? o.tipValue(i) : fmt(totals[i]), (o.tipLabel ? o.tipLabel(i) : lab), o.series.length > 1 ? rows : (o.tipRows ? o.tipRows(i) : [])) }, svg);
+  });
+  if (o.xTitle) el("text", { x: m.l + pw / 2, y: H - 4, "text-anchor": "middle" }, svg, o.xTitle);
+}
+/* horizontal bars: labels[], series[], stacked */
+function hbars(host, o) {
+  const rowH = o.rowH || 30, W = Math.max(300, host.clientWidth), m = { l: o.left || 70, r: 46, t: 4, b: 20 }, n = o.labels.length, H = m.t + m.b + rowH * n;
+  const totals = o.labels.map((_, i) => o.series.reduce((a, s) => a + s.values[i], 0)), max = niceMax(Math.max(...totals, 1)), pw = W - m.l - m.r;
+  legend(host, o.series.length > 1 ? o.series.map(s => ({ name: s.name, c: s.c })) : []);
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  for (let k = 0; k <= 4; k++) { const x = m.l + pw * k / 4; el("line", { class: k ? "gl" : "ax", x1: x, x2: x, y1: m.t, y2: H - m.b }, svg); el("text", { x, y: H - 6, "text-anchor": "middle" }, svg, fmt(Math.round(max * k / 4))); }
+  o.labels.forEach((lab, i) => {
+    const y = m.t + rowH * i, bh = Math.min(20, rowH - 10), by = y + (rowH - bh) / 2;
+    el("text", { x: m.l - 8, y: by + bh / 2 + 4, "text-anchor": "end", class: "v" }, svg, lab);
+    let acc = 0; const present = o.series.map((s, k) => s.values[i] ? k : -1).filter(k => k >= 0), last = present[present.length - 1];
+    o.series.forEach((s, k) => {
+      const v = s.values[i]; if (!v) return; const w = Math.max(1, pw * v / max - (o.stacked ? 2 : 0));
+      const x = m.l + pw * acc / max; el("path", { d: `M${x},${by}h${w - 4 * (k === last)}${k === last ? "a4,4 0 0 1 4,4v" + (bh - 8) + "a4,4 0 0 1 -4,4" : "v" + bh}h${-(w - 4 * (k === last))}z`, fill: "var(" + s.c + ")" }, svg);
+      acc += v;
+    });
+    el("text", { x: m.l + pw * acc / max + 6, y: by + bh / 2 + 4, class: "v" }, svg, fmt(totals[i]));
+    el("rect", { class: "hit", x: 0, y, width: W, height: rowH, tabindex: 0, "data-tip": tipAttr(fmt(totals[i]), lab, o.series.length > 1 ? o.series.map(s => ({ k: s.name, v: fmt(s.values[i]), c: s.c })) : []) }, svg);
+  });
+}
+/* heatmap: rows[], cols[], values[row][col] */
+function heatmap(host, o) {
+  const W = Math.max(300, host.clientWidth), m = { l: o.left || 44, r: 8, t: 6, b: 24 }, nr = o.rows.length, nc = o.cols.length;
+  const cw = (W - m.l - m.r) / nc, ch = Math.min(o.cellH || 18, 26), H = m.t + m.b + ch * nr;
+  const max = Math.max(...o.values.flatMap((r, i) => o.skipDiag ? r.filter((_, j) => j !== i) : r), 1);
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  o.rows.forEach((r, i) => {
+    el("text", { x: m.l - 6, y: m.t + ch * i + ch / 2 + 3.5, "text-anchor": "end" }, svg, r);
+    o.cols.forEach((c, j) => {
+      const v = o.values[i][j], x = m.l + cw * j, y = m.t + ch * i;
+      el("rect", { class: "cell", x: x + 1, y: y + 1, width: Math.max(1, cw - 2), height: ch - 2, rx: 3, fill: o.skipDiag && i === j ? css("--empty") : rampColor(v, max), tabindex: 0, "data-tip": tipAttr(o.fmtV ? o.fmtV(v) : fmt(v), r + " · " + c, []) }, svg);
+      if (o.labelCells && cw > 38) el("text", { x: x + cw / 2, y: y + ch / 2 + 4, "text-anchor": "middle", style: "fill:" + (!(o.skipDiag && i === j) && v / max > 0.55 && !dark() ? "#fff" : "var(--ink)") }, svg, o.fmtV ? o.fmtV(v) : fmt(v));
+    });
+  });
+  scaleLegend(host, max, o.fmtV);
+  const every = Math.ceil(nc / Math.max(2, Math.floor((W - m.l) / 30)));
+  o.cols.forEach((c, j) => { if (j % every === 0) el("text", { x: m.l + cw * (j + 0.5), y: H - 6, "text-anchor": "middle" }, svg, c); });
+}
+/* color scale for a heatmap: fewer on the left, more on the right (the ramp is reversed on the dark surface) */
+function scaleLegend(host, max, f) {
+  const lg = html("div", { class: "legend", style: "margin:4px 0 0; align-items:center" }, host); lg.setAttribute("aria-hidden", "true");
+  html("span", {}, lg, "0 (none)"); const bar = html("span", { style: "display:inline-flex; gap:2px" }, lg);
+  for (let k = 1; k <= 8; k++) html("i", { style: "width:22px;height:10px;margin:0;background:" + rampColor(max * k / 8, max) }, bar);
+  html("span", {}, lg, (f ? f(max) : fmt(max)) + " (most)");
+}
+/* dot strip: rows[{label, pts:[{x (0..1), tip}]}], x ticks */
+function dotStrip(host, o) {
+  const W = Math.max(300, host.clientWidth), m = { l: 110, r: 14, t: 6, b: 26 }, rowH = 34, n = o.rows.length, H = m.t + m.b + rowH * n, pw = W - m.l - m.r;
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": o.aria || "" }, host);
+  o.ticks.forEach(t => { const x = m.l + pw * t.x; el("line", { class: "gl", x1: x, x2: x, y1: m.t, y2: H - m.b }, svg); el("text", { x, y: H - 8, "text-anchor": t.anchor || "middle" }, svg, t.label); });
+  o.rows.forEach((r, i) => {
+    const y = m.t + rowH * i + rowH / 2; el("line", { class: "gl", x1: m.l, x2: W - m.r, y1: y, y2: y }, svg);
+    el("text", { x: m.l - 8, y: y + 4, "text-anchor": "end", class: "v" }, svg, r.label);
+    if (!r.pts.length) el("text", { x: m.l + 8, y: y + 4 }, svg, "not seen in this period");
+    r.pts.forEach(p => { const x = m.l + pw * p.x; el("circle", { cx: x, cy: y, r: 6, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 }, svg); el("circle", { class: "hit", cx: x, cy: y, r: 13, tabindex: 0, "data-tip": p.tip }, svg); });
+  });
+}
+
+/* ---------- table views: every chart has a twin ---------- */
+const TABLES = {};
+function tableHtml(t) {
+  const tb = html("table", { class: "t" }); const hd = html("tr", {}, html("thead", {}, tb));
+  t.cols.forEach((c, i) => html("th", i ? { class: "n" } : {}, hd, c));
+  const body = html("tbody", {}, tb);
+  t.rows.forEach(r => { const tr = html("tr", {}, body); r.forEach((v, i) => html("td", i ? { class: "n" } : {}, tr, v)); });
+  const wrap = html("div", { class: "scroll" }); wrap.appendChild(tb); return wrap;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".tbtn"); if (!b) return;
+  const id = b.dataset.t, host = $("c-" + id), on = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", on); b.textContent = on ? "Chart" : "Table"; host.dataset.mode = on ? "table" : "chart"; paint(id);
+});
+function paint(id) { const host = $("c-" + id), p = PAINT[id]; if (!host || !p || !DATA) return; host.replaceChildren(); if (host.dataset.mode === "table" && TABLES[id]) host.appendChild(tableHtml(TABLES[id])); else p(host); }
+
+
+let DATA = null, autoT = null;
+const ago = s => s == null ? "never" : s < 90 ? Math.round(s) + " s ago" : s < 5400 ? Math.round(s / 60) + " min ago" : s < 172800 ? Math.round(s / 3600) + " h ago" : Math.round(s / 86400) + " days ago";
+const gb = b => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? Math.round(b / 1e6) + " MB" : Math.round(b / 1e3) + " KB";
+const nowS = () => DATA.generated;
+function status(h, level, word) {   // never color alone: icon + word
+  const icon = { good: "\u2713", warn: "\u25B2", bad: "\u25B2", off: "\u2013" }[level];
+  html("span", { class: "st " + level }, h, icon + " " + word);
+}
+function kv(h, rows) { const d = html("dl", { class: "kv" }, h); rows.forEach(([k, v]) => { html("dt", {}, d, k); const dd = html("dd", {}, d); if (v instanceof Node) dd.appendChild(v); else dd.textContent = v; }); }
+function table(h, cols, rows, numFrom) {
+  const tb = html("table", { class: "t" }), hd = html("tr", {}, html("thead", {}, tb)); cols.forEach((c, i) => html("th", i >= (numFrom ?? 99) ? { class: "n" } : {}, hd, c));
+  const body = html("tbody", {}, tb); rows.forEach(r => { const tr = html("tr", {}, body); r.forEach((v, i) => { const td = html("td", i >= (numFrom ?? 99) ? { class: "n" } : {}, tr); if (v instanceof Node) td.appendChild(v); else td.textContent = v; }); });
+  const w = html("div", { class: "scroll" }, h); w.appendChild(tb);
+}
+const span = (level, word) => { const s = document.createElement("span"); status(s, level, word); return s.firstChild; };
+const PAINT = {
+  pipe(h) {
+    const d = DATA, w = d.watcher, lg = d.lag;
+    const share = lg && lg.available ? [["Clips on the share today", lg.on_share + " (newest " + (lg.newest_clip || "none") + " CamTime)"], ["Read so far", lg.processed + " of " + lg.on_share],
+      ["Waiting", lg.waiting ? span(lg.waiting > 15 ? "warn" : "good", lg.waiting + " clip(s), oldest " + lg.oldest_waiting) : span("good", "none")]] : [];
+    kv(h, [["Watcher log", w.idle_s == null ? span("bad", "no log") : w.idle_s > 600 ? span("bad", "quiet " + ago(w.idle_s)) : span("good", "active, last line " + ago(w.idle_s))], ...share,
+      ["Clips in the last 24 h", String(w.clips_24h)], ["Duplicates merged in 24 h", String(w.merged_24h)], ["Workers per batch", String(w.workers)],
+      ["Errors in 24 h", w.errors_24h ? span("warn", w.errors_24h + " error(s)") : span("good", "none")]]);
+    if (w.recent_errors.length) table(h, ["When", "Recent error"], w.recent_errors.map(e => [new Date(e.t * 1000).toLocaleString([], { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }), e.text]));
+  },
+  clips(h) {
+    const v = DATA.watcher.clips_per_hour, labs = v.map((_, i) => HOUR(i));
+    TABLES.clips = { cols: ["Hour (Mac clock)", "Clips"], rows: labs.map((l, i) => [l, v[i]]) };
+    columns(h, { labels: labs, series: [{ name: "Clips", c: "--s1", values: v }], aria: "Clips processed by hour", xTitle: "hour (Mac clock)", tipLabel: i => labs[i] + ":00", tipValue: i => v[i] + " clips" });
+  },
+  jobs(h) {
+    const rows = DATA.jobs.map(j => {
+      const st = j.running ? span("good", "Running") : j.off ? span("off", "Off") : j.late ? span("bad", "Late") : j.last == null && j.every_s ? span("warn", "Never run") : span("good", "Idle");
+      return [j.name, st, j.last ? ago(nowS() - j.last) : (j.key === "watcher" ? ago(DATA.watcher.idle_s) : "n/a"), j.every_s ? (j.every_s >= 86400 ? j.every_s / 86400 + " day(s)" : j.every_s / 60 + " min") : "as needed", j.note || ""];
+    });
+    table(h, ["Job", "Status", "Last run", "Expected every", "Note"], rows);
+  },
+  store(h) {
+    const s = DATA.storage, last = s.history[s.history.length - 1], disk = s.data_disk;
+    const parts = last ? Object.entries(last.parts).sort((a, b) => b[1] - a[1]) : [];
+    if (disk) kv(h, [["Free on the data disk", gb(disk.free) + " of " + gb(disk.total)], ["Growth", s.growth_per_day ? gb(s.growth_per_day) + " per day" : "needs two snapshots"], ["Days until full", s.days_until_full ? String(s.days_until_full) : "n/a"]]);
+    if (!parts.length) return empty(h, "No snapshot yet. It is written by the nightly cleanup, or run: ops.py snapshot");
+    TABLES.store = { cols: ["Part", "Size"], rows: parts.map(([k, v]) => [k, gb(v)]) };
+    hbars(h, { labels: parts.map(p => p[0]), series: [{ name: "GB", c: "--s1", values: parts.map(p => Math.round(p[1] / 1e7) / 100) }], left: 100, rowH: 28, aria: "Size of each storage part in GB" });
+    html("div", { class: "note" }, h, "Snapshot " + new Date(last.epoch * 1000).toLocaleString() + ". Values in GB.");
+  },
+  grow(h) {
+    const hs = DATA.storage.history; if (hs.length < 2) return empty(h, "Needs two nightly snapshots.");
+    const labs = hs.map(x => x.ts.slice(5, 10)), v = hs.map(x => Math.round(x.total / 1e7) / 100);
+    TABLES.grow = { cols: ["Snapshot", "Total (GB)"], rows: hs.map((x, i) => [x.ts.slice(0, 16).replace("T", " "), v[i]]) };
+    columns(h, { labels: labs, series: [{ name: "GB", c: "--s1", values: v }], aria: "Data root size over time", tipLabel: i => labs[i], tipValue: i => v[i] + " GB" });
+  },
+  cal(h) {
+    const a = DATA.accuracy; if (!a.available || !a.calibration.length) return empty(h, "No score run yet. Run: lpr score");
+    const pct = a.calibration.map(c => Math.round(100 * c.right / Math.max(1, c.total)));
+    TABLES.cal = { cols: ["Confidence", "Labeled plates", "Exactly right", "Share"], rows: a.calibration.map((c, i) => [c.band, c.total, c.right, pct[i] + "%"]) };
+    columns(h, { labels: a.calibration.map(c => c.band), series: [{ name: "Right (%)", c: "--s1", values: pct }], labelW: 80, aria: "First-read accuracy by confidence", xTitle: "first-pass confidence", tipLabel: i => "Confidence " + a.calibration[i].band, tipValue: i => pct[i] + "% right", tipRows: i => [{ k: "Labeled plates", v: String(a.calibration[i].total) }] });
+  },
+  acc(h) {
+    const a = DATA.accuracy; if (!a.available) return empty(h, "reports/accuracy.md not found.");
+    const f = p => p ? p.right + " of " + p.total + " (" + Math.round(100 * p.right / Math.max(1, p.total)) + "%)" : "n/a";
+    kv(h, [["First pass, all known plates", f(a.first_pass)], ["When both passes agree", f(a.agree)], ["Night 00-06", f(a.night)], ["Day 07 and later", f(a.day)], ["Last score run", new Date(a.updated * 1000).toLocaleString()]]);
+    html("div", { class: "note" }, h, a.header);
+    const b = html("button", { class: "chip" }, h, "Recompute now"); b.onclick = async () => { b.disabled = true; b.textContent = "Started"; try { await fetch("/api/ops/score", { method: "POST", headers: HDR }); } catch (e) { /* the page keeps working */ } };
+  },
+  conf(h) {
+    const c = DATA.confusion; if (!c.available) return empty(h, "reports/confusions.csv not found.");
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split(""), ix = Object.fromEntries(chars.map((x, i) => [x, i]));
+    const m = chars.map(() => chars.map(() => 0)); c.subs.forEach(r => { if (r.ocr in ix && r.true in ix) m[ix[r.ocr]][ix[r.true]] += r.n; });
+    const top = c.subs.slice().sort((a, b) => b.n - a.n).slice(0, 12);
+    TABLES.conf = { cols: ["Printed", "True", "Times"], rows: top.map(r => [r.ocr, r.true, r.n]) };
+    heatmap(h, { rows: chars, cols: chars, values: m, left: 24, cellH: 15, aria: "Substitution confusion matrix, printed versus true character", fmtV: v => v + " times" });
+    html("div", { class: "note" }, h, "Top: " + top.slice(0, 6).map(r => r.ocr + " read for " + r.true + " (" + r.n + ")").join(", ") + ".");
+  },
+  rev(h) {
+    const r = DATA.review, days = r.days; if (!days.length) return empty(h);
+    const S = [["Labeled or approved", "--s1", x => Math.max(0, x.total - x.auto - x.rejected - x.left - x.waiting)], ["Auto", "--s2", x => x.auto], ["Auto-rejected", "--s3", x => x.rejected], ["Left to review", "--s4", x => x.left], ["Waiting for second pass", "--s5", x => x.waiting]];
+    TABLES.rev = { cols: ["Day", ...S.map(s => s[0]), "Re-check"], rows: days.map(x => [x.day, ...S.map(s => s[2](x)), x.recheck]) };
+    hbars(h, { labels: days.map(x => x.day.slice(5)), stacked: true, left: 50, rowH: 26, series: S.map(s => ({ name: s[0], c: s[1], values: days.map(s[2]) })), aria: "What happened to each read per day" });
+    html("div", { class: "note" }, h, fmt(r.labels) + " labels, " + fmt(r.merged) + " duplicate frames merged, " + fmt(r.states) + " plate states, " + r.stale + " vehicle record(s) marked stale, " + r.recheck + " waiting for a re-check.");
+  },
+  alerts(h) {
+    const a = DATA.alerts; if (!a.by_day.length) return empty(h, "No alert in the last 14 days.");
+    TABLES.alerts = { cols: ["Day", "Alerts"], rows: a.by_day.map(x => [x.day, x.n]) };
+    columns(h, { labels: a.by_day.map(x => x.day), series: [{ name: "Alerts", c: "--s1", values: a.by_day.map(x => x.n) }], labelW: 50, aria: "Alerts sent per day", tipLabel: i => a.by_day[i].day, tipValue: i => a.by_day[i].n + " alerts" });
+    html("div", { class: "note" }, h, a.last_7d + " in the last 7 days, last " + ago(nowS() - a.last) + ".");
+  },
+  mach(h) {
+    const m = DATA.machine, p = DATA.procs, r = DATA.review;
+    kv(h, [["Load (1, 5, 15 min)", m.load.map(x => x.toFixed(1)).join(", ") + " on " + m.cpus + " cores"], ["Swap used", m.swap_used_mb == null ? "n/a" : Math.round(m.swap_used_mb) + " MB"],
+      ["Reading processes", String(p.process_day)], ["Second-pass processes", String(p.second_pass)], ["Review server", p.review ? span("good", "Running") : span("off", "not seen")],
+      ["Reads waiting for second pass", r.waiting ? span("warn", String(r.waiting)) : span("good", "0")], ["Frames to re-check", String(r.recheck)]]);
+  },
+};
+function empty(h, msg) { html("div", { class: "empty" }, h, msg || "Nothing to show."); }
+const HDR = { "Content-Type": "application/json", "X-Requested-With": "lpr-review" };
+function paintAll() {
+  Object.keys(PAINT).forEach(paint); kpis();
+  const a = $("att"); a.replaceChildren();
+  if (!DATA.attention.length) { const li = html("li", {}, a); status(li, "good", "All clear"); html("span", {}, li, "No job is late, the watcher is active and disk space is fine."); }
+  DATA.attention.forEach(x => { const li = html("li", {}, a); status(li, x.level === "critical" ? "bad" : "warn", x.level === "critical" ? "Critical" : "Warning"); html("span", {}, li, x.text); });
+}
+function kpis() {
+  const d = DATA, w = d.watcher, free = d.storage.data_disk && d.storage.data_disk.free;
+  const T = [["Watcher", w.idle_s != null && w.idle_s < 600 ? "Active" : "Quiet", "last log line " + ago(w.idle_s)], ["Clips in 24 h", String(w.clips_24h), w.errors_24h + " error(s)"],
+    ["Free space", free == null ? "n/a" : gb(free), d.storage.days_until_full ? "about " + d.storage.days_until_full + " days at current growth" : "data disk"],
+    ["Left to review", String(d.review.left), d.review.waiting + " waiting for second pass"], ["Alerts in 7 days", String(d.alerts.last_7d), "last " + ago(d.alerts.last ? nowS() - d.alerts.last : null)]];
+  $("kpis").replaceChildren(); T.forEach(t => { const x = html("div", { class: "tile" }, $("kpis")); html("div", { class: "l" }, x, t[0]); html("div", { class: "v" }, x, t[1]); html("div", { class: "d" }, x, t[2]); });
+}
+const clock = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+async function load() {
+  try { DATA = await api("/api/ops"); } catch (e) { $("scope").textContent = DATA ? "Refresh failed; showing the numbers from the last good load." : "Could not load. Is the review server running?"; return; }
+  $("scope").textContent = "Updated " + clock() + " (your computer's clock).";
+  paintAll();
+}
+$("refresh").onclick = load;
+function setAuto(on) { clearInterval(autoT); autoT = null; if (on) autoT = setInterval(() => { if (!document.hidden) load(); }, 30000); }
+$("auto").onchange = () => setAuto($("auto").checked); setAuto(true);
+let rz = null; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => DATA && paintAll(), 150); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => DATA && paintAll());
+load();
+</script>
+</body>
+</html>

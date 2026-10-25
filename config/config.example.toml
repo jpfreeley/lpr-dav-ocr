@@ -1,0 +1,84 @@
+# lpr-dav-ocr configuration template.
+#
+# Copy to ~/.config/lpr-dav-ocr/config.toml (or point $LPR_CONFIG at a file) and edit.
+# `lpr config init` does the copy; `lpr config show` prints the effective values.
+# Every key is optional. Anything left out keeps the default shown here.
+# Precedence: defaults < this file < environment (LPR_HOME, LPR_CAMERA_DIR, LPR_DATA_ROOT) < command-line flags.
+#
+# Do not commit your edited copy: it names your camera share. The repository ignores config.toml.
+
+[paths]
+# Local per-user state: OCR models, the watchlist, the notification topic, logs, caches.
+# Keep this on a local disk. It contains secrets (the ntfy topic) and the watchlist.
+home = "~/.lpr-ocr"
+
+# Folder that contains one YYYY-MM-DD folder per day of .dav clips.
+# Example (macOS SMB mount):  "/Volumes/camera-share/<camera-id>"
+camera_dir = ""
+
+# Where frames, indexes, labels, crops and reports are written.
+# Empty = a folder named db_<camera folder name> NEXT TO the camera folder if it already exists
+# (create it yourself), otherwise ~/lpr-data. Keeping it beside, not inside, the camera folder
+# stops the camera's own recycling from touching it.
+data_root = ""
+
+[camera]
+frame_width = 1920
+frame_height = 1080
+fps = 30
+
+# Rotate frames counter-clockwise by this many degrees before OCR (0 = off). On a fixed camera the
+# plates share a tilt, and levelling them lets the detector run at a smaller, faster size.
+# Measure it on your own footage: docs/configuration.md#measuring-the-tilt
+tilt_degrees = 20.0
+
+# Burned-in overlays (timestamp, channel label) as fractions of the frame: [x0, y0, x1, y1].
+# They are blanked before OCR and ignored by motion detection.
+overlays = [[0.66, 0.02, 0.97, 0.10], [0.0, 0.88, 0.12, 1.0]]
+
+# If you move the overlay on the camera, say when, so earlier footage keeps its old boxes and new footage uses new ones.
+# `from` is the camera clock (the time in the clip file names). Clips starting at or after it use these boxes.
+# [[camera.overlay_changes]]
+# from = "2026-01-01T09:08:30"
+# overlays = [[0.0, 0.88, 0.40, 1.0]]
+
+[pipeline]
+det_side = 640            # detector max side in px; use 960 if tilt_degrees = 0
+min_conf = 0.80           # ignore reads below this confidence
+plate_regex = "[A-Z0-9]{5,8}"   # what a plate read looks like. Do not exclude letters-only or digits-only plates.
+max_segments = 6          # strongest motion bursts kept per clip
+max_frames = 16           # full-resolution frames read per burst
+stride = 2                # read every Nth moving frame
+workers = 3               # parallel clips. Each worker holds about 1 GB of RAM
+stop_conf = 0.98          # stop reading a burst once reads reach this confidence ...
+stop_hits = 2             # ... this many times ...
+min_frames = 4            # ... and at least this many frames were read
+fallback_segments = 2     # retry this many empty top bursts un-rotated
+fallback_frames = 6       # frames per retried burst (0 disables the retry)
+min_motion = 3.0          # floor for the motion threshold (gray levels)
+motion_k = 6.0            # motion threshold = median + k * MAD
+pad = 2                   # frames added around each moving frame
+
+[review]
+port = 8770               # the page binds 127.0.0.1 only
+auto_accept_conf = 0.99   # confidence at which agreeing, plate-shaped reads skip the review queue
+reject_aspect = 3.5        # reads whose text region is wider than this (length/height) are auto-rejected as not plates; 0 = off
+recent_days = 30          # a read that equals a plate YOU verified within this many days is auto-approved
+
+[watch]
+poll_seconds = 60         # how often to look for new clips
+lookback_minutes = 90     # only clips that ended this recently are picked up
+settle_seconds = 45       # a clip must have ended this long ago and stopped growing
+cooldown_seconds = 600    # minimum time between alerts for the same watched plate
+dedupe = true             # after each batch, merge duplicate sightings (keeps the clearer frame; extras go to <data_root>/trash)
+dedupe_window = 30        # seconds: reads of one plate this close are one sighting
+vehicles_refresh_days = 7 # refresh the local vehicle index (lpr vehicles) this often, in the background; 0 = off
+cleanup_days = 1          # once a day at night: gray frames (lossless), image cache and log trim, index compaction; 0 = off
+cache_mb = 1024           # keep the review page image cache under this size
+trash_keep_days = 0       # delete merged-away frames after this many days (0 = keep until you run lpr dedupe --purge)
+workers = 1               # keep low: the watcher runs next to everything else
+
+[ntfy]
+enabled = true
+server = "https://ntfy.sh/"   # or your own self-hosted ntfy server
+topic_file = "{home}/ntfy_topic"   # created by `lpr watch --init`. Treat the topic like a password.

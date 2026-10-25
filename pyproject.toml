@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lpr-dav-ocr"
+version = "0.1.0"
+description = "Local license plate reading for fixed-camera .dav recordings, with a human review page, accuracy scoring and watchlist alerts."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+# The OCR stack. PaddlePaddle publishes wheels for CPython 3.12 and older at the time of writing.
+ocr = ["paddlepaddle>=3.0", "paddleocr>=3.0", "opencv-python>=4.8", "imageio-ffmpeg>=0.5"]
+dev = ["ruff>=0.5"]
+
+[project.scripts]
+lpr = "lpr_dav_ocr.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"lpr_dav_ocr.review" = ["page.html", "history.html", "reports.html"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E9", "F"]

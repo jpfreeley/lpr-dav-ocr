@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate History</title>
+<style>
+  :root {
+    --bg: #101216; --panel: #181b21; --panel2: #1f232b; --line: #2b303a;
+    --text: #e8eaee; --muted: #8b93a1; --accent: #4c9eff;
+    --ok: #3ecf8e; --warn: #f5b942; --bad: #ff6b6b;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f3f4f7; --panel:#fff; --panel2:#f0f2f6; --line:#d9dde5; --text:#1b1f27; --muted:#667085; --accent:#1f6feb; --ok:#13a36a; --warn:#b9770e; --bad:#d63b3b; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; gap:10px 18px; align-items:center; flex-wrap:wrap; padding:8px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:14px; margin:0; font-weight:600; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  main { max-width:1100px; margin:0 auto; padding:14px 16px 40px; }
+  .search { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .search input[type=text] { flex:1; min-width:200px; max-width:340px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font:600 18px var(--mono); letter-spacing:.08em; text-transform:uppercase; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 16px; font:inherit; font-weight:600; cursor:pointer; }
+  label.opt { color:var(--muted); font-size:13px; display:flex; gap:6px; align-items:center; }
+  .hint { color:var(--muted); font-size:12.5px; margin:6px 0 0; }
+  .sugg { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 0; }
+  .sugg a { font:600 13px var(--mono); background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:3px 9px; color:var(--text); }
+  .sugg a small { color:var(--muted); font-weight:400; margin-left:6px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:14px; }
+  .sum { display:flex; flex-wrap:wrap; gap:6px 28px; align-items:baseline; }
+  .sum .plate { font:700 26px var(--mono); letter-spacing:.1em; }
+  .sum span { color:var(--muted); font-size:13px; } .sum b { color:var(--text); }
+  .hours { display:flex; align-items:flex-end; gap:2px; height:44px; margin-top:12px; }
+  .hours i { flex:1; background:var(--accent); opacity:.75; min-height:2px; border-radius:2px 2px 0 0; }
+  .hlab { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; margin-top:4px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; font-size:12px; }
+  td.mono { font-family:var(--mono); }
+  .badge { font-size:11px; border-radius:99px; padding:1px 8px; border:1px solid var(--line); color:var(--muted); }
+  .badge.verified, .badge.fixed { color:var(--ok); border-color:var(--ok); }
+  .badge.auto { color:var(--accent); border-color:var(--accent); }
+  .badge.unverified { color:var(--warn); border-color:var(--warn); }
+  .thumb { width:150px; height:56px; background:#000 no-repeat; border-radius:5px; display:block; }
+  .chip { display:inline-flex; align-items:center; gap:2px; background:var(--panel); border:1px solid var(--line); border-radius:7px; }
+  .chip a { border:0; background:none; padding:3px 4px 3px 9px; }
+  .chip .star { background:none; color:var(--muted); border:0; padding:2px 8px 2px 4px; font-size:14px; line-height:1; cursor:pointer; }
+  .chip .star.on, .ystar { color:#f5c518; text-shadow:0 0 1px rgba(0,0,0,.45); }
+  .chip .star.on { font-size:16px; }
+  .sum .watchbadge .ystar { color:#f5c518; font-size:17px; }   /* beats ".sum span" (muted) */
+  .watchbadge { color:var(--text); }
+  .chip .star:hover { color:var(--accent); }
+  .watchbadge { font-size:13px; font-weight:600; display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .watchbadge button, .wform button { padding:3px 10px; font-size:12px; background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:7px; font-weight:500; }
+  .wform { display:inline-flex; gap:4px; align-items:center; }
+  .wform input { width:130px; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--panel2); color:var(--text); font:inherit; font-size:12px; }
+  .camt { font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:3px; font-weight:400; }
+  a.plate.ext { color: inherit; text-decoration: none; border-bottom: 2px dotted var(--accent); cursor: pointer; }
+  a.plate.ext:hover { color: var(--accent); } a.plate.ext .arrow { font-size: 16px; color: var(--accent); }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--page, #fff); background: #1b1f27; color: #fff; padding: 8px 14px; border-radius: 9px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 30; }
+  #toast.on { opacity: .95; }
+  .more { margin-top:10px; background:var(--panel2); color:var(--text); border:1px solid var(--line); }
+  .empty { color:var(--muted); padding:14px 0; }
+</style>
+</head>
+<body>
+<header><h1>Plate history</h1><a href="/">&larr; Review queue</a><a href="/reports">Reports</a><a href="/ops">Operations</a></header>
+<div id="toast" role="status"></div>
+<main>
+  <form class="search" id="f" autocomplete="off">
+    <input type="text" id="q" placeholder="Plate, e.g. ABC1234" maxlength="10" spellcheck="false" autofocus>
+    <button>Search</button>
+    <label class="opt"><input type="checkbox" id="unv"> include unreviewed reads</label>
+  </form>
+  <p class="hint">Exact match only. By default only plates you confirmed, corrected, or that the auto-accept rule passed.</p>
+  <div class="sugg" id="sugg"></div>
+  <div id="out"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const W = 1920, H = 1080, PAGE = 100;
+const clean = s => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const unv = () => $("unv").checked ? "&unverified=1" : "";
+const api = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status); return r.json(); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let data = null, shown = 0, watching = [];
+function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 4000); }
+/* the link opens a third-party site, so nothing about the plate is sent until you paste it there (noreferrer keeps the plate out of the Referer) */
+$("out").addEventListener("click", e => {
+  const a = e.target.closest("a.ext"); if (!a || !data) return;
+  const p = data.plate, st = (data.states && Object.keys(data.states)[0]) || "";
+  const done = () => toast(`${p} copied. Paste it into the search box at howsmydrivingny.nyc${st ? " (state " + st + ")" : ""}.`);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(p).then(done, () => toast("Could not copy; type " + p + " on the site."));
+  else toast("Type " + p + " on the site.");
+});
+const HDR = { "Content-Type": "application/json", "X-Requested-With": "lpr-review" };
+const loadWatch = async () => { try { watching = await api("/api/watch"); } catch (e) { watching = []; } };
+const watchOf = p => watching.find(w => w.plate === p);
+async function setWatch(plate, nick) {
+  await fetch("/api/watch", { method: "POST", headers: HDR, body: JSON.stringify({ plate, nickname: nick }) });
+  await loadWatch();
+}
+async function unWatch(plate) {
+  await fetch("/api/watch/remove", { method: "POST", headers: HDR, body: JSON.stringify({ plate }) });
+  await loadWatch();
+}
+function watchHtml(p) {
+  const w = watchOf(p);
+  return w ? `<span class="watchbadge"><span class="ystar">&#9733;</span> Watching${w.nickname ? " as " + esc(w.nickname) : ""} <button id="unwatch">Stop watching</button></span>`
+           : `<span class="wform"><button id="dowatch">&#9734; Watch</button><input id="wnick" placeholder="nickname" maxlength="40" hidden><button id="wadd" hidden>Add</button></span>`;
+}
+function wireWatch(p) {
+  const u = $("unwatch"), b = $("dowatch");
+  if (u) u.onclick = async () => { await unWatch(p); render(); };
+  if (b) b.onclick = () => { b.hidden = true; $("wnick").hidden = false; $("wadd").hidden = false; $("wnick").focus(); };
+  if ($("wadd")) {
+    const go = async () => { await setWatch(p, $("wnick").value.trim()); render(); };
+    $("wadd").onclick = go;
+    $("wnick").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+  }
+}
+
+function thumb(r) {
+  if (!r.box) return `<span class="thumb"></span>`;
+  const [x0, y0, x1, y1] = r.box, bw = x1 - x0, bh = y1 - y0, px = bw * 0.15, py = bh * 0.4;
+  const cx = Math.max(0, x0 - px), cy = Math.max(0, y0 - py), cw = Math.min(W, x1 + px) - cx, ch = Math.min(H, y1 + py) - cy;
+  const k = Math.min(150 / cw, 56 / ch);
+  return `<span class="thumb" style="background-image:url('/img/${encodeURIComponent(r.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px"></span>`;
+}
+function rows(from, to) {
+  return data.sightings.slice(from, to).map(r => `<tr>
+    <td>${esc(r.day)}</td><td class="mono">${esc(r.time)}</td>
+    <td><a href="/i/${encodeURIComponent(r.image)}" title="Open in the review page">${thumb(r)}</a></td>
+    <td><span class="badge ${r.basis}">${r.basis}</span></td><td>${r.conf.toFixed(3)}</td><td>${esc(r.state && r.state !== "UNKN" ? r.state : "")}</td></tr>`).join("");
+}
+function render() {
+  const d = data, out = $("out");
+  if (!d.count) { out.innerHTML = `<div class="card empty">No ${$("unv").checked ? "" : "confirmed "}sightings of <b>${esc(d.plate)}</b>.${$("unv").checked ? "" : " Tick &ldquo;include unreviewed reads&rdquo; to widen the search."} ${watchHtml(d.plate)}</div>`; wireWatch(d.plate); return; }
+  const mx = Math.max(...d.by_hour, 1);
+  const st = Object.entries(d.states).map(([k, v]) => `${k} ${v}`).join(", ");
+  out.innerHTML = `<div class="card"><div class="sum"><a class="plate ext" href="https://howsmydrivingny.nyc/" target="_blank" rel="noopener noreferrer" title="Copies the plate, then opens How's My Driving NY (parking and camera violations) in a new tab. Paste the plate there.">${esc(d.plate)}<span class="arrow"> &#8599;</span></a>${watchHtml(d.plate)}
+    <span><b>${d.count}</b> sighting${d.count === 1 ? "" : "s"} on <b>${d.days}</b> day${d.days === 1 ? "" : "s"}</span>
+    <span>first <b>${esc(d.first)}</b> <span class="camt">CamTime</span></span><span>last <b>${esc(d.last)}</b> <span class="camt">CamTime</span></span>${st ? `<span>state <b>${esc(st)}</b></span>` : ""}</div>
+    <div class="note" id="veh" style="margin:8px 0 0"></div>
+    <div class="hours" title="Sightings by hour of day">${d.by_hour.map((n, h) => `<i style="height:${Math.max(4, n / mx * 100)}%" title="${String(h).padStart(2, "0")}:00  ${n}"></i>`).join("")}</div>
+    <div class="hlab"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>
+    <div class="card"><table><thead><tr><th>Day</th><th>Time <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th></tr></thead>
+    <tbody id="tb">${rows(0, PAGE)}</tbody></table><button class="more" id="more" ${d.count <= PAGE ? "hidden" : ""}>Show more</button>
+    <p class="hint">CamTime is the camera clock, taken from the clip file names. It may run behind the computer clock.</p></div>`;
+  wireWatch(d.plate);
+  const v = d.vehicle, ve = $("veh");
+  ve.replaceChildren();
+  ve.textContent = !v || !v.available ? "Vehicle lookup is off. Build the local NYC ticket index with: lpr vehicles import"
+    : v.none ? "No NYC parking ticket on record for this plate in the imported years, so make and model are unknown."
+    : "Vehicle on NYC tickets: " + v.text + ". Last in fiscal year " + v.last_fy + (v.others ? "; " + v.others + " other recorded variant(s)" : "") + ". A ticket writer typed it: it can be wrong or out of date, and the city records no model or trim.";
+  if (v && v.available && !v.none) {
+    const st = v.stale && v.stale.same_record;
+    if (v.stale) ve.appendChild(document.createTextNode(st ? " Marked verified stale on " + v.stale.ts.slice(0, 10) + ": the vehicle you saw did not match." : " It was marked stale on " + v.stale.ts.slice(0, 10) + ", but the record has changed since."));
+    const b = document.createElement("button");
+    b.className = "tbtn"; b.style.marginLeft = "8px"; b.textContent = st ? "Undo stale mark" : "Mark verified stale"; ve.appendChild(b);
+    b.onclick = async () => { await fetch("/api/vehicle/flag", { method: "POST", headers: HDR, body: JSON.stringify({ plate: v.plate, stale: !st }) }); search(d.plate); };
+  }
+  shown = PAGE;
+  $("more").onclick = () => { $("tb").insertAdjacentHTML("beforeend", rows(shown, shown + PAGE)); shown += PAGE; if (shown >= d.count) $("more").hidden = true; };
+}
+async function search(p) {
+  p = clean(p); $("q").value = p;
+  history.replaceState(null, "", p ? "/history?q=" + p + (unv() ? "&unverified=1" : "") : "/history");
+  if (!p) { $("out").innerHTML = ""; showWatched(); return; }
+  $("out").innerHTML = `<div class="card empty">Searching&hellip;</div>`;
+  try { data = await api("/api/history?q=" + p + unv()); render(); } catch (e) { $("out").innerHTML = `<div class="card empty">Search failed. Is the review server running?</div>`; }
+}
+const chip = (p, n) => { const w = watchOf(p); return `<span class="chip"><a href="#" data-p="${esc(p)}">${esc(p)}${n != null ? `<small>${n}</small>` : ""}</a><button class="star${w ? " on" : ""}" data-star="${esc(p)}" title="${w ? "Watching" + (w.nickname ? " as " + esc(w.nickname) + ". Click to stop." : ". Click to stop.") : "Watch this plate"}">${w ? "&#9733;" : "&#9734;"}</button></span>`; };
+function showWatched() {
+  $("sugg").innerHTML = watching.length ? `<span class="hint" style="margin:0 6px 0 0">Watching:</span>` + watching.map(w => chip(w.plate, null).replace(`>${esc(w.plate)}</a>`, `>${esc(w.plate)}${w.nickname ? `<small>${esc(w.nickname)}</small>` : ""}</a>`)).join("") : "";
+}
+let t = null;
+$("q").addEventListener("input", () => {
+  $("q").value = clean($("q").value); clearTimeout(t);
+  t = setTimeout(async () => {
+    const v = $("q").value;
+    if (v.length < 2) { $("sugg").innerHTML = ""; return; }
+    try {
+      const s = await api("/api/plates?q=" + v + unv());
+      await loadWatch();
+      $("sugg").innerHTML = s.map(e => chip(e.plate, e.count)).join("");
+    } catch (e) { /* suggestions are optional */ }
+  }, 250);
+});
+$("sugg").addEventListener("click", async e => {
+  const st = e.target.closest(".star");
+  if (st) {
+    const p = st.dataset.star;
+    if (watchOf(p)) await unWatch(p);
+    else { const n = window.prompt("Nickname for " + p + " (optional):", ""); if (n === null) return; await setWatch(p, n.trim()); }
+    if ($("q").value.length >= 2) $("q").dispatchEvent(new Event("input")); else showWatched();
+    if (data && data.plate === p) render();
+    return;
+  }
+  const a = e.target.closest("a"); if (a) { e.preventDefault(); search(a.dataset.p); }
+});
+$("f").addEventListener("submit", e => { e.preventDefault(); search($("q").value); });
+$("unv").addEventListener("change", () => { if ($("q").value) search($("q").value); });
+const u = new URLSearchParams(location.search);
+if (u.get("unverified") === "1") $("unv").checked = true;
+loadWatch().then(() => { if (u.get("q")) search(u.get("q")); else showWatched(); });
+</script>
+</body>
+</html>

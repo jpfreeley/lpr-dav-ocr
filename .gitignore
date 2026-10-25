@@ -1,0 +1,40 @@
+# ---- Never commit real data. This project handles license plates (personal data). ----
+# Frames, crops, thumbnails and indexes produced by the pipeline
+*.dav
+*.idx
+frames/
+crops/
+thumbs/
+reports/
+imgcache/
+index.csv
+second_pass.csv
+labels/
+labels.jsonl
+*.jsonl
+# Per-user state and secrets
+config.toml
+ntfy_topic
+watchlist.csv
+alerts.jsonl
+watch_batch.txt
+.lpr-ocr/
+lpr-data/
+db_*/
+# Images are ignored by default; documentation images must be added explicitly and must be synthetic.
+*.png
+*.jpg
+*.jpeg
+!docs/images/*.png
+
+# ---- Python / tooling ----
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
