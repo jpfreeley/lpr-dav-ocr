@@ -10,6 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- `[[camera.overlay_changes]]`: say when you moved the burned-in timestamp on the camera. Clips and saved frames that start at or after that camera-clock time are masked with the new boxes, earlier ones keep the old boxes, so backfills stay correct and the freed area is read again.
 - `lpr demo results --days N`: several synthetic days that share plates, so the Reports page has regulars to show. README and docs now carry screenshots of the Reports and Operations pages made from it.
 - Operations page (`/ops`, `lpr ops`): needs-attention list, pipeline and watcher, scheduled jobs, storage with a nightly snapshot, accuracy by confidence, confusion-matrix heatmap, review and labels, alerts and machine health. See docs/operations.md.
 - Reports: a Vehicles section (fleet mix, vehicle kind by hour, regulars by vehicle kind, record coverage by plate type) and a Vehicle column in the regulars table, from the local ticket index. The report build reuses one stale-mark map and remembers a missing file, so it takes about a second.

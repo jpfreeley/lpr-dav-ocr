@@ -22,7 +22,8 @@ Writes <day>/second_pass.csv. Incremental: images already listed are skipped.
   --fill-crop     add the crop read to existing rows where the two passes disagree
 Run with:  lpr second-pass <data_root>/frames/<date>
 """
-import csv, fcntl, hashlib, math, os, re, sys, tempfile, time
+import csv
+import fcntl, hashlib, math, os, re, sys, tempfile, time
 from pathlib import Path
 
 from . import pipeline as P
@@ -196,6 +197,9 @@ def main(argv=None):
     for n, r in enumerate(todo, 1):
         t0 = time.time()
         img = cv2.imread(str(day / r["image"]))
+        m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d\d\.\d\d\.\d\d)-", r["image"])
+        if m:
+            P.use_layout(m.group(1), m.group(2))                # the overlay boxes that were burned into this frame
         if fill:
             old = have[r["image"]]
             res = (old["plate2"], float(old["conf2"]), [int(old[k]) for k in ("x0", "y0", "x1", "y1")], float(old["aspect"] or 0)) if img is not None else None

@@ -32,6 +32,9 @@ DEFAULTS = {
         # Burned-in overlays (timestamp, channel label) as fractions of the frame: x0, y0, x1, y1.
         # They are blanked before OCR and ignored by motion detection.
         "overlays": [[0.66, 0.02, 0.97, 0.10], [0.0, 0.88, 0.12, 1.0]],
+        # If you moved the overlay on the camera: [[camera.overlay_changes]] entries with `from` (camera clock,
+        # "YYYY-MM-DDTHH:MM:SS") and `overlays`. Clips that start at or after `from` use those boxes.
+        "overlay_changes": [],
     },
     "pipeline": {
         "det_side": 640,

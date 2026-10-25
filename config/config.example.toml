@@ -36,6 +36,12 @@ tilt_degrees = 20.0
 # They are blanked before OCR and ignored by motion detection.
 overlays = [[0.66, 0.02, 0.97, 0.10], [0.0, 0.88, 0.12, 1.0]]
 
+# If you move the overlay on the camera, say when, so earlier footage keeps its old boxes and new footage uses new ones.
+# `from` is the camera clock (the time in the clip file names). Clips starting at or after it use these boxes.
+# [[camera.overlay_changes]]
+# from = "2026-01-01T09:08:30"
+# overlays = [[0.0, 0.88, 0.40, 1.0]]
+
 [pipeline]
 det_side = 640            # detector max side in px; use 960 if tilt_degrees = 0
 min_conf = 0.80           # ignore reads below this confidence

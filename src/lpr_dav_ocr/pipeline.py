@@ -29,6 +29,22 @@ import numpy as np
 # Overlay regions as fractions (x0, y0, x1, y1) of the frame. Reads centered here are dropped.
 # Configured under [camera] overlays.
 OVERLAYS = [tuple(o) for o in CFG["camera"]["overlays"]]
+_BASE_OVERLAYS = list(OVERLAYS)
+# [camera] overlay_changes: from this camera-clock time on, use these boxes instead (you moved the overlay on the camera).
+OVERLAY_CHANGES = sorted((str(c["from"]).replace(" ", "T")[:19], [tuple(o) for o in c["overlays"]])
+                         for c in CFG["camera"].get("overlay_changes", []))
+
+
+def use_layout(day, start):
+    """Choose the overlay boxes for a clip or a saved frame that starts at `start` (HH.MM.SS or HH:MM:SS) on `day`
+    (YYYY-MM-DD), both on the camera clock. Changes OVERLAYS in place, so every module that holds it sees the new boxes."""
+    stamp = f"{day}T{str(start).replace('.', ':')}"[:19]
+    chosen = _BASE_OVERLAYS
+    for frm, boxes in OVERLAY_CHANGES:
+        if frm <= stamp:
+            chosen = boxes
+    OVERLAYS[:] = chosen
+    return OVERLAYS
 
 
 def ffmpeg_exe():
@@ -188,6 +204,9 @@ def default_out(clip, date):
 
 
 def process_clip(ff, W_, clip, a, rx):
+    m = re.match(r"(\d\d\.\d\d\.\d\d)-", Path(clip).name)
+    if m and re.fullmatch(r"\d{4}-\d{2}-\d{2}", Path(clip).parent.name):
+        use_layout(Path(clip).parent.name, m.group(1))          # the overlay may have moved since an earlier day
     W, H = probe(ff, clip)
     d = motion_scores(ff, clip, W, H)
     picks, nseg = pick_frames(d, a.min_motion, a.k, a.pad, a.max_frames, a.stride, max_segments=a.max_segments)

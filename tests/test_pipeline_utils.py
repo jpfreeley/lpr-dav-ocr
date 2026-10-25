@@ -118,3 +118,32 @@ class OutputFolderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OverlayLayoutTests(unittest.TestCase):
+    def setUp(self):
+        self.saved = (list(P.OVERLAYS), list(P._BASE_OVERLAYS), list(P.OVERLAY_CHANGES))
+
+    def tearDown(self):
+        P.OVERLAYS[:] = self.saved[0]
+        P._BASE_OVERLAYS[:] = self.saved[1]
+        P.OVERLAY_CHANGES[:] = self.saved[2]
+
+    def test_layout_follows_the_clip_start_time(self):
+        P._BASE_OVERLAYS[:] = [(0.66, 0.02, 0.97, 0.10)]
+        P.OVERLAY_CHANGES[:] = [("2026-01-05T09:08:30", [(0.0, 0.88, 0.4, 1.0)])]
+        self.assertEqual(P.use_layout("2026-01-05", "09.08.29"), [(0.66, 0.02, 0.97, 0.10)])
+        self.assertEqual(P.use_layout("2026-01-05", "09.08.30"), [(0.0, 0.88, 0.4, 1.0)])
+        self.assertEqual(P.use_layout("2026-01-06", "00:00:01"), [(0.0, 0.88, 0.4, 1.0)])
+        self.assertEqual(P.use_layout("2026-01-04", "23.59.59"), [(0.66, 0.02, 0.97, 0.10)])   # earlier days keep the old boxes
+
+    @unittest.skipUnless(HAVE_CV2, "needs opencv")
+    def test_prep_blanks_the_current_boxes(self):
+        P._BASE_OVERLAYS[:] = [(0.0, 0.0, 0.5, 0.5)]
+        P.OVERLAY_CHANGES[:] = [("2026-01-05T00:00:00", [(0.5, 0.5, 1.0, 1.0)])]
+        frame = np.full((100, 200, 3), 200, np.uint8)
+        P.use_layout("2026-01-04", "10.00.00")
+        self.assertEqual(int(P.prep(frame, 0)[10, 10, 0]), 0)
+        P.use_layout("2026-01-05", "10.00.00")
+        out = P.prep(frame, 0)
+        self.assertEqual((int(out[10, 10, 0]), int(out[90, 190, 0])), (200, 0))

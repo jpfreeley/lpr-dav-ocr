@@ -46,6 +46,12 @@ The data root layout:
 | `tilt_degrees` | 20.0 | Rotate frames counter-clockwise by this much before OCR. 0 disables it. |
 | `overlays` | timestamp and channel label boxes | Rectangles `[x0, y0, x1, y1]` as fractions of the frame that hold burned-in text. They are blanked before OCR and ignored by motion detection. Without this, the timestamp is read as if it were a plate. |
 
+**If you move the overlay on the camera.** Add an `[[camera.overlay_changes]]` entry with `from` (the camera clock, the time in the
+clip file names) and the new `overlays`. A clip, or a saved frame, that starts at or after `from` is masked with the new boxes and
+anything earlier keeps the old ones, so a backfill of old days stays correct. Move it far from where plates cross (a corner) and
+make the new box a little larger than the text, because some cameras show the text mid-move while you drag it. Leave the old
+top-of-frame box out of the new list, otherwise the freed area is still blanked and a plate there would not be read.
+
 ### Measuring the tilt
 
 On a fixed camera, plates share a tilt. Levelling them lets the detector run at a smaller, faster size
