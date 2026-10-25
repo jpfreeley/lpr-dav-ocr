@@ -24,6 +24,42 @@ page is for labelling what the pipeline found, which gives you accuracy numbers 
 - **Watch:** adds the plate (the corrected text if you edited the boxes) to the watchlist. See
   [watcher-and-alerts.md](watcher-and-alerts.md).
 
+## A review session, step by step
+
+This is what reviewing a plate feels like. Most plates need one or two clicks.
+
+1. **Look.** The frame shows the plate outlined, and the leveled crop sits beside it with the current text drawn under it,
+   one letter per position. Most of the time the read is right and you press **Correct** (or `Enter`).
+2. **Read the hints.** When the read is doubtful, the page puts clickable offers around the character boxes. Each one is
+   a suggestion: nothing changes until you click it.
+   - **2nd pass says X**, the crop read and the **best guess**: other readings of the same frame. Click one to copy it into the boxes.
+   - **Pattern badges** (for example "fits NYS standard", or the NYC taxi pattern) with a **set NY** or **set NJ** button.
+   - **Same last four**: known plates with the same digits and one or two different letters, most-seen first.
+   - **One character from a plate you verified**: "one character from ABC1234 (verified 3x within a month) - use".
+   - **Seen N times in the last 7, 30 or 90 days**: click the number for a montage of every earlier sighting.
+   - **Watch**: shows if the plate is on your watchlist, and adds it with one click.
+3. **See the vehicle.** If the plate has a record in the local NYC ticket index, one line shows the make, body type, year
+   and color (for example "2020 BMW SUV or wagon, blue"). If you can see that the car does not match, press **doesn't
+   match** to mark the record verified stale. When no state chip is picked yet, the record also picks the state for you.
+4. **Fix by typing.** Change a box and everything above follows your text (next section). A changed box shows what it
+   was ("was H").
+5. **Save.** **Correct** or **Save fix** stores your label, applies the state to every other sighting of that plate, and
+   moves to the next plate. Later sightings of a plate you verified are approved for you.
+
+## Hints and ticket data follow your edits
+
+The hints, the "seen N times" count, the watch status and the vehicle line are not computed once when the plate opens.
+They are recomputed from the text in the boxes every time you edit them. Type `ABC1234` where the read said `A8C1234` and
+the vehicle line, the state chip, the history count, the pattern badge and the offers all switch to the plate you typed.
+A line beside the count states what it is checking ("checking ABC1234: fits the NYS standard pattern, you verified it 3
+other times nearby"). Clear a box or press **Reset** and they return to the OCR read.
+
+Because everything is local, this is effectively instant. The check starts 250 ms after your last keystroke, so it does
+not run on every key. The lookup itself, covering the vehicle record, the same-last-four and verified-plate hints, the
+watchlist and the history count, took about 1 to 2 ms per request on the author's Mac (the largest index is 650 MB of
+SQLite, queried by plate). The first request after starting the server can take about half a second while caches warm.
+Nothing leaves the machine: the NYC ticket index is a local file (see [usage](usage.md#vehicle-make-body-year-and-color)).
+
 ## Verdicts
 
 | Button | Meaning | Training use |
@@ -188,9 +224,9 @@ first read is the non-plate text. A relabeled plate becomes a normal sighting in
 
 ## Editing updates the checks
 
-As soon as you change a box (after a short pause, once every box is filled) the page re-checks the text you typed: the
-"seen N other times" count and its montage, the same-last-4 hints, the one-character-from-a-verified-plate offer, and
-the Watch button all follow the edited text. A line beside the count says what the typed plate is: "checking ABC1234:
+As soon as you change a box (after a 250 ms pause, once every box is filled) the page re-checks the text you typed: the
+"seen N other times" count and its montage, the same-last-4 hints, the one-character-from-a-verified-plate offer, the
+vehicle line from the ticket data (and the state chip, when none is picked), and the Watch button all follow the edited text. A line beside the count says what the typed plate is: "checking ABC1234:
 fits the NYS standard pattern, you verified it 3 other times nearby, on your watchlist as ...". If the text matches
 a plate you know, the count goes up and the hints disappear; if it is a new plate you will see "not seen again". This
 is a confirmation that the edit is right, not a rule. Clear a box or press Reset to go back to the OCR read.

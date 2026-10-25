@@ -25,7 +25,8 @@ network use is a one-time download of the OCR models and, if you turn it on, pus
   passes agree, the read is right about 95% of the time. When they disagree, you are asked.
 - **Lets you review fast.** A local web page shows the frame, a leveled crop of the plate, and one box
   per character, so fixing a misread means changing one box. Verdicts: correct, fix, not a plate,
-  obstructed, can't tell. Confident, agreeing reads can skip the queue.
+  obstructed, can't tell. Confident, agreeing reads can skip the queue. Clickable hints, the plate's history and its NYC ticket
+  record update as you type, in a couple of milliseconds. See [a review session](docs/review-ui.md#a-review-session-step-by-step).
 - **Measures accuracy from your labels.** `lpr score` reports exact-match accuracy, how trustworthy the
   confidence is, and a character confusion table (for example M read as H).
 - **Cuts the review work.** Duplicate sightings of one plate are merged, reads equal to a plate you verified recently
