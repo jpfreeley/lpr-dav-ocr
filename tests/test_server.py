@@ -633,10 +633,21 @@ class ReportsTests(unittest.TestCase):
                              ("ZZZ0000", "NY", "FORD", "VAN", 2005, "BL", 2, 2027)])
             store._vdb = db
             v = S._reports.build(store)["vehicles"]
+            # two stale marks: one on the record you saw, one on a record that has since changed
+            recs = {p: store.vehicle(p, "NY")["text"] for p in ("ABC1234", "T123456C")}
+            marks = [dict(ts="2026-01-01T00:00:00", plate="ABC1234", stale=True, record=recs["ABC1234"]),
+                     dict(ts="2026-01-01T00:00:00", plate="T123456C", stale=True, record="2010 Old Make, red")]
+            fresh = S.Store(self.root)
+            fresh._vdb = db
+            (self.root / "labels").mkdir(exist_ok=True)
+            (self.root / "labels" / "vehicle_flags.jsonl").write_text("".join(json.dumps(m) + "\n" for m in marks))
+            vs = S._reports.build(fresh)["vehicles"]
+            (self.root / "labels" / "vehicle_flags.jsonl").unlink()
             d.cleanup()
         finally:
             S._veh.open_db = real
         self.assertEqual((v["plates"], v["matched"], v["stale"]), (4, 3, 0))                # QRS5678 has no record
+        self.assertEqual((vs["stale"], vs["stale_old"]), (1, 1))                            # only the unchanged record counts
         self.assertEqual(v["makes"][0], {"name": "Toyota", "count": 2})
         kinds = {k["kind"]: k["hours"] for k in v["kind_hours"]}
         self.assertEqual(kinds["Taxi (TLC plate)"][9], 1)                                    # taxi is told by plate pattern

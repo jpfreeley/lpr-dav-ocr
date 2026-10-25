@@ -55,12 +55,15 @@ def vehicle_section(store, by_plate, ndays_by_plate, S):
     probe = store.vehicle("ZZZ0000")
     if not probe.get("available"):
         return dict(available=False)
-    rec, stale = {}, 0
+    rec, stale, stale_old = {}, 0, 0
     for p in by_plate:
         v = store.vehicle(p, store.state_of(p))
         if v.get("available") and not v.get("none"):
             rec[p] = v
-            stale += bool(v.get("stale"))
+            st = v.get("stale")
+            if st:                                  # a mark counts only while the record is the one you saw
+                stale += bool(st.get("same_record"))
+                stale_old += not st.get("same_record")
     top = lambda key, n: collections.Counter(v[key] for v in rec.values() if v.get(key)).most_common(n)
     makes = collections.Counter(v["make"] for v in rec.values() if v.get("make"))
     other_makes = sum(n for _, n in makes.most_common()[10:])
@@ -82,7 +85,7 @@ def vehicle_section(store, by_plate, ndays_by_plate, S):
         cov[t][1] += 1
         cov[t][0] += p in rec
     cover = [dict(type=t, matched=m, total=n) for t, (m, n) in sorted(cov.items(), key=lambda x: -x[1][1])]
-    return dict(available=True, plates=len(by_plate), matched=len(rec), stale=stale,
+    return dict(available=True, plates=len(by_plate), matched=len(rec), stale=stale, stale_old=stale_old,
                 makes=[dict(name=k, count=n) for k, n in makes.most_common(10)] + ([dict(name="Other makes", count=other_makes)] if other_makes else []),
                 bodies=[dict(name=k, count=n) for k, n in top("body", 8)], colors=[dict(name=k, count=n) for k, n in top("color", 8)],
                 ages=[dict(band=f"{b}-{b + 4}", count=ages[b]) for b in sorted(ages) if b >= 1980], kinds=KINDS,

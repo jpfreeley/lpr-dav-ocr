@@ -364,7 +364,7 @@ const PAINT = {
     const names = { standard: "Standard", TLC: "TLC (taxi)", NJ: "NJ", commercial: "NY commercial", moped: "NY moped", other: "Other" }, c = v.coverage;
     TABLES.cover = { cols: ["Plate type", "Plates", "With record", "Share"], rows: c.map(x => [names[x.type] || x.type, x.total, x.matched, x.total ? Math.round(100 * x.matched / x.total) + "%" : ""]) };
     hbars(h, { labels: c.map(x => names[x.type] || x.type), stacked: true, left: 100, rowH: 32, series: [{ name: "With record", c: "--s1", values: c.map(x => x.matched) }, { name: "No record", c: "--other", values: c.map(x => x.total - x.matched) }], aria: "Plates with a ticket record, by plate type" });
-    html("div", { class: "note" }, h, fmt(v.matched) + " of " + fmt(v.plates) + " plates match a record (" + Math.round(100 * v.matched / Math.max(1, v.plates)) + "%)." + (v.stale ? " " + v.stale + " record(s) you marked as not matching are counted as matched." : ""));
+    html("div", { class: "note" }, h, fmt(v.matched) + " of " + fmt(v.plates) + " plates match a record (" + Math.round(100 * v.matched / Math.max(1, v.plates)) + "%)." + (v.stale ? " " + v.stale + " record(s) you marked as not matching are still in use and are counted as matched." : "") + (v.stale_old ? " " + v.stale_old + " older mark(s) no longer apply because the record has changed since." : ""));
   },
   regulars(h) {
     const d = DATA; if (!d.regulars.length) return empty(h, "No plate has been seen on 2 or more days yet.");

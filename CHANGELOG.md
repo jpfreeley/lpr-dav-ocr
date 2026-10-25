@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Fixed
 
+- Reports: the stale-record count counts only marks whose record is unchanged. A mark whose record changed after a refresh is shown separately as no longer applying.
 - History page: searching a plate that has a NYC ticket record failed with "Search failed" because the stale-mark button used a helper that exists only on the reports page.
 
 ### Added
