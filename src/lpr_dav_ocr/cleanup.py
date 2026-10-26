@@ -29,6 +29,7 @@ import fcntl
 import os
 import re
 import sqlite3
+import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -336,6 +337,10 @@ def main(argv=None):
             _ops.storage_snapshot(home, root)
         except Exception as ex:
             print(f"storage snapshot skipped: {ex}")
+        try:                                    # keep reports/accuracy.md and confusions.csv current (a few seconds)
+            subprocess.run([sys.executable, "-m", "lpr_dav_ocr.score", "--root", str(root)], timeout=600, capture_output=True, check=False)
+        except Exception as ex:
+            print(f"accuracy refresh skipped: {ex}")
     total = sum(freed.values())
     print(f"{'freed' if a.apply else 'could free'} about {human(total)}" + ("" if a.apply else ". Add --apply to do it."))
 
