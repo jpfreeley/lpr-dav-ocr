@@ -89,7 +89,7 @@ def candidates(day_dir, labels, skip, reject_aspect=3.5, fps=FPS):
         if verdict not in (None, "ok", "fix"):
             continue                                          # not a plate / obstructed / can't tell
         asp = float(s["aspect"]) if s.get("aspect") else None
-        if verdict is None and reject_aspect and asp is not None and asp > reject_aspect:
+        if verdict is None and reject_aspect and asp is not None and asp > reject_aspect and not s.get("elsewhere"):
             continue                                          # auto-rejected: not plate-shaped
         t = seconds(img, r.get("frame"), fps)
         if t is None:
