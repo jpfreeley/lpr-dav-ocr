@@ -20,6 +20,7 @@ When the two reads disagree, a third read of a tight, enlarged crop around the o
 Writes <day>/second_pass.csv. Incremental: images already listed are skipped.
   --retry-empty   re-run rows that have no read and no outline (use after upgrading this script)
   --fill-crop     add the crop read to existing rows where the two passes disagree
+  --fill-elsewhere  for wide (aspect over 3.0) rows, look for another plate-shaped read in the frame (elsewhere, elsewhere_conf)
 Run with:  lpr second-pass <data_root>/frames/<date>
 """
 import csv
@@ -29,7 +30,7 @@ from pathlib import Path
 from . import pipeline as P
 from .util import read_csv
 
-HEADER = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3"]
+HEADER = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf"]
 RX = re.compile(r"[A-Z0-9]{5,8}")
 
 
@@ -95,12 +96,32 @@ def crop_read(ocr, img, box, cv2):
     return best
 
 
+def plate_shaped(cands, exclude=()):
+    """The most confident candidate whose outline is plate-shaped (aspect 1.5 to 3.0) and whose text is not in `exclude`.
+    (text, conf) or None."""
+    ok = [x for x in cands if 1.5 <= x[3] <= 3.0 and x[0] not in exclude]
+    best = max(ok, key=lambda x: x[1], default=None)
+    return (best[0], best[1]) if best else None
+
+
+def find_elsewhere(ocr, get_fast, img, chosen, tilt, cv2, np):
+    """Another plate-shaped read in a frame whose chosen read is not plate-shaped (a badge or a decal was read instead
+    of the plate). Looks un-rotated and rotated by the tilt. (text, conf) or None."""
+    seen = []
+    for deg in (0, tilt):
+        if deg == tilt and not tilt:
+            continue
+        seen += candidates(ocr, img, deg, cv2, np)
+    return plate_shaped(seen, {chosen})
+
+
 def shape_of(asp):
     return "ok" if 1.5 <= asp <= 3.0 else "wide" if asp > 3.0 else "narrow"
 
 
 def second_read(ocr, get_fast, img, p1, tilt, cv2, np):
-    """Returns (plate2, conf2, box, aspect) or None. plate2 is '' for an outline-only result."""
+    """Returns (plate2, conf2, box, aspect, elsewhere) or None. plate2 is '' for an outline-only result. `elsewhere` is
+    (text, conf) of another plate-shaped read, looked for only when the chosen read is wide, or None."""
     for deg in (0, tilt):
         if deg == tilt and not tilt:
             continue
@@ -108,12 +129,15 @@ def second_read(ocr, get_fast, img, p1, tilt, cv2, np):
         near = [x for x in c if P.similar(p1, x[0])]
         best = max(near or c, key=lambda x: x[1], default=None)
         if best:
-            return best[0], best[1], best[2], best[3]
+            alt = None
+            if best[3] > 3.0:
+                alt = plate_shaped(c, {best[0]}) or find_elsewhere(ocr, get_fast, img, best[0], tilt, cv2, np)
+            return best[0], best[1], best[2], best[3], alt
     c = candidates(get_fast(), img, tilt, cv2, np)            # first pass's own settings: outline only
     near = [x for x in c if P.similar(p1, x[0])]
     best = max(near or c, key=lambda x: x[1], default=None)
     if best:
-        return "", None, best[2], best[3]
+        return "", None, best[2], best[3], (plate_shaped(c, {best[0]}) if best[3] > 3.0 else None)
     return None
 
 
@@ -122,9 +146,11 @@ def row_for(r, res, secs, third=None):
     p1 = r["plate"]
     t3 = ["", ""] if third is None else [third[0], f"{third[1]:.4f}"] if third else ["", "0"]
     if res is None:
-        return [r["image"], p1, r["conf"], "", "", 0, "", "", "", "", "", "", secs, *t3]
-    p2, c2, box, asp = res
-    return [r["image"], p1, r["conf"], p2, f"{c2:.4f}" if c2 is not None else "", int(p2 == p1 and p2 != ""), *box, f"{asp:.2f}", shape_of(asp), secs, *t3]
+        return [r["image"], p1, r["conf"], "", "", 0, "", "", "", "", "", "", secs, *t3, "", ""]
+    p2, c2, box, asp = res[:4]
+    alt = res[4] if len(res) > 4 else None
+    el = ["", ""] if asp <= 3.0 else [alt[0], f"{alt[1]:.4f}"] if alt else ["", "0"]      # "0" means looked, nothing found
+    return [r["image"], p1, r["conf"], p2, f"{c2:.4f}" if c2 is not None else "", int(p2 == p1 and p2 != ""), *box, f"{asp:.2f}", shape_of(asp), secs, *t3, *el]
 
 
 def needs_crop(p1, res):
@@ -147,6 +173,7 @@ def main(argv=None):
     args = [a for a in argv if not a.startswith("--")]
     retry = "--retry-empty" in argv
     fill = "--fill-crop" in argv
+    fill_else = "--fill-elsewhere" in argv
     if not args:
         sys.exit(__doc__)
     day = Path(args[0]).expanduser()
@@ -163,9 +190,14 @@ def main(argv=None):
     index = [r for r in read_csv(day / "index.csv") if r["plate"]]
     existing = read_csv(out) if out.exists() else []
     have = {r["image"]: r for r in existing}
-    if existing and "conf3" not in existing[0]:      # file from before the crop read: add the columns
+    if existing and "elsewhere_conf" not in existing[0]:      # file from before the crop read or the elsewhere read: add the columns
         rewrite(day, out, existing, {})
-    if fill:
+        existing = read_csv(out)
+        have = {r["image"]: r for r in existing}
+    if fill_else:
+        pend = {i for i, r in have.items() if r["aspect"] and float(r["aspect"]) > 3.0 and not r.get("elsewhere_conf")}
+        todo = [r for r in index if r["image"] in pend]
+    elif fill:
         pend = {i for i, r in have.items() if r["plate2"] and r["plate2"] != r["plate1"] and r["x0"] and not r.get("conf3")}
         todo = [r for r in index if r["image"] in pend]
     elif retry:
@@ -188,7 +220,7 @@ def main(argv=None):
 
     new_rows = {}
     f = None
-    if not retry and not fill:
+    if not retry and not fill and not fill_else:
         f = out.open("a", newline="")
         w = csv.writer(f)
         if not existing and not out.stat().st_size:
@@ -200,6 +232,15 @@ def main(argv=None):
         m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d\d\.\d\d\.\d\d)-", r["image"])
         if m:
             P.use_layout(m.group(1), m.group(2))                # the overlay boxes that were burned into this frame
+        if fill_else:
+            old = have[r["image"]]
+            alt = find_elsewhere(ocr, get_fast, img, old["plate2"] or old["plate1"], tilt, cv2, np) if img is not None else None
+            row = [old.get(k, "") for k in HEADER]
+            row[-2:] = [alt[0], f"{alt[1]:.4f}"] if alt else ["", "0"]
+            new_rows[r["image"]] = row
+            if n % 10 == 0:
+                print(f"  {n}/{len(todo)}", flush=True)
+            continue
         if fill:
             old = have[r["image"]]
             res = (old["plate2"], float(old["conf2"]), [int(old[k]) for k in ("x0", "y0", "x1", "y1")], float(old["aspect"] or 0)) if img is not None else None
@@ -221,8 +262,11 @@ def main(argv=None):
             print(f"  {n}/{len(todo)}", flush=True)
     if f:
         f.close()
-    if (retry or fill) and new_rows:
+    if (retry or fill or fill_else) and new_rows:
         rewrite(day, out, existing, new_rows)
+        if fill_else:
+            found = sum(1 for r in new_rows.values() if r[-2])
+            print(f"elsewhere read for {len(new_rows)} wide frames: {found} have a plate-shaped read", flush=True)
         if fill:
             print(f"crop read added to {len(new_rows)} rows", flush=True)
         else:

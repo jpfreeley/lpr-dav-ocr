@@ -92,7 +92,7 @@ def main(argv=None):
                 continue
             rows.append(dict(image=r["image"], day=day.name, verdict=lb["verdict"], truth=lb.get("truth"), state=lb.get("state"),
                              p1=r["plate"], c1=float(r["conf"]), p3=s.get("plate3") or "", p2=s.get("plate2") or "", c2=float(s["conf2"]) if s.get("conf2") else 0.0,
-                             shape=s.get("shape") or "", aspect=s.get("aspect") or "",
+                             shape=s.get("shape") or "", aspect=s.get("aspect") or "", elsewhere=s.get("elsewhere") or "",
                              hour=_hour(r["image"])))
     known = [r for r in rows if r["verdict"] in ("ok", "fix") and r["truth"]]
     out = []
@@ -204,7 +204,7 @@ def main(argv=None):
     # 7. the auto-reject rule: how many reads wider than reject_aspect were really not plates?
     thr = float(_config.load()["review"]["reject_aspect"])
     if thr:
-        wide = [r for r in rows if r["aspect"] and float(r["aspect"]) > thr]
+        wide = [r for r in rows if r["aspect"] and float(r["aspect"]) > thr and not r["elsewhere"]]      # a plate-shaped read elsewhere keeps the frame in review
         P("\n## Auto-reject rule (aspect above %.1f)\n" % thr)
         P(f"- Labeled reads above the threshold: {len(wide)}. Not a plate {sum(r['verdict'] == 'notplate' for r in wide)}, "
           f"obstructed or can't tell {sum(r['verdict'] in ('obstructed', 'skip') for r in wide)}, "

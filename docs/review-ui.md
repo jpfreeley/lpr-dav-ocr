@@ -146,7 +146,14 @@ have normal shapes.
 - No label is written (a weak label, like auto-accept). Rejected reads are left out of plate history and never trigger
   a watchlist alert.
 - A plate that equals one you verified recently is auto-approved instead, so a vouched plate is never rejected.
-- `lpr score` prints how many labeled reads were above the threshold and how many were real plates. A threshold of 3.0
+- **A frame is kept in review when the second pass also found plate-shaped text in it** (aspect 1.5 to 3.0, a different
+  text from the wide read). The usual cause is a model badge or decal read with high confidence while the real plate
+  sits elsewhere in the frame. The page then shows "plate-shaped text elsewhere in the frame XYZ 0.876 - use" so you can
+  copy that read into the boxes. On the author's labels 13 of the 16 real plates above 3.5 were such frames (the first
+  read was `SPORT`, `4MATIC`, `NEWYORK` and the like), and the other 3 were correct plate reads with a wide shape. The
+  second pass looks for this only when its chosen read is wide, so it costs nothing on normal frames. Existing days are
+  filled in with `lpr second-pass <folder> --fill-elsewhere`.
+- `lpr score` prints how many labeled reads were above the threshold (not counting frames kept for a plate-shaped read elsewhere) and how many were real plates. A threshold of 3.0
   also removes 3 real plates in 162, so the default stays at 3.5. Set `review.reject_aspect = 0` to switch it off.
 
 ## "Same last four" hints

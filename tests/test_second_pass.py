@@ -96,8 +96,24 @@ class RowTests(unittest.TestCase):
 
     def test_tried_and_empty_is_marked_untried_is_blank(self):
         res = ("DEMO002", 0.8, [1, 2, 3, 4], 2.0)
-        self.assertEqual(S.row_for(self.r, res, 1.0)[-2:], ["", ""])
-        self.assertEqual(S.row_for(self.r, res, 1.0, ())[-2:], ["", "0"])
+        h = lambda row: dict(zip(S.HEADER, row))
+        self.assertEqual((h(S.row_for(self.r, res, 1.0))["plate3"], h(S.row_for(self.r, res, 1.0))["conf3"]), ("", ""))
+        self.assertEqual((h(S.row_for(self.r, res, 1.0, ()))["plate3"], h(S.row_for(self.r, res, 1.0, ()))["conf3"]), ("", "0"))
+
+    def test_elsewhere_column_only_for_wide_reads(self):
+        h = lambda row: dict(zip(S.HEADER, row))
+        narrow = h(S.row_for(self.r, ("DEMO002", 0.8, [1, 2, 3, 4], 2.0, None), 1.0))
+        self.assertEqual((narrow["elsewhere"], narrow["elsewhere_conf"]), ("", ""))                 # not looked for
+        wide_none = h(S.row_for(self.r, ("BADGE", 0.9, [1, 2, 3, 4], 4.5, None), 1.0))
+        self.assertEqual((wide_none["elsewhere"], wide_none["elsewhere_conf"]), ("", "0"))          # looked, found nothing
+        wide_alt = h(S.row_for(self.r, ("BADGE", 0.9, [1, 2, 3, 4], 4.5, ("DEMO003", 0.8765)), 1.0))
+        self.assertEqual((wide_alt["elsewhere"], wide_alt["elsewhere_conf"]), ("DEMO003", "0.8765"))
+
+    def test_plate_shaped_picks_the_best_plate_shaped_other_text(self):
+        c = [("BADGE", 0.99, [0, 0, 1, 1], 4.5), ("DEMO003", 0.8, [0, 0, 1, 1], 2.1), ("DEMO004", 0.9, [0, 0, 1, 1], 2.4), ("WIDE", 0.95, [0, 0, 1, 1], 3.4)]
+        self.assertEqual(S.plate_shaped(c, {"BADGE"}), ("DEMO004", 0.9))
+        self.assertIsNone(S.plate_shaped([c[0], c[3]], {"BADGE"}))
+        self.assertIsNone(S.plate_shaped(c, {"BADGE", "DEMO003", "DEMO004"}))
 
     def test_crop_only_when_passes_disagree(self):
         self.assertTrue(S.needs_crop("DEMO001", ("DEMO002", 0.8, [1, 2, 3, 4], 2.0)))

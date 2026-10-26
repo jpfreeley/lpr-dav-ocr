@@ -12,6 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Second pass records `elsewhere` and `elsewhere_conf`: a plate-shaped read other than the chosen one, looked for when the chosen read is wide (`--fill-elsewhere` fills older days). Auto-reject no longer hides a frame that has one, and the review page offers it as a button.
 - `lpr selfcheck` and `scripts/install-selfcheck.sh`: an hourly check that sends an ntfy alert only when something needs attention (watcher, jobs, disk, or an automatic rule falling below its floor on your labels). ADR 0019.
 - `[[camera.overlay_changes]]`: say when you moved the burned-in timestamp on the camera. Clips and saved frames that start at or after that camera-clock time are masked with the new boxes, earlier ones keep the old boxes, so backfills stay correct and the freed area is read again.
 - `lpr demo results --days N`: several synthetic days that share plates, so the Reports page has regulars to show. README and docs now carry screenshots of the Reports and Operations pages made from it.

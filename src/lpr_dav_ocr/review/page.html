@@ -192,6 +192,7 @@
         <button class="alt" id="pick" hidden></button>
         <button class="alt tlc" id="tlc" hidden></button>
         <button class="alt" id="alt" hidden title="Click to copy this read into the boxes"></button>
+        <button class="alt" id="else" hidden title="The second pass also found plate-shaped text elsewhere in the frame. Click to copy it into the boxes."></button>
       </div>
       <div class="meter"><i id="meter"></i></div>
 
@@ -326,6 +327,12 @@ function render() {
     const cu = $("cropuse");
     if (cu) cu.onclick = e => { e.stopPropagation(); buildCells(it.crop.split("")); focusCell(cells().length - 1); };
   }
+  const el = $("else");
+  if (it.elsewhere) {
+    el.hidden = false; el.className = "alt";
+    el.innerHTML = `plate-shaped text elsewhere in the frame <span class="a">${it.elsewhere.plate}</span> ${it.elsewhere.conf.toFixed(3)} &middot; use`;
+    el.onclick = () => { buildCells(it.elsewhere.plate.split("")); focusCell(cells().length - 1); };
+  } else { el.hidden = true; el.onclick = null; }
   orig = it.plate.split("");
   const lb = it.label;
   setState(lb ? lb.state : "UNKN");

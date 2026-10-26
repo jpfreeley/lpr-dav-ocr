@@ -18,6 +18,15 @@ verified recently, and a read of a model badge or sign (text much wider than a p
   the threshold, and `review.reject_aspect` changes it (0 turns it off).
 - A human label always wins over both rules. Auto decisions write weak labels only.
 
+## Amendment, 2026-10-26: keep a frame when a plate-shaped read exists elsewhere
+
+The weekly self-check ([ADR 0019](0019-self-check-alerts-only-on-trouble.md)) found auto-reject right on 174 of 185
+labeled reads (94.1%) instead of 120 of 120. Thirteen of the 16 misses were frames where a badge or decal was read with
+high confidence and a real plate sat elsewhere in the frame. The second pass now records the best plate-shaped read other
+than its chosen one (`elsewhere`, `elsewhere_conf`), looked for only when the chosen read is wide, and auto-reject skips a
+frame that has one. The other three misses were correct plate reads with a wide shape and are still rejected. The aspect
+limit stays 3.5, because widening it removes more real plates than it saves.
+
 ## Consequences
 
 - The queue holds mostly hard cases, so each review minute is worth more.

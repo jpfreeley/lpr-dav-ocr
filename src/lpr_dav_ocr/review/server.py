@@ -225,10 +225,12 @@ class Store:
             by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok"
             auto = by_conf or bool(rec and rec["exact"])
             asp = float(s["aspect"]) if s.get("aspect") else None
-            rejected = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT and not auto)
+            elsewhere = s.get("elsewhere") or None          # the second pass found another plate-shaped read in this frame
+            rejected = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT and not auto and not elsewhere)
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
+                elsewhere=({"plate": elsewhere, "conf": float(s["elsewhere_conf"] or 0)} if elsewhere else None),
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
                 fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
                 pick=dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None,
