@@ -24,3 +24,4 @@ from where the decision shows up.
 | [0016](0016-local-vehicle-index-from-ticket-data.md) | A local vehicle index from public parking-ticket data |
 | [0017](0017-lossless-gray-storage-and-nightly-cleanup.md) | Single-channel PNG frames and a nightly cleanup |
 | [0018](0018-operations-page-and-storage-snapshots.md) | Operations page fed by cheap reads and a daily snapshot |
+| [0019](0019-self-check-alerts-only-on-trouble.md) | A self-check that speaks only when something needs attention |

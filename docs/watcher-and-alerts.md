@@ -80,6 +80,21 @@ denial sticks and the log fills with `PermissionError: Operation not permitted`;
 
 Set `LPR_LABEL` to name the agent something of your own, and `LPR_BIN` if `lpr` is not on the PATH.
 
+## The self-check: alerts only on trouble
+
+`lpr selfcheck` looks for problems and sends an ntfy alert only when it finds one. It is meant to run about hourly,
+apart from the watcher, so it can notice a watcher that has stopped:
+
+```bash
+scripts/install-selfcheck.sh install     # hourly LaunchAgent
+lpr selfcheck --dry-run --rules          # list every current problem, send nothing
+```
+
+It checks the watcher, the scheduled jobs, free disk space and the machine load every run, and about once a week checks
+that each automatic rule (auto-accept, auto-approve, auto-reject) is still right often enough on your labels. A problem
+alerts once, again after a day (a week for the rules) if it lasts, and alerts again if it clears and comes back. The text
+never contains a plate. See [ADR 0019](adr/0019-self-check-alerts-only-on-trouble.md).
+
 ## Trying it without waiting for a vehicle
 
 ```bash

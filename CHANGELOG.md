@@ -6,12 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Fixed
 
+- Nightly cleanup also writes the storage snapshot and refreshes `reports/accuracy.md` and `confusions.csv`. In the standalone script the snapshot step failed silently under `python -I`, because that mode leaves the script folder off the import path.
 - Reports: the stale-record count counts only marks whose record is unchanged. A mark whose record changed after a refresh is shown separately as no longer applying.
 - History page: searching a plate that has a NYC ticket record failed with "Search failed" because the stale-mark button used a helper that exists only on the reports page.
 
 ### Added
 
 - Second pass records `elsewhere` and `elsewhere_conf`: a plate-shaped read other than the chosen one, looked for when the chosen read is wide (`--fill-elsewhere` fills older days). Auto-reject no longer hides a frame that has one, and the review page offers it as a button.
+- `lpr selfcheck` and `scripts/install-selfcheck.sh`: an hourly check that sends an ntfy alert only when something needs attention (watcher, jobs, disk, or an automatic rule falling below its floor on your labels). ADR 0019.
 - `[[camera.overlay_changes]]`: say when you moved the burned-in timestamp on the camera. Clips and saved frames that start at or after that camera-clock time are masked with the new boxes, earlier ones keep the old boxes, so backfills stay correct and the freed area is read again.
 - `lpr demo results --days N`: several synthetic days that share plates, so the Reports page has regulars to show. README and docs now carry screenshots of the Reports and Operations pages made from it.
 - Operations page (`/ops`, `lpr ops`): needs-attention list, pipeline and watcher, scheduled jobs, storage with a nightly snapshot, accuracy by confidence, confusion-matrix heatmap, review and labels, alerts and machine health. See docs/operations.md.
