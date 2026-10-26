@@ -282,24 +282,25 @@ def lag(cam_dir, frames_root, now=None):
 
 
 def attention(d):
-    """The short list at the top of the page: [{level, text}], worst first."""
+    """The short list at the top of the page: [{key, level, text}], worst first. `key` names the kind of problem and
+    stays the same while its numbers change, so a scheduler can tell a new problem from a continuing one."""
     out = []
     w = d["watcher"]
     if w["idle_s"] is None or w["idle_s"] > 600:
-        out.append(dict(level="critical", text="The watcher log has been quiet for " + (f"{w['idle_s'] // 60} minutes." if w["idle_s"] else "a long time.") + " It may not be running."))
+        out.append(dict(key="watcher-quiet", level="critical", text="The watcher log has been quiet for " + (f"{w['idle_s'] // 60} minutes." if w["idle_s"] else "a long time.") + " It may not be running."))
     if w["errors_24h"]:
-        out.append(dict(level="warning", text=f"{w['errors_24h']} watcher error(s) in the last 24 hours. Last: {w['recent_errors'][-1]['text']}"))
+        out.append(dict(key="watcher-errors", level="warning", text=f"{w['errors_24h']} watcher error(s) in the last 24 hours. Last: {w['recent_errors'][-1]['text']}"))
     lg = d.get("lag", {})
     if lg.get("available") and lg["waiting"] > 15:
-        out.append(dict(level="warning", text=f"{lg['waiting']} clips on the share are not processed yet (oldest {lg['oldest_waiting']} CamTime)."))
+        out.append(dict(key="clips-waiting", level="warning", text=f"{lg['waiting']} clips on the share are not processed yet (oldest {lg['oldest_waiting']} CamTime)."))
     free = d["storage"].get("data_disk", {}).get("free")
     if free is not None and free < 20e9:
-        out.append(dict(level="critical" if free < 5e9 else "warning", text=f"Only {free / 1e9:.0f} GB free on the data disk."))
+        out.append(dict(key="disk-low", level="critical" if free < 5e9 else "warning", text=f"Only {free / 1e9:.0f} GB free on the data disk."))
     for j in d["jobs"]:
         if j["late"]:
-            out.append(dict(level="warning", text=f"{j['name']} has not run in {j['age_s'] // 3600} hours."))
+            out.append(dict(key="job-late-" + j["key"], level="warning", text=f"{j['name']} has not run in {j['age_s'] // 3600} hours."))
     if d["machine"]["load"][0] > 2 * (d["machine"]["cpus"] or 4):
-        out.append(dict(level="warning", text=f"The machine is overloaded (load {d['machine']['load'][0]:.0f})."))
+        out.append(dict(key="overloaded", level="warning", text=f"The machine is overloaded (load {d['machine']['load'][0]:.0f})."))
     order = {"critical": 0, "warning": 1}
     return sorted(out, key=lambda x: order[x["level"]])
 
