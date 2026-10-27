@@ -129,7 +129,10 @@
   #mont .hd b { font:700 18px var(--mono); letter-spacing:.08em; }
   #mont .hd .sp { flex:1; } #mont .hd a { color:var(--accent); font-size:13px; cursor:pointer; }
   #mont .grid { overflow:auto; padding:12px 16px 16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }
-  #mont .cell { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:6px; cursor:pointer; text-align:left; color:var(--text); font:inherit; }
+  #mont .cell { position:relative; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:6px; cursor:pointer; text-align:left; color:var(--text); font:inherit; }
+  #mont .cell.goldc { border-color:#e3a008; }
+  #mont .cstar { position:absolute; top:8px; right:10px; font-size:20px; line-height:1; color:#fff; text-shadow:0 0 3px #000; cursor:pointer; }
+  #mont .cstar:hover { color:#e3a008; } #mont .cstar.on { color:#e3a008; }
   #mont .cell:hover { border-color:var(--accent); }
   #mont .cell .th { width:100%; aspect-ratio:230/86; background:#000 no-repeat; border-radius:5px; display:block; }
   #mont .cell small { display:block; color:var(--muted); font-size:11.5px; margin-top:4px; }
@@ -458,14 +461,14 @@ function renderGold() {
   gb.hidden = !human;
   if (human) {
     gb.className = "goldb" + (it.is_gold ? " on" : ""); gb.textContent = (it.is_gold ? "\u2605" : "\u2606") + " gold standard";
-    gb.title = it.is_gold ? "This frame is the gold standard for its plate. Click to remove it." : "Mark this frame as the gold standard for its plate: very clear, no question what the read is. Other sightings and similar reads are compared with it.";
+    gb.title = it.is_gold ? "This frame is the gold standard for its plate. Click to remove it." : "For an especially clear frame: mark it as the gold standard for its plate (no question what the read is). You can also mark one from the montage of all sightings (click the seen-N-times number). Other sightings and similar reads are compared with it.";
     gb.onclick = async () => {
       try { await api("/api/gold", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ image: it.image, on: !it.is_gold }) });
         it.is_gold = !it.is_gold; renderGold(); toast(it.is_gold ? "Marked as the gold standard" : "Gold standard removed"); } catch (e) { toast("Could not save the gold standard"); }
     };
   }
   const g = it.gold; gc.hidden = !g;
-  if (g) gc.innerHTML = `${g.exact ? "gold standard for" : "gold standard of the plate this is one character from,"} <b>${g.plate}</b> <a href="/i/${encodeURIComponent(g.image)}" title="Open the gold standard frame">${cropThumb(g.image, g.box, 240, 90)}</a>`;
+  if (g) gc.innerHTML = `\u2605 ${g.exact ? "gold standard in this plate's history:" : "gold standard of the plate this is one character from,"} <b>${g.plate}</b> <a href="/i/${encodeURIComponent(g.image)}" title="Open the gold standard frame">${cropThumb(g.image, g.box, 240, 90)}</a>`;
 }
 function showVehicle(v) {
   const el = $("veh");
@@ -523,6 +526,8 @@ async function openMontage() {
   $("montfull").href = "/history?q=" + encodeURIComponent(p);
   const r = await api("/api/history?unverified=1&q=" + encodeURIComponent(p));
   const list = earlier(r).reverse();      // oldest first
+  const gold = r.sightings.find(x => x.gold && x.image !== me);       // the gold standard is always shown first, even outside the window
+  if (gold) { const k = list.findIndex(x => x.image === gold.image); if (k >= 0) list.splice(k, 1); list.unshift(gold); }
   $("montn").textContent = `${list.length} other sighting${list.length === 1 ? "" : "s"} within ${seenDays ? seenDays + " days" : "(all time)"}, oldest first. Click one to open it.`;
   $("montg").innerHTML = list.map(s => {
     let st = "";
@@ -532,12 +537,28 @@ async function openMontage() {
       const k = Math.min(230 / cw, 86 / ch);
       st = `background-image:url('/img/${encodeURIComponent(s.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px`;
     }
-    return `<button class="cell" data-i="${s.image}"><span class="th" style="${st}"></span><small>${s.day} ${s.time} CamTime &middot; ${s.basis}</small></button>`;
+    const star = s.basis === "verified" || s.basis === "fixed"
+      ? `<span class="cstar${s.gold ? " on" : ""}" role="button" data-img="${s.image}" data-on="${s.gold ? 0 : 1}" title="${s.gold ? "The gold standard for this plate. Click to remove it." : "Mark as the gold standard: a very clear frame with no question about the read"}">${s.gold ? "\u2605" : "\u2606"}</span>` : "";
+    return `<div class="cell${s.gold ? " goldc" : ""}" data-i="${s.image}">${star}<span class="th" style="${st}"></span><small>${s.day} ${s.time} CamTime &middot; ${s.basis}${s.gold ? " &middot; \u2605 gold standard" : ""}</small></div>`;
   }).join("");
 }
 const closeMontage = () => { $("mont").hidden = true; };
 $("montx").onclick = closeMontage;
-$("mont").addEventListener("click", e => { if (e.target === $("mont")) closeMontage(); const c = e.target.closest(".cell"); if (c) { closeMontage(); go(c.dataset.i, false); } });
+/* after the gold standard changes in the montage, refresh the gold card and button for the plate under review */
+async function refreshGold() {
+  try { const d = await api(`/api/item?image=${encodeURIComponent(it.image)}&f=${F}&day=${DAY}`); if (d.item && d.item.image === it.image) { it.gold = d.item.gold; it.is_gold = d.item.is_gold; renderGold(); } } catch (e) { /* optional */ }
+}
+$("mont").addEventListener("click", async e => {
+  if (e.target === $("mont")) closeMontage();
+  const star = e.target.closest(".cstar");
+  if (star) {
+    e.stopPropagation();
+    try { await api("/api/gold", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ image: star.dataset.img, on: star.dataset.on === "1" }) });
+      toast(star.dataset.on === "1" ? "Marked as the gold standard" : "Gold standard removed"); await openMontage(); refreshGold(); } catch (err) { toast("Could not save the gold standard"); }
+    return;
+  }
+  const c = e.target.closest(".cell"); if (c) { closeMontage(); go(c.dataset.i, false); }
+});
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("mont").hidden) { closeMontage(); e.stopPropagation(); } }, true);
 
 /* watchlist: add or remove the plate shown (the boxes if you edited them) */

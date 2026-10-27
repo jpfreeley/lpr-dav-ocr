@@ -162,11 +162,14 @@ Some plates in the history are fuzzy but legible, and some frames are perfectly 
 Mark such a frame as the **gold standard** of its plate. Only a frame you verified (Correct or Save fix) can be one, and a plate
 has one at a time (a new mark replaces the old). It is saved in `labels/gold.jsonl`.
 
-- **Mark it:** the star on a sighting in the plate history, or the **gold standard** button on the review page when you are
-  looking at a verified frame. A filled star means it is the gold standard; click again to remove it.
-- **See it:** the plate history shows the gold frame at the top. On the review page, a reading of that plate (or of a plate one
-  character away, such as from a hint) shows the gold crop beside the vehicle line, so you can compare a fuzzy read with the
-  clear one.
+- **Mark it:** where you look over all the sightings of a plate: the star on a verified sighting in the **montage** (click the
+  "seen N other times" number on the review page) or in the plate history. For an especially clear frame you are reviewing, the
+  **gold standard** button on the review page does the same. A filled star means it is the gold standard; click again to
+  remove it. Only sightings you verified have a star.
+- **See it:** the plate history shows the gold frame at the top, and the montage always shows it first (outlined in amber, even
+  when it is outside the day window). On the review page, a reading of that plate (or of a plate one character away, such as
+  from a hint) shows a "★ gold standard in this plate's history" line with the gold crop beside the vehicle line, so you can
+  compare a fuzzy read with the clear one.
 - **Protected:** the duplicate merge always keeps the gold frame, so it is never moved to the trash and deleted.
 - **Measured:** `lpr score` reports how the first pass does on your gold frames, a clean test of the reader on clear plates.
 
