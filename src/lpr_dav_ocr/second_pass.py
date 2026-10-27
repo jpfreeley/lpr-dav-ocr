@@ -30,7 +30,7 @@ from pathlib import Path
 from . import pipeline as P
 from .util import read_csv
 
-HEADER = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf"]
+HEADER = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf", "elsewhere_box"]
 RX = re.compile(r"[A-Z0-9]{5,8}")
 
 
@@ -98,15 +98,15 @@ def crop_read(ocr, img, box, cv2):
 
 def plate_shaped(cands, exclude=()):
     """The most confident candidate whose outline is plate-shaped (aspect 1.5 to 3.0) and whose text is not in `exclude`.
-    (text, conf) or None."""
+    (text, conf, box) or None; box is [x0, y0, x1, y1] in the saved frame, so the plate can be outlined where it really is."""
     ok = [x for x in cands if 1.5 <= x[3] <= 3.0 and x[0] not in exclude]
     best = max(ok, key=lambda x: x[1], default=None)
-    return (best[0], best[1]) if best else None
+    return (best[0], best[1], best[2]) if best else None
 
 
 def find_elsewhere(ocr, get_fast, img, chosen, tilt, cv2, np):
     """Another plate-shaped read in a frame whose chosen read is not plate-shaped (a badge or a decal was read instead
-    of the plate). Looks un-rotated and rotated by the tilt. (text, conf) or None."""
+    of the plate). Looks un-rotated and rotated by the tilt. (text, conf, box) or None."""
     seen = []
     for deg in (0, tilt):
         if deg == tilt and not tilt:
@@ -146,10 +146,11 @@ def row_for(r, res, secs, third=None):
     p1 = r["plate"]
     t3 = ["", ""] if third is None else [third[0], f"{third[1]:.4f}"] if third else ["", "0"]
     if res is None:
-        return [r["image"], p1, r["conf"], "", "", 0, "", "", "", "", "", "", secs, *t3, "", ""]
+        return [r["image"], p1, r["conf"], "", "", 0, "", "", "", "", "", "", secs, *t3, "", "", ""]
     p2, c2, box, asp = res[:4]
     alt = res[4] if len(res) > 4 else None
-    el = ["", ""] if asp <= 3.0 else [alt[0], f"{alt[1]:.4f}"] if alt else ["", "0"]      # "0" means looked, nothing found
+    box_s = lambda a: " ".join(str(int(v)) for v in a[2]) if len(a) > 2 and a[2] else ""
+    el = ["", "", ""] if asp <= 3.0 else [alt[0], f"{alt[1]:.4f}", box_s(alt)] if alt else ["", "0", ""]      # "0" means looked, nothing found
     return [r["image"], p1, r["conf"], p2, f"{c2:.4f}" if c2 is not None else "", int(p2 == p1 and p2 != ""), *box, f"{asp:.2f}", shape_of(asp), secs, *t3, *el]
 
 
@@ -190,12 +191,13 @@ def main(argv=None):
     index = [r for r in read_csv(day / "index.csv") if r["plate"]]
     existing = read_csv(out) if out.exists() else []
     have = {r["image"]: r for r in existing}
-    if existing and "elsewhere_conf" not in existing[0]:      # file from before the crop read or the elsewhere read: add the columns
+    if existing and "elsewhere_box" not in existing[0]:      # file from before the crop read or the elsewhere read: add the columns
         rewrite(day, out, existing, {})
         existing = read_csv(out)
         have = {r["image"]: r for r in existing}
     if fill_else:
-        pend = {i for i, r in have.items() if r["aspect"] and float(r["aspect"]) > 3.0 and not r.get("elsewhere_conf")}
+        pend = {i for i, r in have.items() if r["aspect"] and float(r["aspect"]) > 3.0
+                and (not r.get("elsewhere_conf") or (r.get("elsewhere") and not r.get("elsewhere_box")))}
         todo = [r for r in index if r["image"] in pend]
     elif fill:
         pend = {i for i, r in have.items() if r["plate2"] and r["plate2"] != r["plate1"] and r["x0"] and not r.get("conf3")}
@@ -236,7 +238,7 @@ def main(argv=None):
             old = have[r["image"]]
             alt = find_elsewhere(ocr, get_fast, img, old["plate2"] or old["plate1"], tilt, cv2, np) if img is not None else None
             row = [old.get(k, "") for k in HEADER]
-            row[-2:] = [alt[0], f"{alt[1]:.4f}"] if alt else ["", "0"]
+            row[-3:] = [alt[0], f"{alt[1]:.4f}", " ".join(str(int(v)) for v in alt[2])] if alt else ["", "0", ""]
             new_rows[r["image"]] = row
             if n % 10 == 0:
                 print(f"  {n}/{len(todo)}", flush=True)
