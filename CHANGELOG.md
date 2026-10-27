@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Fixed
 
+- Most valuable queue: a plate with no reason to review it early (no "no strong signal" entries any more) is not listed. When none is left, the queue says nothing would change your results and points to Needs review.
 - Review page: the **Last reviewed** button is now **Back** (Alt+B, and Alt+L still works): it returns to the plate you were just looking at, one step at a time, in every queue. The old button jumped to the furthest labeled plate of the day, which often felt random.
 - Most valuable queue: "seen on N days" now counts only other days and only sightings that count in the plate history (not ones you marked obstructed, not a plate or can't tell), so it no longer contradicts "not seen again" on the review page.
 - Review page: **matches** and **doesn't match** feel instant. The save returns the fresh vehicle in the same response (no second lookup request), and the server rebuilds its plate cache in the background instead of making the next request wait about half a second or more.
