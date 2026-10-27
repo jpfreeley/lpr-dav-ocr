@@ -207,6 +207,24 @@ two letters; and a NYS moped plate, three digits, two letters and a digit. A rea
 T123456C - use") selects **NY** automatically. These are habits of the plates, not rules: a pattern never rejects or
 changes a plate, and it never picks a state on its own except through that TLC button.
 
+## The ticket record as evidence
+
+A read that exists in the local NYC ticket data is very likely right, because a misread rarely lands on another registered
+plate. On the author's labels 77% of the correct first reads had a ticket record, against 7% of the wrong ones. A read with a
+record was right 93.7% of the time, and a read without one only 24.9%. Two things use that:
+
+- **Auto-accept with a record.** When both passes agree, the shape is plate-like, the confidence is at least
+  `review.record_accept_conf` (default 0.97, below the usual 0.99) and the plate has a vehicle in the ticket data, the plate is
+  auto-accepted. The badge says "both passes agree and the plate has a vehicle in the ticket data". On the author's labels
+  this was right 98.0% of the time (384 of 392; `lpr score` prints it, and the self-check watches it). A record you marked
+  **doesn't match** (verified stale) does not count. Set the key to 0 to turn the rule off.
+- **You confirm the vehicle.** If the ticket data says Subaru and the car in the frame is that Subaru with that plate, press
+  **matches** beside the vehicle line. That is independent evidence the plate is read right, stronger than the text alone.
+  The plate then vouches for its other sightings, exact text only, for `review.confirmed_days` (default 365) either side
+  instead of 30. **undo** removes the confirmation. A confirmation applies to the record you saw: if a refresh changes the
+  record, it no longer counts, as with a stale mark. **matches** only records the vehicle; you still press **Correct** or
+  **Save fix** for the plate itself.
+
 ## Digits in letter positions
 
 In a standard plate (three letters then four digits) the first three characters are letters, so a digit there is a

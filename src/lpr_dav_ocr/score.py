@@ -13,11 +13,21 @@ from datetime import date
 from pathlib import Path
 
 from . import config as _config
+from . import vehicles as _veh
 from .util import read_csv, read_jsonl
 
 CFG = _config.load()
 AUTO_CONF = CFG["review"]["auto_accept_conf"]   # same setting the review page uses
+RECORD_CONF = CFG["review"]["record_accept_conf"]
 
+
+
+def _open_vehicles():
+    """The local ticket index, or None when it is not built."""
+    try:
+        return _veh.open_db()
+    except Exception:
+        return None
 
 def _hour(image):
     """Hour of day from the file name (<date>_HH.MM.SS-...), or -1 when the name has none."""
@@ -180,6 +190,14 @@ def main(argv=None):
     P(f"- Covers {auto_all} of {items_all} plates found so far ({auto_all / max(items_all, 1):.0%}), including ones nobody has reviewed")
     P(f"- Among the {len(au)} you labeled that match the rule: real plate right {pct(sum(r['p1'] == r['truth'] for r in auk), len(auk))}; "
       f"{len(au) - len(auk)} were not plates or unreadable ({', '.join(f'{v} {k}' for k, v in collections.Counter(r['verdict'] for r in au if r['verdict'] not in ('ok', 'fix')).most_common())})\n")
+    # 5b. the ticket-record rule: confidence below auto-accept, both passes agree, shape ok, and the plate has a vehicle in the ticket index
+    db = _open_vehicles()
+    if RECORD_CONF and db is not None:
+        rr = [r for r in rows if RECORD_CONF <= r["c1"] < AUTO_CONF and r["p2"] == r["p1"] and r["shape"] == "ok" and _veh.lookup(db, r["p1"], None)]
+        rrk = [r for r in rr if r["verdict"] in ("ok", "fix")]
+        P("\n## Ticket-record rule (conf %.2f to %.2f, both passes agree, shape ok, the plate has a vehicle in the ticket data)\n" % (RECORD_CONF, AUTO_CONF))
+        P(f"- Among the {len(rr)} you labeled that match the ticket-record rule: real plate right {pct(sum(r['p1'] == r['truth'] for r in rrk), len(rrk))}; "
+          f"{len(rr) - len(rrk)} were not plates or unreadable\n")
     # 6. recently verified plates: how good is "equals a plate you verified within N days"?
     days = int(_config.load()["review"]["recent_days"])
     ver = [(r["image"], r["truth"], date.fromisoformat(r["image"][:10])) for r in rows if r["verdict"] in ("ok", "fix") and r["truth"] and re.match(r"\d{4}-\d\d-\d\d_", r["image"])]

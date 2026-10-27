@@ -32,6 +32,8 @@ VERDICTS = {"ok", "fix", "notplate", "obstructed", "skip"}
 AUTO_CONF = CFG["review"]["auto_accept_conf"]
 RECENT_DAYS = CFG["review"]["recent_days"]
 REJECT_ASPECT = CFG["review"]["reject_aspect"]
+RECORD_CONF = CFG["review"]["record_accept_conf"]      # a plate that has a ticket record is auto-accepted from this confidence (0 turns it off)
+CONFIRMED_DAYS = CFG["review"]["confirmed_days"]        # a plate whose vehicle you confirmed vouches for its sightings this many days either side
 VALUE_QUEUE = CFG["review"]["value_queue"]      # size of the "most valuable first" queue
 NOT_PLATE_TEXTS = {t.strip().upper() for t in CFG["review"]["not_plate_texts"]}      # words that are never a plate (state banner)
 
@@ -243,7 +245,8 @@ class Store:
             rec = self.recent(r["plate"], img)
             banner = r["plate"] in NOT_PLATE_TEXTS                # a word printed on plates (NEWYORK), never the plate itself
             by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok" and not banner
-            auto = (by_conf or bool(rec and rec["exact"])) and not banner
+            by_record = bool(RECORD_CONF) and not by_conf and conf >= RECORD_CONF and bool(alt) and alt == r["plate"] and shape == "ok" and not banner and self.has_record(r["plate"])
+            auto = (by_conf or by_record or bool(rec and rec["exact"])) and not banner
             asp = float(s["aspect"]) if s.get("aspect") else None
             elsewhere = s.get("elsewhere") or None          # the second pass found another plate-shaped read in this frame
             wide = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT)
@@ -254,7 +257,7 @@ class Store:
                 elsewhere=({"plate": elsewhere, "conf": float(s["elsewhere_conf"] or 0)} if elsewhere else None),
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
                 stdfix=self._stdfix(r["plate"], alt, s.get("plate3")),
-                fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
+                fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "record" if by_record else "recent" if auto else None),
                 pick=(dict(plate=elsewhere, why="the first read is the state banner, not a plate") if banner and elsewhere else
                       dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None),
                 banner=banner,
@@ -350,8 +353,10 @@ class Store:
         if not plate or not d0 or RECENT_DAYS <= 0:
             return None
         by, near = self.vindex()
-        hits = lambda t: [x for x in by.get(t, []) if x[1] != image and abs(x[0] - d0) <= RECENT_DAYS]
+        hits = lambda t, w=RECENT_DAYS: [x for x in by.get(t, []) if x[1] != image and abs(x[0] - d0) <= w]
         h = hits(plate)
+        if not h and CONFIRMED_DAYS > RECENT_DAYS and self._vflags().get(plate, {}).get("match") and self.confirmed(plate):
+            h = hits(plate, CONFIRMED_DAYS)         # you confirmed the vehicle by eye: the plate vouches for a longer stretch
         if h:
             return dict(plate=plate, n=len(h), exact=True, state=self.state_of(plate))
         if len(plate) < 5:
@@ -400,6 +405,23 @@ class Store:
             self._vflags_key = key
         return self._vflags_map
 
+    def has_record(self, plate):
+        """True when the local ticket index has a vehicle for this plate text, and you have not marked that record
+        verified stale. Cached per plate for the life of the process (cleared when you mark a record)."""
+        c = self.__dict__.setdefault("_rec_cache", {})
+        if plate not in c:
+            v = self.vehicle(plate)
+            c[plate] = bool(v.get("available") and not v.get("none") and not (v.get("stale") and v["stale"]["same_record"]))
+        return c[plate]
+
+    def confirmed(self, plate):
+        """True when you confirmed by eye that the vehicle matches this plate's ticket record, and the record is unchanged."""
+        f = self._vflags().get(plate)
+        if not f or not f.get("match") or f.get("stale"):
+            return False
+        v = self.vehicle(plate)
+        return bool(v.get("confirmed") and v["confirmed"]["same_record"])
+
     def vehicle(self, plate, state=None):
         """What the local NYC ticket index says about a plate (see vehicles.py): {available, make, body, year, color, ...}."""
         db = getattr(self, "_vdb", None)
@@ -414,13 +436,15 @@ class Store:
         flag = self._vflags().get(plate)
         if flag and flag.get("stale"):          # you looked at the car and the record did not match
             out["stale"] = dict(ts=flag["ts"], same_record=flag.get("record") == out["text"], record=flag.get("record"))
+        if flag and flag.get("match"):          # you looked at the car and it matched the record
+            out["confirmed"] = dict(ts=flag["ts"], same_record=flag.get("record") == out["text"])
         return out
 
-    def set_vehicle_stale(self, plate, stale, image=None):
+    def set_vehicle_stale(self, plate, stale, image=None, match=False):
         """Mark (or unmark) the ticket record for a plate as verified stale: you saw the vehicle and it does not match.
         Nothing about the plate or its sightings changes; the record you saw is kept with the mark."""
         v = self.vehicle(plate)
-        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, stale=bool(stale),
+        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, stale=bool(stale), match=bool(match) and not stale,
                    image=image, record=v.get("text") if v.get("available") and not v.get("none") else None)
         with self.write_lock, self.vflags_path.open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
@@ -429,6 +453,8 @@ class Store:
         c = self._cache.get(self.vflags_path)
         if c:
             c[1].append(rec)
+        self.__dict__.pop("_rec_cache", None)
+        self._reads_cache = None               # plate history and the recent-verified window depend on the mark
         return rec
 
     @staticmethod
@@ -769,7 +795,7 @@ def make_handler(store):
                     d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
                     plate = re.sub(r"[^A-Z0-9]", "", str(d["plate"]).upper())[:10]
                     assert len(plate) >= 2
-                    return self._send(200, store.set_vehicle_stale(plate, bool(d.get("stale", True)), d.get("image")) | {"ok": True})
+                    return self._send(200, store.set_vehicle_stale(plate, bool(d.get("stale", True)), d.get("image"), bool(d.get("match"))) | {"ok": True})
                 except (KeyError, ValueError, TypeError, AssertionError):
                     return self._send(400, {"error": "bad vehicle flag"})
             if path in ("/api/watch", "/api/watch/remove"):

@@ -290,7 +290,7 @@ function render() {
   if (!wv.hidden) wv.textContent = "Worth a label: " + it.value.why.join(" \u00b7 ");
   if (rc) $("rechkb").textContent = `you marked this Not a plate, but the second pass found plate-like text${it.alt ? " (" + it.alt.plate + ")" : ""}: is there a plate in the frame?`;
   $("rejb").hidden = !(it.rejected && !it.label); $("rejb").textContent = `auto-rejected: not plate-shaped (aspect ${it.aspect})`;
-  $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : "auto-accepted";
+  $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : it.auto_why === "record" ? "auto-accepted: both passes agree and the plate has a vehicle in the ticket data" : "auto-accepted";
   renderLike(it.like);
   renderNear(it.recent);
   liveKey = "";
@@ -454,6 +454,18 @@ function showVehicle(v) {
       toast(stale ? "Marked verified stale" : "Stale mark removed"); } catch (e) { toast("Could not save the mark"); }
   };
   el.appendChild(b);
+  const confirmedNow = !!(v.confirmed && v.confirmed.same_record);
+  if (confirmedNow) { const m = document.createElement("span"); m.textContent = " \u00b7 you confirmed this vehicle"; el.appendChild(m); }
+  if (!(v.stale && v.stale.same_record)) {
+    const mb = document.createElement("button"); mb.className = "vbtn"; mb.textContent = confirmedNow ? "undo" : "matches";
+    mb.title = confirmedNow ? "Remove your confirmation" : "The vehicle in the frame matches this record (make, body, color). This is strong evidence the plate is read right, and the plate then vouches for its other sightings for a year.";
+    mb.onclick = async () => {
+      try { await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale: false, match: !confirmedNow, image: it && it.image }) });
+        const fresh = await api("/api/lookup?q=" + encodeURIComponent(v.plate) + "&image=" + encodeURIComponent(it ? it.image : "")); it.vehicle = fresh.vehicle; showVehicle(fresh.vehicle);
+        toast(confirmedNow ? "Confirmation removed" : "Vehicle confirmed"); } catch (e) { toast("Could not save the confirmation"); }
+    };
+    el.appendChild(mb);
+  }
   el.title = "From NYC parking tickets (" + v.state + ", up to fiscal year " + v.last_fy + "). A ticket writer typed it, so it can be wrong or out of date.";
 }
 const seenPlate = () => (edited() ? value() : ((it.label && it.label.truth) || it.plate));

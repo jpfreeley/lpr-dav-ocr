@@ -13,6 +13,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Review page: auto-accept from confidence 0.97 when both passes agree, the shape is plate-like and the plate has a vehicle in the local ticket data (`review.record_accept_conf`). A **matches** button beside the vehicle line records that you saw the car matches the record; the plate then vouches for its other sightings for a year (`review.confirmed_days`). `lpr score` and the self-check measure the new rule.
 - `review.not_plate_texts` (default `NEWYORK`): exact words that are printed on plates but are never the plate. A read of one is never auto-approved and is auto-rejected unless the second pass found plate-shaped text elsewhere in the frame; then that text becomes the best guess.
 - Review page: when no read fits three letters then four digits but a fix of a digit in a letter position would (0 as D, 6 as G, 2 as Z), a one-click offer shows the fixed read. Never automatic.
 - Review page: **Most valuable first** queue, the top 40 unreviewed plates across all days ranked by how much one label changes the results (watchlist matches, plates where one label approves many more sightings, near-matches of verified plates, repeat plates with disagreeing reads). `review.value_queue` sets the size.

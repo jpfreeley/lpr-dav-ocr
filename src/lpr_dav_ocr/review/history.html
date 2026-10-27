@@ -159,6 +159,7 @@ function render() {
     : "Vehicle on NYC tickets: " + v.text + ". Last in fiscal year " + v.last_fy + (v.others ? "; " + v.others + " other recorded variant(s)" : "") + ". A ticket writer typed it: it can be wrong or out of date, and the city records no model or trim.";
   if (v && v.available && !v.none) {
     const st = v.stale && v.stale.same_record;
+    if (v.confirmed && v.confirmed.same_record) ve.appendChild(document.createTextNode(" You confirmed on " + v.confirmed.ts.slice(0, 10) + " that the vehicle you saw matches this record."));
     if (v.stale) ve.appendChild(document.createTextNode(st ? " Marked verified stale on " + v.stale.ts.slice(0, 10) + ": the vehicle you saw did not match." : " It was marked stale on " + v.stale.ts.slice(0, 10) + ", but the record has changed since."));
     const b = document.createElement("button");
     b.className = "tbtn"; b.style.marginLeft = "8px"; b.textContent = st ? "Undo stale mark" : "Mark verified stale"; ve.appendChild(b);

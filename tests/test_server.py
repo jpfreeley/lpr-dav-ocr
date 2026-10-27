@@ -879,3 +879,74 @@ class BannerTests(unittest.TestCase):
         self.assertEqual((self.item("NEWYORKS", "03")["banner"], self.item("NEWYORKS", "03")["auto"]), (False, True))
         self.assertTrue(self.item("DEMO001", "04")["auto"])
 
+
+class TicketRecordTests(unittest.TestCase):
+    """A plate that has a vehicle in the ticket data is auto-accepted at a lower confidence; a vehicle you confirm by eye
+    makes the plate vouch for its other sightings over a longer window."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        plan = {"2026-01-01": [("01.00.00", "DEMO001", 0.98), ("02.00.00", "DEMO002", 0.98), ("03.00.00", "DEMO001", 0.96)],
+                "2026-04-10": [("01.00.00", "DEMO001", 0.80), ("02.00.00", "DEMO003", 0.98)]}
+        cls.img = {}
+        for day, items in plan.items():
+            d = cls.root / "frames" / day
+            d.mkdir(parents=True)
+            with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+                w, v = csv.writer(f), csv.writer(g)
+                w.writerow(hdr_i)
+                v.writerow(hdr_s)
+                for t, p1, conf in items:
+                    img = f"{day}_{t}-{t}-{p1}_{conf:.2f}.png"
+                    cls.img[(day, t)] = img
+                    w.writerow([f"{t}-{t}[M].dav", p1, conf, 30, "", img, 500, 1, 3, 5])
+                    v.writerow([img, p1, conf, p1, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2])
+        (cls.root / "labels").mkdir()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def make(self):
+        from tests.test_vehicles import make_db
+        d, db = make_db([("DEMO001", "NY", "SUBAR", "SUBN", 2019, "GY", 3, 2027), ("DEMO003", "NY", "TOYOT", "4DSD", 2020, "WH", 2, 2027)])
+        store = S.Store(self.root)
+        store._vdb = db
+        store.labels_path = self.root / "labels" / "t.jsonl"
+        store.vflags_path = self.root / "labels" / "f.jsonl"
+        for p in (store.labels_path, store.vflags_path):
+            p.unlink(missing_ok=True)
+        self.addCleanup(d.cleanup)
+        return store
+
+    def auto(self, store, day, t):
+        return next(i for i in store.items(day) if i["image"] == self.img[(day, t)])
+
+    def test_record_lowers_the_confidence_needed(self):
+        st = self.make()
+        a = self.auto(st, "2026-01-01", "01.00.00")
+        self.assertEqual((a["auto"], a["auto_why"]), (True, "record"))           # conf 0.98, agree, plate-shaped, has a record
+        self.assertFalse(self.auto(st, "2026-01-01", "02.00.00")["auto"])         # same, but DEMO002 has no record
+        self.assertFalse(self.auto(st, "2026-01-01", "03.00.00")["auto"])         # a record, but 0.96 is under the 0.97 floor
+
+    def test_a_stale_mark_withdraws_the_record(self):
+        st = self.make()
+        st.set_vehicle_stale("DEMO001", True)
+        self.assertFalse(self.auto(st, "2026-01-01", "01.00.00")["auto"])
+
+    def test_confirming_the_vehicle_widens_the_vouching_window(self):
+        st = self.make()
+        st.add_label(dict(image=self.img[("2026-01-01", "01.00.00")], verdict="ok", truth="DEMO001", ts="2026-01-02T00:00:00"))
+        far = self.img[("2026-04-10", "01.00.00")]                                # 99 days later, outside the 30-day window
+        self.assertIsNone(st.recent("DEMO001", far))
+        st.set_vehicle_stale("DEMO001", False, image=far, match=True)             # you saw the Subaru and the plate
+        r = st.recent("DEMO001", far)
+        self.assertTrue(r and r["exact"])
+        self.assertTrue(st.vehicle("DEMO001")["confirmed"]["same_record"])
+        st.set_vehicle_stale("DEMO001", False, image=far, match=False)            # undo
+        self.assertIsNone(st.recent("DEMO001", far))
+
