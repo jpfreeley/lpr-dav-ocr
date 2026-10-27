@@ -624,7 +624,8 @@ class Store:
             for i in self.items(d):
                 if i["rejected"]:
                     continue
-                same[i["plate"]].append(i)
+                if self.basis(i)[0] is not None:       # only sightings that count in the plate history (not obstructed, not a plate, can't tell)
+                    same[i["plate"]].append(i)
                 if i["ready"] and not i["label"] and not i["auto"]:
                     cands.append(i)
         pend = collections.defaultdict(list)
@@ -648,12 +649,12 @@ class Store:
             if rec and not rec["exact"]:
                 score += 60
                 why.append(f"one character from {rec['plate']} you verified")
-            days = len({x["day"] for x in same[i["plate"]]})
-            if i["alt"] and i["alt"]["plate"] != i["plate"] and (n > 0 or days >= 2):
+            days = len({x["day"] for x in same[i["plate"]] if x["day"] != i["day"]})       # other days, the same count the history shows
+            if i["alt"] and i["alt"]["plate"] != i["plate"] and (n > 0 or days >= 1):
                 score += 40
                 why.append("repeat plate, the two reads disagree")
-            if days >= 2:
-                why.append(f"seen on {days} days")
+            if days >= 1:
+                why.append(f"seen on {days} other day{'s' if days != 1 else ''}")
             score += 4 * min(days, 5) + (2 if i["fits"] else 0)
             i["value"] = dict(score=score, why=why or ["no strong signal"])
             out.append(i)

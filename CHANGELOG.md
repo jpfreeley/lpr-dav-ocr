@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Fixed
 
+- Most valuable queue: "seen on N days" now counts only other days and only sightings that count in the plate history (not ones you marked obstructed, not a plate or can't tell), so it no longer contradicts "not seen again" on the review page.
 - Review page: the gold standard button is always visible beside History and Watch. On a frame you have not saved yet, clicking it marks the frame as the gold standard when you save it with Correct or Save fix (it used to appear only after you had verified the frame).
 - Review page: in the **Most valuable first** queue, **Last reviewed** jumps to the label you saved most recently, not the furthest plate in time order of one day. The other queues keep the old meaning.
 - Nightly cleanup also writes the storage snapshot and refreshes `reports/accuracy.md` and `confusions.csv`. In the standalone script the snapshot step failed silently under `python -I`, because that mode leaves the script folder off the import path.
