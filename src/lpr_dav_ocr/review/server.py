@@ -53,6 +53,23 @@ def tlc_fix(p):
     return c if TLC_RX.fullmatch(c) else None
 
 
+# In the three letter positions of a standard plate (AAANNNN) a digit is a misread letter. On the author's labels a 0 there
+# was really D about 80% of the time, a 6 a G and a 2 a Z about 80 to 90% (an 8 or a 5 was close to a coin flip and a 1
+# had no clear winner, so those are left alone). It is only ever offered, never applied: some real plates do start with a digit.
+_STD_LETTER = {"0": "D", "6": "G", "2": "Z"}
+
+
+def std_fix(p):
+    """The AAANNNN plate this read most likely is, when the last four are digits and the first three are letters or
+    0/6/2 with at least one letter among them. None otherwise."""
+    if not p or len(p) != 7 or not p[3:].isdigit():
+        return None
+    head = p[:3]
+    if not any(c.isalpha() for c in head) or not any(c in _STD_LETTER for c in head) or not all(c.isalpha() or c in _STD_LETTER for c in head):
+        return None
+    return "".join(_STD_LETTER.get(c, c) for c in head) + p[3:]
+
+
 # Plate patterns used as a hint when choosing between reads. NYS standard passenger plates are three letters then four
 # digits (AAANNNN); NYC TLC plates are in the TLC pattern above. Many valid plates fit neither (vanity, older
 # styles, other states), so a fit only ever breaks a tie. It never rejects a read.
@@ -236,6 +253,7 @@ class Store:
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
                 elsewhere=({"plate": elsewhere, "conf": float(s["elsewhere_conf"] or 0)} if elsewhere else None),
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
+                stdfix=self._stdfix(r["plate"], alt, s.get("plate3")),
                 fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
                 pick=(dict(plate=elsewhere, why="the first read is the state banner, not a plate") if banner and elsewhere else
                       dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None),
@@ -256,6 +274,18 @@ class Store:
             f = tlc_fix(p)
             if f:
                 return dict(plate=f, shaped=False)
+        return None
+
+    @staticmethod
+    def _stdfix(p1, p2, p3):
+        """Offer for the review page: {plate, read} when no read fits AAANNNN or the TLC pattern but a letter-position fix of one does."""
+        reads = [p for p in (p1, p2, p3) if p]
+        if any(STD_RX.fullmatch(p) or TLC_RX.fullmatch(p) for p in reads):
+            return None
+        for p in reads:
+            f = std_fix(p)
+            if f:
+                return dict(plate=f, read=p)
         return None
 
     # --- recently verified plates: auto-approve an exact match, offer a one-character correction ----------

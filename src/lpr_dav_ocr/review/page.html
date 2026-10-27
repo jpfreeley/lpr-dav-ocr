@@ -193,6 +193,7 @@
         <button class="alt" id="near" hidden title="This read is one character away from a plate you verified recently"></button>
         <button class="alt" id="pick" hidden></button>
         <button class="alt tlc" id="tlc" hidden></button>
+        <button class="alt tlc" id="stdfix" hidden></button>
         <button class="alt" id="alt" hidden title="Click to copy this read into the boxes"></button>
         <button class="alt" id="else" hidden title="The second pass also found plate-shaped text elsewhere in the frame. Click to copy it into the boxes."></button>
       </div>
@@ -320,6 +321,13 @@ function render() {
     tl.onclick = it.tlc.shaped ? () => applyState("NY", "TLC plates are NYC taxis")
                                : () => { buildCells(it.tlc.plate.split("")); focusCell(cells().length - 1); applyState("NY", "TLC plates are NYC taxis"); };
   } else tl.hidden = true;
+  const sf = $("stdfix");
+  if (it.stdfix) {
+    sf.hidden = false; sf.className = "alt tlc";
+    sf.innerHTML = `three letters then four digits <span class="a">${it.stdfix.plate}</span> &middot; use`;
+    sf.title = "In the three letter positions a digit is a misread letter: on your labels a 0 was really D about 80% of the time, and a 6 a G and a 2 a Z about 80 to 90%. An offer only: some real plates start with a digit.";
+    sf.onclick = () => { buildCells(it.stdfix.plate.split("")); focusCell(cells().length - 1); };
+  } else sf.hidden = true;
   const alt = $("alt");
   if (!it.alt) { alt.hidden = !it.second_pass; alt.className = "alt"; alt.textContent = "2nd pass: no read"; alt.onclick = null; }
   else {

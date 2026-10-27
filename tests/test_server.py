@@ -276,6 +276,26 @@ class HistoryTests(unittest.TestCase):
         self.assertNotIn("DEMO004", [e["plate"] for e in s])   # waiting for a second pass: not confirmed
 
 
+class StdFixTests(unittest.TestCase):
+    """Letter-position digits in an AAANNNN-shaped read are offered as letters (0 as D, 6 as G, 2 as Z)."""
+
+    def test_fix(self):
+        self.assertEqual(S.std_fix("0AB1234"), "DAB1234")
+        self.assertEqual(S.std_fix("A06"+"1234"), "ADG1234")
+        self.assertEqual(S.std_fix("ABC1234"), None)                    # nothing to fix
+        self.assertEqual(S.std_fix("8AB1234"), None)                    # 8 and 5 are coin flips, 1 is ambiguous: not offered
+        self.assertEqual(S.std_fix("0001234"), None)                    # needs at least one letter to anchor the pattern
+        self.assertEqual(S.std_fix("0AB123"), None)                     # wrong length or digits
+        self.assertEqual(S.std_fix("0AB12X4"), None)
+
+    def test_offer_only_when_no_read_already_fits(self):
+        f = S.Store._stdfix
+        self.assertEqual(f("0AB1234", None, None), dict(plate="DAB1234", read="0AB1234"))
+        self.assertEqual(f("0AB1234", "DAB1234", None), None)           # the second pass already fits the pattern
+        self.assertEqual(f("T123456C", None, None), None)               # a TLC plate is not touched
+        self.assertEqual(f("XYZ", "2AB1234", None), dict(plate="ZAB1234", read="2AB1234"))
+
+
 class TlcHintTests(unittest.TestCase):
     def test_common_misreads_are_fixed(self):
         self.assertEqual(S.tlc_fix("11234560"), "T123456C")      # T read as 1, C read as 0
