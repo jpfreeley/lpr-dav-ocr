@@ -13,6 +13,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Gold standard: stars in the review page's montage of earlier sightings (verified frames only), the gold frame shown first in the montage, and a "gold standard in this plate's history" line with the crop on the review page.
 - Gold standard frames: mark a verified frame as the clear exemplar of its plate (a star in the plate history, a button on the review page). The history shows it, the review page offers it as a visual comparison for that plate and for near reads, the duplicate merge never drops it, and `lpr score` reports the first pass on gold frames. Saved in `labels/gold.jsonl`.
 - Review page: auto-accept from confidence 0.97 when both passes agree, the shape is plate-like and the plate has a vehicle in the local ticket data (`review.record_accept_conf`). A **matches** button beside the vehicle line records that you saw the car matches the record; the plate then vouches for its other sightings for a year (`review.confirmed_days`). `lpr score` and the self-check measure the new rule.
 - `review.not_plate_texts` (default `NEWYORK`): exact words that are printed on plates but are never the plate. A read of one is never auto-approved and is auto-rejected unless the second pass found plate-shaped text elsewhere in the frame; then that text becomes the best guess.
