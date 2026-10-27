@@ -978,10 +978,13 @@ class GoldTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
+    stores = 0
+
     def make(self):
+        GoldTests.stores += 1                                  # a counter, not id(): Python reuses ids, which let one test's labels leak into the next
         st = S.Store(self.root)
         for name in ("labels", "gold"):
-            setattr(st, name + "_path", self.root / "labels" / f"g_{name}_{id(st)}.jsonl")
+            setattr(st, name + "_path", self.root / "labels" / f"g_{name}_{GoldTests.stores}.jsonl")
         return st
 
     def test_only_a_verified_frame_can_be_gold(self):
