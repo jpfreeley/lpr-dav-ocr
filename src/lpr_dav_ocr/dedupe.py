@@ -74,7 +74,7 @@ def load_registry(root):
     return out
 
 
-def candidates(day_dir, labels, skip, reject_aspect=3.5, fps=FPS):
+def candidates(day_dir, labels, skip, reject_aspect=3.5, fps=FPS, not_plate_texts=("NEWYORK",)):
     """The reads of one day that may be merged: dicts with plate, t, conf, agree, human, box, image."""
     sp = {r["image"]: r for r in _rows(Path(day_dir) / "second_pass.csv")}
     out, seen = [], set()
@@ -95,6 +95,8 @@ def candidates(day_dir, labels, skip, reject_aspect=3.5, fps=FPS):
         if t is None:
             continue
         plate = (lb.get("truth") or "").upper() if verdict == "fix" else r["plate"]
+        if verdict is None and plate in not_plate_texts and not s.get("elsewhere"):
+            continue                                          # a banner read such as NEWYORK is never a plate
         out.append(dict(image=img, clip=r.get("clip", ""), plate=plate, t=t, conf=float(r["conf"]), verdict=verdict,
                         agree=bool(s.get("plate2")) and s.get("plate2") == r["plate"],
                         box=[int(s[k]) for k in ("x0", "y0", "x1", "y1")] if s.get("x0") not in (None, "") else None))

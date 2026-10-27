@@ -33,6 +33,7 @@ AUTO_CONF = CFG["review"]["auto_accept_conf"]
 RECENT_DAYS = CFG["review"]["recent_days"]
 REJECT_ASPECT = CFG["review"]["reject_aspect"]
 VALUE_QUEUE = CFG["review"]["value_queue"]      # size of the "most valuable first" queue
+NOT_PLATE_TEXTS = {t.strip().upper() for t in CFG["review"]["not_plate_texts"]}      # words that are never a plate (state banner)
 
 
 
@@ -223,18 +224,22 @@ class Store:
             alt = s.get("plate2") or None
             shape = s.get("shape") or None
             rec = self.recent(r["plate"], img)
-            by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok"
-            auto = by_conf or bool(rec and rec["exact"])
+            banner = r["plate"] in NOT_PLATE_TEXTS                # a word printed on plates (NEWYORK), never the plate itself
+            by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok" and not banner
+            auto = (by_conf or bool(rec and rec["exact"])) and not banner
             asp = float(s["aspect"]) if s.get("aspect") else None
             elsewhere = s.get("elsewhere") or None          # the second pass found another plate-shaped read in this frame
-            rejected = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT and not auto and not elsewhere)
+            wide = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT)
+            rejected = bool((wide or banner) and not auto and not elsewhere)
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
                 elsewhere=({"plate": elsewhere, "conf": float(s["elsewhere_conf"] or 0)} if elsewhere else None),
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
                 fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
-                pick=dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None,
+                pick=(dict(plate=elsewhere, why="the first read is the state banner, not a plate") if banner and elsewhere else
+                      dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None),
+                banner=banner,
                 shape=shape, aspect=s.get("aspect") or None, second_pass=img in sp, ready=img in sp,
                 variants=[v for v in (r.get("variants") or "").split("|") if v and v != r["plate"]],
                 label=labels.get(img),
@@ -525,7 +530,7 @@ class Store:
                 score += 1000 if any(x[1] == "exact" for x in m) else 600
                 why.append("watchlist: " + m[0][0]["nickname"])
             o, n = self._ordinal(i["image"]), 0
-            if RECENT_DAYS > 0 and o:
+            if RECENT_DAYS > 0 and o and not i["banner"]:
                 n = sum(1 for x in pend[i["plate"]] if x and abs(x - o) <= RECENT_DAYS) - 1
             if n > 0:
                 score += 12 * min(n, 25)
@@ -547,9 +552,10 @@ class Store:
         res, taken = [], collections.defaultdict(list)
         for i in out:                          # one entry per plate: a label on it approves the rest within RECENT_DAYS
             o = self._ordinal(i["image"])
-            if any(o and x and abs(o - x) <= RECENT_DAYS for x in taken[i["plate"]]):
+            key = i["image"] if i["banner"] else i["plate"]            # banner reads are separate frames, not repeats of a plate
+            if any(o and x and abs(o - x) <= RECENT_DAYS for x in taken[key]):
                 continue
-            taken[i["plate"]].append(o)
+            taken[key].append(o)
             res.append(i)
             if len(res) >= limit:
                 break

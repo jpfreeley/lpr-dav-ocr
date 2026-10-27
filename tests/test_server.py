@@ -803,3 +803,48 @@ class ValueQueueTests(unittest.TestCase):
             self.assertEqual(first["plate"], "WATCHED")
             store.add_label(dict(image=first["image"], verdict="ok", ts="2026-01-06T00:00:00"))
             self.assertNotIn(first["image"], [i["image"] for i in store.value_queue()])   # labeled plates leave the queue at once
+
+
+class BannerTests(unittest.TestCase):
+    """A read of a known non-plate word (the state banner NEWYORK) is never auto-approved and is auto-rejected unless
+    the second pass found plate-shaped text elsewhere in the frame."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf"]
+        d = cls.root / "frames" / "2026-01-01"
+        d.mkdir(parents=True)
+        rows = [("01.00.00", "NEWYORK", "", ""), ("02.00.00", "NEWYORK", "DEMO010", "0.8800"), ("03.00.00", "NEWYORKS", "", ""), ("04.00.00", "DEMO001", "", "")]
+        with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+            w, v = csv.writer(f), csv.writer(g)
+            w.writerow(hdr_i)
+            v.writerow(hdr_s)
+            for t, p1, el, elc in rows:
+                img = f"2026-01-01_{t}-{t}-{p1}_0.999.png"
+                w.writerow([f"{t}-{t}[M].dav", p1, 0.999, 30, "", img, 500, 1, 3, 5])
+                v.writerow([img, p1, 0.999, p1, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2, "", "", el, elc])    # high confidence, both agree, plate-shaped
+        cls.store = S.Store(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def item(self, plate, hour):
+        return next(i for i in self.store.items("2026-01-01") if i["plate"] == plate and f"_{hour}." in i["image"])
+
+    def test_banner_is_never_auto_approved_and_is_rejected(self):
+        i = self.item("NEWYORK", "01")
+        self.assertEqual((i["auto"], i["rejected"], i["banner"]), (False, True, True))     # conf 0.999 and agreeing would normally approve it
+
+    def test_banner_with_a_plate_elsewhere_stays_in_review_with_that_plate_as_the_guess(self):
+        i = self.item("NEWYORK", "02")
+        self.assertEqual((i["auto"], i["rejected"]), (False, False))
+        self.assertEqual(i["pick"]["plate"], "DEMO010")
+
+    def test_only_the_exact_word_counts(self):
+        self.assertEqual((self.item("NEWYORKS", "03")["banner"], self.item("NEWYORKS", "03")["auto"]), (False, True))
+        self.assertTrue(self.item("DEMO001", "04")["auto"])
+
