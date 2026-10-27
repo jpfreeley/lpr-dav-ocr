@@ -153,6 +153,9 @@ have normal shapes.
   read was `SPORT`, `4MATIC`, `NEWYORK` and the like), and the other 3 were correct plate reads with a wide shape. The
   second pass looks for this only when its chosen read is wide, so it costs nothing on normal frames. Existing days are
   filled in with `lpr second-pass <folder> --fill-elsewhere`.
+  The second pass also stores where that text is (`elsewhere_box`). Clicking the hint moves the blue outline and the
+  zoomed crop to it, and Reset puts them back. When you saved that text as the plate, the history, montage and gold crops
+  use the same box. `--fill-elsewhere` also adds the box to older rows that have the text but no box.
 - `lpr score` prints how many labeled reads were above the threshold (not counting frames kept for a plate-shaped read elsewhere) and how many were real plates. A threshold of 3.0
   also removes 3 real plates in 162, so the default stays at 3.5. Set `review.reject_aspect = 0` to switch it off.
 

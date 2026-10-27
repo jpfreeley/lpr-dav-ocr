@@ -253,12 +253,16 @@ class Store:
             auto = (by_conf or by_record or bool(rec and rec["exact"])) and not banner
             asp = float(s["aspect"]) if s.get("aspect") else None
             elsewhere = s.get("elsewhere") or None          # the second pass found another plate-shaped read in this frame
+            ebox = [int(v) for v in s["elsewhere_box"].split()] if elsewhere and s.get("elsewhere_box") else None
+            lbl = labels.get(img)
+            if ebox and lbl and lbl.get("verdict") == "fix" and (lbl.get("truth") or "").upper() == elsewhere:
+                box = ebox                                  # you chose that text: outline and crop it where it really is, not the badge
             wide = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT)
             rejected = bool((wide or banner) and not auto and not elsewhere)
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
-                elsewhere=({"plate": elsewhere, "conf": float(s["elsewhere_conf"] or 0)} if elsewhere else None),
+                elsewhere=({"plate": elsewhere, "conf": float(s["elsewhere_conf"] or 0), "box": ebox} if elsewhere else None),
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
                 stdfix=self._stdfix(r["plate"], alt, s.get("plate3")),
                 fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "record" if by_record else "recent" if auto else None),
@@ -793,14 +797,16 @@ class Store:
 
     def save_crop(self, item, truth):
         """Leveled plate crop beside the label, for later training. Best effort."""
-        if not item["box"]:
+        el = item.get("elsewhere") or {}
+        box = el["box"] if el.get("box") and truth == el.get("plate") else item["box"]      # the plate you chose may be elsewhere in the frame
+        if not box:
             return
         try:
             import cv2
             img = cv2.imread(str(self.frames(item["day"]) / item["image"]))
             if img is None:
                 return
-            x0, y0, x1, y1 = item["box"]
+            x0, y0, x1, y1 = box
             cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
             M = cv2.getRotationMatrix2D((cx, cy), TILT, 1.0)
             rot = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))

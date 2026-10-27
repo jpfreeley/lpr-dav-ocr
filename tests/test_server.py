@@ -502,7 +502,7 @@ class RejectTests(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.root = Path(cls.tmp.name)
         hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
-        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf", "elsewhere_box"]
         d = cls.root / "frames" / "2026-01-01"
         d.mkdir(parents=True)
         cls.img = {}
@@ -516,7 +516,7 @@ class RejectTests(unittest.TestCase):
                 shape = "ok" if float(asp) <= 3.0 else "wide"
                 w.writerow([f"{t}-{t}[M].dav", p, 0.80, 30, "", img, 500, 1, 3, 5])
                 # SIGNKEEP is wide too, but the second pass found a plate-shaped read elsewhere in the frame, so it stays in review
-                v.writerow([img, p, 0.80, p, 0.70, 1, 100, 100, 340, 220, asp, shape, 2, "", "", *(("DEMO009", "0.8800") if p == "SIGNKEEP" else ("", ""))])
+                v.writerow([img, p, 0.80, p, 0.70, 1, 100, 100, 340, 220, asp, shape, 2, "", "", *(("DEMO009", "0.8800", "5 6 105 56") if p == "SIGNKEEP" else ("", "", ""))])
         cls.store = S.Store(cls.root)
 
     @classmethod
@@ -536,7 +536,7 @@ class RejectTests(unittest.TestCase):
 
     def test_the_frame_offers_the_plate_shaped_read_elsewhere(self):
         keep = next(i for i in self.store.items("2026-01-01") if i["plate"] == "SIGNKEEP")
-        self.assertEqual(keep["elsewhere"], {"plate": "DEMO009", "conf": 0.88})
+        self.assertEqual(keep["elsewhere"], {"plate": "DEMO009", "conf": 0.88, "box": [5, 6, 105, 56]})
         self.assertIsNone(next(i for i in self.store.items("2026-01-01") if i["plate"] == "SIGNTXT")["elsewhere"])
 
     def test_rejected_reads_are_not_plate_history(self):
@@ -855,7 +855,7 @@ class BannerTests(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.root = Path(cls.tmp.name)
         hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
-        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf", "elsewhere_box"]
         d = cls.root / "frames" / "2026-01-01"
         d.mkdir(parents=True)
         rows = [("01.00.00", "NEWYORK", "", ""), ("02.00.00", "NEWYORK", "DEMO010", "0.8800"), ("03.00.00", "NEWYORKS", "", ""), ("04.00.00", "DEMO001", "", "")]

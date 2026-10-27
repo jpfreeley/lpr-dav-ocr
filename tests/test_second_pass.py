@@ -106,12 +106,13 @@ class RowTests(unittest.TestCase):
         self.assertEqual((narrow["elsewhere"], narrow["elsewhere_conf"]), ("", ""))                 # not looked for
         wide_none = h(S.row_for(self.r, ("BADGE", 0.9, [1, 2, 3, 4], 4.5, None), 1.0))
         self.assertEqual((wide_none["elsewhere"], wide_none["elsewhere_conf"]), ("", "0"))          # looked, found nothing
-        wide_alt = h(S.row_for(self.r, ("BADGE", 0.9, [1, 2, 3, 4], 4.5, ("DEMO003", 0.8765)), 1.0))
-        self.assertEqual((wide_alt["elsewhere"], wide_alt["elsewhere_conf"]), ("DEMO003", "0.8765"))
+        wide_alt = h(S.row_for(self.r, ("BADGE", 0.9, [1, 2, 3, 4], 4.5, ("DEMO003", 0.8765, [10, 20, 110, 70])), 1.0))
+        self.assertEqual((wide_alt["elsewhere"], wide_alt["elsewhere_conf"], wide_alt["elsewhere_box"]), ("DEMO003", "0.8765", "10 20 110 70"))
+        self.assertEqual(wide_none["elsewhere_box"], "")
 
     def test_plate_shaped_picks_the_best_plate_shaped_other_text(self):
         c = [("BADGE", 0.99, [0, 0, 1, 1], 4.5), ("DEMO003", 0.8, [0, 0, 1, 1], 2.1), ("DEMO004", 0.9, [0, 0, 1, 1], 2.4), ("WIDE", 0.95, [0, 0, 1, 1], 3.4)]
-        self.assertEqual(S.plate_shaped(c, {"BADGE"}), ("DEMO004", 0.9))
+        self.assertEqual(S.plate_shaped(c, {"BADGE"}), ("DEMO004", 0.9, [0, 0, 1, 1]))
         self.assertIsNone(S.plate_shaped([c[0], c[3]], {"BADGE"}))
         self.assertIsNone(S.plate_shaped(c, {"BADGE", "DEMO003", "DEMO004"}))
 

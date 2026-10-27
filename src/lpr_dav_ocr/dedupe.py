@@ -115,7 +115,8 @@ def candidates(day_dir, labels, skip, reject_aspect=3.5, fps=FPS, not_plate_text
             continue                                          # a banner read such as NEWYORK is never a plate
         out.append(dict(image=img, clip=r.get("clip", ""), plate=plate, t=t, conf=float(r["conf"]), verdict=verdict,
                         agree=bool(s.get("plate2")) and s.get("plate2") == r["plate"],
-                        box=[int(s[k]) for k in ("x0", "y0", "x1", "y1")] if s.get("x0") not in (None, "") else None))
+                        box=([int(v) for v in s["elsewhere_box"].split()] if verdict == "fix" and s.get("elsewhere_box") and plate == s.get("elsewhere")
+                             else [int(s[k]) for k in ("x0", "y0", "x1", "y1")] if s.get("x0") not in (None, "") else None)))
     return out
 
 

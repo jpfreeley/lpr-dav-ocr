@@ -301,12 +301,7 @@ function render() {
   }
   $("pos").textContent = `${D.n} of ${D.total}`;
   $("img").src = "/img/" + encodeURIComponent(it.image);
-  const b = $("box");
-  if (it.box) {
-    const [x0, y0, x1, y1] = it.box;
-    Object.assign(b.style, { left: x0 / W * 100 + "%", top: y0 / H * 100 + "%", width: (x1 - x0) / W * 100 + "%", height: (y1 - y0) / H * 100 + "%" });
-    b.hidden = false;
-  } else b.hidden = true;
+  showBox();
   $("cap").innerHTML = `<span>Clip <b>${it.clip}</b></span><span>~<b>${it.time}</b> <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></span><span>${it.image}</span>`;
   $("plate").textContent = it.plate;
   $("conf").textContent = it.conf.toFixed(3);
@@ -376,7 +371,10 @@ function render() {
   if (it.elsewhere) {
     el.hidden = false; el.className = "alt";
     el.innerHTML = `plate-shaped text elsewhere in the frame <span class="a">${it.elsewhere.plate}</span> ${it.elsewhere.conf.toFixed(3)} &middot; use`;
-    el.onclick = () => { buildCells(it.elsewhere.plate.split("")); focusCell(cells().length - 1); };
+    el.onclick = () => {
+      buildCells(it.elsewhere.plate.split("")); focusCell(cells().length - 1);
+      if (it.elsewhere.box) { it.box0 = it.box0 || it.box; it.box = it.elsewhere.box; showBox(); drawZoom(); }   // outline and crop the text you chose, not the badge
+    };
   } else { el.hidden = true; el.onclick = null; }
   orig = it.plate.split("");
   const lb = it.label;
@@ -673,6 +671,15 @@ $("wadd").onclick = addWatch;
 $("wnick").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addWatch(); } else if (e.key === "Escape") { $("watchform").hidden = true; } e.stopPropagation(); });
 
 /* leveled crop, with the current text under each letter */
+function showBox() {
+  const b = $("box");
+  if (it.box) {
+    const [x0, y0, x1, y1] = it.box;
+    Object.assign(b.style, { left: x0 / W * 100 + "%", top: y0 / H * 100 + "%", width: (x1 - x0) / W * 100 + "%", height: (y1 - y0) / H * 100 + "%" });
+    b.hidden = false;
+  } else b.hidden = true;
+}
+
 async function drawZoom() {
   const cur = it, c = $("zoom"), g = c.getContext("2d");
   g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
@@ -801,7 +808,7 @@ let sel = -1;
 $("cells").addEventListener("focusin", e => { sel = cells().indexOf(e.target); });
 $("addc").onclick = () => { const n = cells().length, i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i + 1, 0, "")); focusCell(i + 1); };
 $("delc").onclick = () => { const n = cells().length; if (n < 2) return; const i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i, 1)); focusCell(Math.min(i, n - 2)); };
-$("reset").onclick = () => { buildCells(orig.slice()); focusCell(0); };
+$("reset").onclick = () => { buildCells(orig.slice()); focusCell(0); if (it.box0) { it.box = it.box0; it.box0 = null; showBox(); drawZoom(); } };
 $("last").onclick = goBack; $("nextun").onclick = () => D.next_unreviewed && go(D.next_unreviewed);
 $("prev").onclick = () => D.prev && go(D.prev); $("next").onclick = () => D.next && go(D.next);
 async function poll() {
