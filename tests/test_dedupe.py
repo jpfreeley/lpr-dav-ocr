@@ -44,6 +44,11 @@ class ChooseTests(unittest.TestCase):
         k, others, why = D.choose(g, ".", sharp=self.sharp)
         return k, others, why
 
+    def test_a_gold_standard_frame_is_always_kept(self):
+        g = [c("ABC1234", 0, conf=0.99, verdict="ok"), c("ABC1234", 1, conf=0.80, verdict="ok", image="gold.png")]
+        k, others, why = D.choose(g, ".", sharp=self.sharp, gold=frozenset({"gold.png"}))
+        self.assertEqual(k["image"], "gold.png")                         # even though the other frame is more confident
+
     def test_your_verified_frame_wins_over_a_more_confident_one(self):
         k, others, why = self.pick([c("ABC1234", 0, conf=0.99), c("ABC1234", 1, conf=0.80, verdict="fix")])
         self.assertEqual((k["conf"], why), (0.80, "kept the frame you verified"))

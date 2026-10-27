@@ -72,6 +72,9 @@
   .camt { font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:3px; }
   #veh .vbtn { font: inherit; font-size: 11.5px; margin-left: 8px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
   #veh .vbtn:hover { color: var(--text); border-color: var(--muted); }
+  .goldb { font: inherit; font-size: 12px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+  .goldb:hover { color: var(--text); border-color: var(--muted); }
+  .goldb.on { color: #e3a008; border-color: #e3a008; font-weight: 700; }
   #veh.stale .vt { text-decoration: line-through; opacity: .7; }
   .cropuse { cursor:pointer; text-decoration:underline dotted; }
   .cropuse:hover { color:var(--accent); }
@@ -181,6 +184,8 @@
           <a id="histlink" class="ghost" href="/history" style="padding:3px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;color:var(--text);text-decoration:none" title="Every time this plate was seen">History</a>
           <span id="seen" class="seen"></span>
           <span id="veh" class="seen" hidden></span>
+          <button id="goldbtn" class="goldb" hidden></button>
+          <span id="goldcard" class="seen" hidden></span>
           <span id="editchk" class="seen" hidden></span>
           <button id="watchbtn" class="ghost" style="padding:3px 10px;font-size:12px" title="Alert me when this plate is seen again">&#9734; Watch</button>
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
@@ -299,6 +304,7 @@ function render() {
   sh.hidden = !(it.shape && it.shape !== "ok");
   sh.textContent = `shape ${it.shape} (${it.aspect})`; sh.title = "US plates are 2:1. This text region is not plate-shaped, so it may not be a plate.";
   showVehicle(it.vehicle);
+  renderGold();
   updateSeen();
   $("histlink").href = "/history?q=" + encodeURIComponent((it.label && it.label.truth) || it.plate);
   const pk = $("pick");
@@ -438,6 +444,28 @@ function stateFromRecord(v) {
     if (cur !== v.state) toast("State set to " + v.state + " (from NYC ticket data)");
     setState(v.state); autoStateVal = v.state;
   }
+}
+/* a plate crop cut from a saved frame, scaled to fit mw x mh */
+function cropThumb(image, box, mw, mh) {
+  if (!box) return "";
+  const [x0, y0, x1, y1] = box, px = (x1 - x0) * 0.15, py = (y1 - y0) * 0.4;
+  const cx = Math.max(0, x0 - px), cy = Math.max(0, y0 - py), cw = Math.min(W, x1 + px) - cx, ch = Math.min(H, y1 + py) - cy, k = Math.min(mw / cw, mh / ch);
+  return `<span style="display:inline-block;width:${cw * k}px;height:${ch * k}px;background:#000 url('/img/${encodeURIComponent(image)}') no-repeat;background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px;border-radius:5px;vertical-align:middle"></span>`;
+}
+/* the gold standard: a frame you verified and marked as the clear exemplar of its plate */
+function renderGold() {
+  const gb = $("goldbtn"), gc = $("goldcard"), lb = it.label, human = !!(lb && (lb.verdict === "ok" || lb.verdict === "fix"));
+  gb.hidden = !human;
+  if (human) {
+    gb.className = "goldb" + (it.is_gold ? " on" : ""); gb.textContent = (it.is_gold ? "\u2605" : "\u2606") + " gold standard";
+    gb.title = it.is_gold ? "This frame is the gold standard for its plate. Click to remove it." : "Mark this frame as the gold standard for its plate: very clear, no question what the read is. Other sightings and similar reads are compared with it.";
+    gb.onclick = async () => {
+      try { await api("/api/gold", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ image: it.image, on: !it.is_gold }) });
+        it.is_gold = !it.is_gold; renderGold(); toast(it.is_gold ? "Marked as the gold standard" : "Gold standard removed"); } catch (e) { toast("Could not save the gold standard"); }
+    };
+  }
+  const g = it.gold; gc.hidden = !g;
+  if (g) gc.innerHTML = `${g.exact ? "gold standard for" : "gold standard of the plate this is one character from,"} <b>${g.plate}</b> <a href="/i/${encodeURIComponent(g.image)}" title="Open the gold standard frame">${cropThumb(g.image, g.box, 240, 90)}</a>`;
 }
 function showVehicle(v) {
   const el = $("veh");

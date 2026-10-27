@@ -950,3 +950,81 @@ class TicketRecordTests(unittest.TestCase):
         st.set_vehicle_stale("DEMO001", False, image=far, match=False)            # undo
         self.assertIsNone(st.recent("DEMO001", far))
 
+
+class GoldTests(unittest.TestCase):
+    """A frame you verified can be marked as the gold standard of its plate, one per plate."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        d = cls.root / "frames" / "2026-01-01"
+        d.mkdir(parents=True)
+        cls.img = []
+        with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+            w, v = csv.writer(f), csv.writer(g)
+            w.writerow(hdr_i)
+            v.writerow(hdr_s)
+            for t, p1 in (("01.00.00", "DEMO001"), ("02.00.00", "DEMO001"), ("03.00.00", "DEMO0O1"), ("04.00.00", "DEMO002")):
+                img = f"2026-01-01_{t}-{t}-{p1}_0.80.png"
+                cls.img.append(img)
+                w.writerow([f"{t}-{t}[M].dav", p1, 0.80, 30, "", img, 500, 1, 3, 5])
+                v.writerow([img, p1, 0.80, p1, 0.70, 1, 100, 100, 340, 220, "2.1", "ok", 2])
+        (cls.root / "labels").mkdir()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def make(self):
+        st = S.Store(self.root)
+        for name in ("labels", "gold"):
+            setattr(st, name + "_path", self.root / "labels" / f"g_{name}_{id(st)}.jsonl")
+        return st
+
+    def test_only_a_verified_frame_can_be_gold(self):
+        st = self.make()
+        with self.assertRaises(ValueError):
+            st.set_gold(self.img[0], True)                                                 # not verified yet
+        st.add_label(dict(image=self.img[0], verdict="ok", truth="DEMO001", ts="x"))
+        rec = st.set_gold(self.img[0], True)
+        self.assertEqual((rec["plate"], rec["gold"]), ("DEMO001", True))
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[0])
+
+    def test_one_gold_per_plate_and_unmark(self):
+        st = self.make()
+        for i in (0, 1):
+            st.add_label(dict(image=self.img[i], verdict="ok", truth="DEMO001", ts="x"))
+        st.set_gold(self.img[0], True)
+        st.set_gold(self.img[1], True)                                                     # a new gold replaces the old one
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[1])
+        st.set_gold(self.img[0], False)                                                    # unmarking a frame that is not the gold changes nothing
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[1])
+        st.set_gold(self.img[1], False)
+        self.assertEqual(st.gold_map(), {})
+
+    def test_history_flags_it_and_a_fix_uses_the_truth(self):
+        st = self.make()
+        st.add_label(dict(image=self.img[2], verdict="fix", truth="DEMO001", ts="x"))      # the read said DEMO0O1; you fixed it
+        st.set_gold(self.img[2], True)
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[2])
+        h = st.sightings("DEMO001")
+        self.assertEqual(h["gold"]["image"], self.img[2])
+        self.assertEqual([r["gold"] for r in h["sightings"] if r["image"] == self.img[2]], [True])
+
+    def test_comparison_frame_for_another_sighting_and_for_a_near_read(self):
+        st = self.make()
+        st.add_label(dict(image=self.img[0], verdict="ok", truth="DEMO001", ts="x"))
+        st.set_gold(self.img[0], True)
+        other = next(i for i in st.items("2026-01-01") if i["image"] == self.img[1])
+        g = st.gold_for(other)
+        self.assertEqual((g["plate"], g["exact"], g["image"]), ("DEMO001", True, self.img[0]))
+        own = next(i for i in st.items("2026-01-01") if i["image"] == self.img[0])
+        self.assertIsNone(st.gold_for(own))                                                # the gold frame is not compared with itself
+        near = next(i for i in st.items("2026-01-01") if i["image"] == self.img[2])      # DEMO0O1 is one character from DEMO001
+        near["like"] = [dict(plate="DEMO001")]
+        g2 = st.gold_for(near)
+        self.assertEqual((g2["plate"], g2["exact"]), ("DEMO001", False))
+

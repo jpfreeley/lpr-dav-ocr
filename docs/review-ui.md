@@ -156,6 +156,20 @@ have normal shapes.
 - `lpr score` prints how many labeled reads were above the threshold (not counting frames kept for a plate-shaped read elsewhere) and how many were real plates. A threshold of 3.0
   also removes 3 real plates in 162, so the default stays at 3.5. Set `review.reject_aspect = 0` to switch it off.
 
+## Gold standard frames
+
+Some plates in the history are fuzzy but legible, and some frames are perfectly clear: there is no question what the read is.
+Mark such a frame as the **gold standard** of its plate. Only a frame you verified (Correct or Save fix) can be one, and a plate
+has one at a time (a new mark replaces the old). It is saved in `labels/gold.jsonl`.
+
+- **Mark it:** the star on a sighting in the plate history, or the **gold standard** button on the review page when you are
+  looking at a verified frame. A filled star means it is the gold standard; click again to remove it.
+- **See it:** the plate history shows the gold frame at the top. On the review page, a reading of that plate (or of a plate one
+  character away, such as from a hint) shows the gold crop beside the vehicle line, so you can compare a fuzzy read with the
+  clear one.
+- **Protected:** the duplicate merge always keeps the gold frame, so it is never moved to the trash and deleted.
+- **Measured:** `lpr score` reports how the first pass does on your gold frames, a clean test of the reader on clear plates.
+
 ## Known non-plate words (the state banner)
 
 Some text is printed on plates but is never the plate: on New York plates the banner reads `NEWYORK`. On the author's

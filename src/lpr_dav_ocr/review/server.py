@@ -155,6 +155,7 @@ class Store:
         (root / "crops").mkdir(parents=True, exist_ok=True)
         self.labels_path = root / "labels" / "labels.jsonl"
         self.dups_path = root / "labels" / "duplicates.jsonl"          # frames merged into another by `dedupe`
+        self.gold_path = root / "labels" / "gold.jsonl"                 # the frame you marked as the clear exemplar of a plate
         self.vflags_path = root / "labels" / "vehicle_flags.jsonl"      # plates whose NYC ticket record you saw is stale
         self.states_path = root / "labels" / "plate_states.jsonl"      # one state per plate, applied to every sighting of it
         self.write_lock = threading.Lock()
@@ -500,11 +501,62 @@ class Store:
             c = self._reads_cache = (time.time(), allr)
         return [r for r in c[1] if unverified or r[1] != "unverified"]
 
+    # --- gold standard frames: one very clear, unquestionable image per plate -------------------------------
+    def gold_map(self):
+        """plate -> {image, ts, box} for the frame you marked as the gold standard (latest mark wins, an unmark removes it)."""
+        out = {}
+        for r in self._read(self.gold_path, "jsonl"):
+            if not (r.get("plate") and r.get("image")):
+                continue
+            if r.get("gold"):
+                out[r["plate"]] = r
+            elif out.get(r["plate"], {}).get("image") == r["image"]:
+                del out[r["plate"]]
+        return out
+
+    def set_gold(self, image, on):
+        """Mark (or unmark) a frame as the gold standard for its plate. Only a frame you verified (Correct or Save fix) can be one,
+        because the point is that there is no question what the read is. One gold frame per plate: a new one replaces the old."""
+        day = self.day_of(image)
+        item = next((i for i in self.items(day) if i["image"] == image), None) if day else None
+        lb = item and item["label"]
+        if not lb or lb.get("verdict") not in ("ok", "fix"):
+            raise ValueError("only a frame you verified can be the gold standard")
+        plate = ((lb.get("truth") or "") if lb["verdict"] == "fix" else item["plate"]).upper()
+        if not plate:
+            raise ValueError("no plate text")
+        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, image=image, gold=bool(on), box=item["box"])
+        with self.write_lock, self.gold_path.open("a") as fh:
+            fh.write(json.dumps(rec) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        c = self._cache.get(self.gold_path)
+        if c:
+            c[1].append(rec)
+        return rec
+
+    def gold_for(self, item):
+        """The gold standard frame to compare this plate with: for its own text, else for the plate it is one character from.
+        {plate, exact, image, box, ts} or None. The frame itself is never offered as its own comparison."""
+        gm = self.gold_map()
+        if not gm:
+            return None
+        truth = ((item["label"] or {}).get("truth") or "").upper()
+        own = truth or item["plate"]
+        texts = [own, item["plate"]] + ([item["recent"]["plate"]] if item.get("recent") else []) + [x["plate"] for x in item.get("like") or []]
+        for t in texts:
+            g = gm.get(t)
+            if g and g["image"] != item["image"]:
+                return dict(plate=t, exact=(t == own), image=g["image"], box=g.get("box"), ts=g["ts"])
+        return None
+
     def sightings(self, plate, unverified=False):
         """Exact-match history of one plate, newest first."""
         plate = re.sub(r"[^A-Z0-9]", "", (plate or "").upper())
+        gm = self.gold_map()
+        goldimg = (gm.get(plate) or {}).get("image")
         rows = [dict(image=i["image"], day=i["day"], time=i["time"], clip=i["clip"], conf=i["conf"], basis=b, box=i["box"],
-                     state=self.eff_state(i, t))
+                     state=self.eff_state(i, t), gold=i["image"] == goldimg)
                 for t, b, i in self.reads(unverified) if t == plate]
         rows.sort(key=lambda r: (r["day"], r["time"]), reverse=True)
         hours = [0] * 24
@@ -517,7 +569,8 @@ class Store:
         return dict(plate=plate, count=len(rows), days=len({r["day"] for r in rows}),
                     first=(rows[-1]["day"] + " " + rows[-1]["time"]) if rows else None,
                     last=(rows[0]["day"] + " " + rows[0]["time"]) if rows else None,
-                    by_hour=hours, states=states, sightings=rows)
+                    by_hour=hours, states=states, sightings=rows,
+                    gold=next((dict(image=r["image"], day=r["day"], time=r["time"], box=r["box"]) for r in rows if r["gold"]), None))
 
     def plate_search(self, q, unverified=False, limit=20):
         """Plates containing q, with sighting counts, most seen first (for the search box)."""
@@ -764,6 +817,9 @@ def make_handler(store):
                     reads = ([lb_["truth"]] if lb_ and lb_.get("truth") else []) + [it_["plate"]] + ([it_["alt"]["plate"]] if it_["alt"] else [])
                     m_ = WL.match(reads)
                     it_["like"] = store.like(it_)
+                    it_["gold"] = store.gold_for(it_)
+                    gm_ = store.gold_map()
+                    it_["is_gold"] = bool(gm_.get(((lb_ or {}).get("truth") or it_["plate"]).upper(), {}).get("image") == it_["image"])
                     it_["vehicle"] = store.vehicle(((it_["label"] or {}).get("truth") or it_["plate"]).upper(), (it_["label"] or {}).get("state"))
                     it_["watch"] = dict(plate=m_[0][0]["plate"], nickname=m_[0][0]["nickname"], level=m_[0][1]) if m_ else None
                 resp = dict(last_reviewed=last, item=its[pos] if pos is not None else None, n=(pos or 0) + 1, total=len(its),
@@ -784,6 +840,12 @@ def make_handler(store):
             path = urlparse(self.path).path
             if self.headers.get("X-Requested-With") != "lpr-review":
                 return self._send(403, {"error": "forbidden"})
+            if path == "/api/gold":
+                try:
+                    d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                    return self._send(200, store.set_gold(str(d["image"]), bool(d.get("on", True))) | {"ok": True})
+                except (KeyError, ValueError, TypeError) as e:
+                    return self._send(400, {"error": str(e) or "bad gold request"})
             if path == "/api/ops/score":
                 if _OPS.get("score") and _OPS["score"].poll() is None:
                     return self._send(200, {"ok": True, "running": True})

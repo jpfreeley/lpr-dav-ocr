@@ -229,6 +229,23 @@ def main(argv=None):
           f"**real plates {sum(r['verdict'] in ('ok', 'fix') for r in wide)}** (these would have been hidden from review)")
         P(f"- Share of all your 'not a plate' labels it catches: {pct(sum(r['verdict'] == 'notplate' for r in wide), sum(r['verdict'] == 'notplate' for r in rows))}")
 
+    # 8. gold standard frames: how does the first pass do when the plate is unquestionably clear?
+    gp = root / "labels" / "gold.jsonl"
+    if gp.exists():
+        cur = {}
+        for line in gp.read_text().splitlines():
+            if line.strip():
+                g = json.loads(line)
+                if g.get("gold"):
+                    cur[g["plate"]] = g["image"]
+                elif cur.get(g.get("plate")) == g.get("image"):
+                    del cur[g["plate"]]
+        gimgs = set(cur.values())
+        gr = [r for r in rows if r["image"] in gimgs and r["verdict"] in ("ok", "fix") and r["truth"]]
+        if gr:
+            P("\n## Gold standard frames\n")
+            P(f"- {len(gimgs)} plates have a frame you marked as the gold standard; the first pass read {pct(sum(r['p1'] == r['truth'] for r in gr), len(gr))} of them exactly right")
+
     sc = collections.Counter(r["state"] for r in rows if r["state"] and r["state"] != "UNKN")
     if sc:
         P("- State labels: " + ", ".join(f"{k} {v}" for k, v in sc.most_common()))

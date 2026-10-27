@@ -61,6 +61,22 @@ def load_labels(root):
     return out
 
 
+def load_gold(root):
+    """Images you marked as the gold standard for a plate (labels/gold.jsonl; the latest line per plate wins)."""
+    cur = {}
+    p = Path(root) / "labels" / "gold.jsonl"
+    if p.exists():
+        with open(p) as fh:
+            for line in fh:
+                if line.strip():
+                    r = json.loads(line)
+                    if r.get("gold"):
+                        cur[r["plate"]] = r["image"]
+                    elif cur.get(r.get("plate")) == r.get("image"):
+                        del cur[r["plate"]]
+    return set(cur.values())
+
+
 def load_registry(root):
     """image -> record, for frames already merged away."""
     out = {}
@@ -159,13 +175,13 @@ def sharpness(path, box):
     return float(cv2.Laplacian(img, cv2.CV_64F).var())
 
 
-def choose(g, day_dir, sharp=sharpness):
+def choose(g, day_dir, sharp=sharpness, gold=frozenset()):
     """(keeper, [others], reason) for one group of same-plate reads."""
     human = [c for c in g if c["verdict"]]
     for c in g:
         c["sharp"] = sharp(Path(day_dir) / c["image"], c["box"]) if len(g) > 1 else 0.0
     # A clipped read ("1123456" for "T123456C") can have the HIGHER confidence, so confidence comes last.
-    key = lambda c: (c["verdict"] is not None, bool(TLC_RX.fullmatch(c["plate"]) or STD_RX.fullmatch(c["plate"])),
+    key = lambda c: (c["image"] in gold, c["verdict"] is not None, bool(TLC_RX.fullmatch(c["plate"]) or STD_RX.fullmatch(c["plate"])),
                      len(c["plate"]), c["agree"], c["sharp"], c["conf"])
     best = max(g, key=key)
     if len(human) > 1:
@@ -186,11 +202,12 @@ def plan(root, days=None, window=30, sharp=sharpness):
     root = Path(root)
     base = root / "frames" if (root / "frames").is_dir() else root
     labels, skip, out = load_labels(root), set(load_registry(root)), []
+    gold = load_gold(root)
     for d in sorted(p for p in base.iterdir() if re.fullmatch(r"\d{4}-\d\d-\d\d", p.name) and (p / "index.csv").exists()):
         if days and d.name not in days:
             continue
         for g in group(candidates(d, labels, skip), window):
-            out.append((d.name, *choose(g, d, sharp)))
+            out.append((d.name, *choose(g, d, sharp, gold)))
     return out
 
 
@@ -203,10 +220,14 @@ def apply(root, decisions):
     moved = missing = skipped = 0
     now = datetime.now().astimezone().isoformat(timespec="seconds")
     labels = load_labels(root)                  # labels saved while the plan was being made must not be lost
+    gold = load_gold(root)
     done = set(load_registry(root))
     with open(reg, "a") as fh:
         for day, keeper, others, reason in decisions:
             verified = lambda c: (labels.get(c["image"]) or {}).get("verdict") in ("ok", "fix")
+            if any(c["image"] in gold for c in others) and keeper["image"] not in gold:
+                skipped += 1                    # a frame you marked as the gold standard is never merged away
+                continue
             if any(verified(c) for c in others) and not verified(keeper):
                 skipped += 1                    # you verified a frame we were about to drop: leave the group alone
                 continue
