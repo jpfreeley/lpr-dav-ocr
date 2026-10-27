@@ -131,6 +131,7 @@
   #mont .grid { overflow:auto; padding:12px 16px 16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }
   #mont .cell { position:relative; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:6px; cursor:pointer; text-align:left; color:var(--text); font:inherit; }
   #mont .cell.goldc { border-color:#e3a008; }
+  #mont .cell.sugg { border-color:#e3a008; border-style:dashed; }
   #mont .cstar { position:absolute; top:8px; right:10px; font-size:20px; line-height:1; color:#fff; text-shadow:0 0 3px #000; cursor:pointer; }
   #mont .cstar:hover { color:#e3a008; } #mont .cstar.on { color:#e3a008; }
   #mont .cell:hover { border-color:var(--accent); }
@@ -486,8 +487,8 @@ function showVehicle(v) {
   b.title = v.stale && v.stale.same_record ? "Remove the stale mark" : "Mark this record verified stale: the vehicle you see does not match it. Nothing else changes.";
   b.onclick = async () => {
     const stale = !(v.stale && v.stale.same_record);
-    try { await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale, image: it && it.image }) });
-      const fresh = await api("/api/lookup?q=" + encodeURIComponent(v.plate) + "&image=" + encodeURIComponent(it ? it.image : "")); it.vehicle = fresh.vehicle; showVehicle(fresh.vehicle);
+    try { const r = await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale, image: it && it.image }) });
+      it.vehicle = r.vehicle; showVehicle(r.vehicle);
       toast(stale ? "Marked verified stale" : "Stale mark removed"); } catch (e) { toast("Could not save the mark"); }
   };
   el.appendChild(b);
@@ -497,8 +498,8 @@ function showVehicle(v) {
     const mb = document.createElement("button"); mb.className = "vbtn"; mb.textContent = confirmedNow ? "undo" : "matches";
     mb.title = confirmedNow ? "Remove your confirmation" : "The vehicle in the frame matches this record (make, body, color). This is strong evidence the plate is read right, and the plate then vouches for its other sightings for a year.";
     mb.onclick = async () => {
-      try { await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale: false, match: !confirmedNow, image: it && it.image }) });
-        const fresh = await api("/api/lookup?q=" + encodeURIComponent(v.plate) + "&image=" + encodeURIComponent(it ? it.image : "")); it.vehicle = fresh.vehicle; showVehicle(fresh.vehicle);
+      try { const r = await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale: false, match: !confirmedNow, image: it && it.image }) });
+        it.vehicle = r.vehicle; showVehicle(r.vehicle);
         toast(confirmedNow ? "Confirmation removed" : "Vehicle confirmed"); } catch (e) { toast("Could not save the confirmation"); }
     };
     el.appendChild(mb);
@@ -545,7 +546,8 @@ async function openMontage() {
     }
     const star = s.basis === "verified" || s.basis === "fixed"
       ? `<span class="cstar${s.gold ? " on" : ""}" role="button" data-img="${s.image}" data-on="${s.gold ? 0 : 1}" title="${s.gold ? "The gold standard for this plate. Click to remove it." : "Mark as the gold standard: a very clear frame with no question about the read"}">${s.gold ? "\u2605" : "\u2606"}</span>` : "";
-    return `<div class="cell${s.gold ? " goldc" : ""}" data-i="${s.image}">${star}<span class="th" style="${st}"></span><small>${s.day} ${s.time} CamTime &middot; ${s.basis}${s.gold ? " &middot; \u2605 gold standard" : ""}</small></div>`;
+    const sug = !r.gold && r.suggest === s.image;
+    return `<div class="cell${s.gold ? " goldc" : sug ? " sugg" : ""}" data-i="${s.image}">${star}<span class="th" style="${st}"></span><small>${s.day} ${s.time} CamTime &middot; ${s.basis}${s.clarity != null ? " &middot; clarity " + s.clarity : ""}${s.gold ? " &middot; \u2605 gold standard" : sug ? " &middot; suggested gold" : ""}</small></div>`;
   }).join("");
 }
 const closeMontage = () => { $("mont").hidden = true; };

@@ -884,6 +884,9 @@ class BannerTests(unittest.TestCase):
         self.assertEqual((i["auto"], i["rejected"]), (False, False))
         self.assertEqual(i["pick"]["plate"], "DEMO010")
 
+    def test_the_default_list_has_the_state_banners_and_the_company_name(self):
+        self.assertTrue({"NEWYORK", "EWYORK", "WYORK", "TEXAS", "FEDEX", "FEDEXCOM"} <= S.NOT_PLATE_TEXTS)
+
     def test_only_the_exact_word_counts(self):
         self.assertEqual((self.item("NEWYORKS", "03")["banner"], self.item("NEWYORKS", "03")["auto"]), (False, True))
         self.assertTrue(self.item("DEMO001", "04")["auto"])
@@ -946,6 +949,23 @@ class TicketRecordTests(unittest.TestCase):
         st = self.make()
         st.set_vehicle_stale("DEMO001", True)
         self.assertFalse(self.auto(st, "2026-01-01", "01.00.00")["auto"])
+
+    def test_the_mark_route_returns_the_fresh_vehicle(self):
+        st = self.make()
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), S.make_handler(st))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=10)
+            c.request("POST", "/api/vehicle/flag", body=json.dumps(dict(plate="DEMO001", stale=False, match=True)),
+                      headers={"Content-Type": "application/json", "X-Requested-With": "lpr-review"})
+            r = c.getresponse()
+            body = json.loads(r.read())
+            self.assertEqual(r.status, 200)
+            self.assertTrue(body["vehicle"]["confirmed"]["same_record"])        # the page updates from this, no second request
+            c.close()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
 
     def test_confirming_the_vehicle_widens_the_vouching_window(self):
         st = self.make()
@@ -1025,6 +1045,24 @@ class GoldTests(unittest.TestCase):
         h = st.sightings("DEMO001")
         self.assertEqual(h["gold"]["image"], self.img[2])
         self.assertEqual([r["gold"] for r in h["sightings"] if r["image"] == self.img[2]], [True])
+
+    def test_clarity_suggestion_and_agreement_with_your_pick(self):
+        st = self.make()
+        for i in (0, 1):
+            st.add_label(dict(image=self.img[i], verdict="ok", truth="DEMO001", ts="x"))
+        sharp = dict(sharp=3000.0, h=80, w=160, contrast=150.0, clip=0.0)
+        soft = dict(sharp=40.0, h=30, w=60, contrast=30.0, clip=0.0)
+        st._clarity = {self.img[0]: soft, self.img[1]: sharp, self.img[2]: soft, self.img[3]: soft}     # pretend the frames were measured
+        h = st.sightings("DEMO001")
+        by = {r["image"]: r["clarity"] for r in h["sightings"]}
+        self.assertGreater(by[self.img[1]], by[self.img[0]])
+        self.assertEqual(h["suggest"], self.img[1])                                  # the sharper verified frame is suggested
+        self.assertEqual(h["clarity_pending"], 0)
+        st.set_gold(self.img[0], True)                                               # you picked the other one
+        self.assertIsNone(st.sightings("DEMO001")["suggest"])                        # nothing to suggest once there is a gold
+        self.assertEqual(st.gold_check(), dict(plates=1, top1=0, ranks=[2]))         # your pick was the second clearest
+        st.set_gold(self.img[1], True)
+        self.assertEqual(st.gold_check()["top1"], 1)
 
     def test_comparison_frame_for_another_sighting_and_for_a_near_read(self):
         st = self.make()
