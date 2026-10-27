@@ -459,6 +459,7 @@ class Store:
             c[1].append(rec)
         self.__dict__.pop("_rec_cache", None)
         self._reads_cache = None               # plate history and the recent-verified window depend on the mark
+        threading.Thread(target=self.reads, daemon=True).start()      # rebuild it in the background so the next page load is not the one that waits
         return rec
 
     @staticmethod
@@ -937,7 +938,8 @@ def make_handler(store):
                     d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
                     plate = re.sub(r"[^A-Z0-9]", "", str(d["plate"]).upper())[:10]
                     assert len(plate) >= 2
-                    return self._send(200, store.set_vehicle_stale(plate, bool(d.get("stale", True)), d.get("image"), bool(d.get("match"))) | {"ok": True})
+                    rec = store.set_vehicle_stale(plate, bool(d.get("stale", True)), d.get("image"), bool(d.get("match")))
+                    return self._send(200, rec | {"ok": True, "vehicle": store.vehicle(plate)})          # the page updates from this, with no second request
                 except (KeyError, ValueError, TypeError, AssertionError):
                     return self._send(400, {"error": "bad vehicle flag"})
             if path in ("/api/watch", "/api/watch/remove"):

@@ -71,7 +71,7 @@ DEFAULTS = {
         "confirmed_days": 365,
         # Exact texts that are printed on plates but are never the plate itself, such as the state banner. A read of one is
         # never auto-approved, and is auto-rejected unless the second pass found plate-shaped text elsewhere in the frame.
-        "not_plate_texts": ["NEWYORK"],
+        "not_plate_texts": ["NEWYORK", "NEWYOR", "NEWYORE", "EWYORK", "EWYOR", "WYORK", "TEXAS", "FEDEX", "FEDEXCOM"],
     },
     "watch": {
         "poll_seconds": 60,

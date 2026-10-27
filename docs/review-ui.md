@@ -184,11 +184,11 @@ has one at a time (a new mark replaces the old). It is saved in `labels/gold.jso
 - **Protected:** the duplicate merge always keeps the gold frame, so it is never moved to the trash and deleted.
 - **Measured:** `lpr score` reports how the first pass does on your gold frames, a clean test of the reader on clear plates.
 
-## Known non-plate words (the state banner)
+## Known non-plate words (state banners, company names)
 
-Some text is printed on plates but is never the plate: on New York plates the banner reads `NEWYORK`. On the author's
+Some text is printed on plates or vehicles but is never the plate: on New York plates the banner reads `NEWYORK`, Texas plates read `TEXAS`, and delivery trucks carry `FEDEX` and `FEDEX.COM`. On the author's
 data every one of the 20 labeled `NEWYORK` reads was wrong (5 not a plate, 12 fixed to the real plate, 3 obstructed), and
-the reader gives it with high confidence. `review.not_plate_texts` (default `["NEWYORK"]`) lists exact words like this:
+the reader gives it with high confidence. `review.not_plate_texts` (default `NEWYORK` and its clipped misreads `NEWYOR`, `NEWYORE`, `EWYORK`, `EWYOR` and `WYORK`, plus `TEXAS`, `FEDEX` and `FEDEXCOM`) lists exact words like this:
 
 - A read that is exactly one of these words is **never auto-approved**, even with high confidence and both passes agreeing.
 - It is **auto-rejected**, unless the second pass found plate-shaped text elsewhere in the same frame. Then it stays in

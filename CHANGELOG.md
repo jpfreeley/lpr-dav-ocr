@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Fixed
 
+- Review page: **matches** and **doesn't match** feel instant. The save returns the fresh vehicle in the same response (no second lookup request), and the server rebuilds its plate cache in the background instead of making the next request wait about half a second or more.
 - Review page: the gold standard button is always visible beside History and Watch. On a frame you have not saved yet, clicking it marks the frame as the gold standard when you save it with Correct or Save fix (it used to appear only after you had verified the frame).
 - Review page: in the **Most valuable first** queue, **Last reviewed** jumps to the label you saved most recently, not the furthest plate in time order of one day. The other queues keep the old meaning.
 - Nightly cleanup also writes the storage snapshot and refreshes `reports/accuracy.md` and `confusions.csv`. In the standalone script the snapshot step failed silently under `python -I`, because that mode leaves the script folder off the import path.
@@ -15,6 +16,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 ### Added
 
 - Suggested gold standard: a clarity score (0 to 100: sharpness, plate size, contrast, exposure, read certainty, shape) for each verified sighting, a "suggested" marker on the clearest one in the plate history and the montage, and an Operations line showing how often the suggestion matched your own gold pick. A suggestion only; nothing is marked for you.
+- `review.not_plate_texts` now also lists the clipped misreads of the New York banner (`NEWYOR`, `NEWYORE`, `EWYORK`, `EWYOR`, `WYORK`) and `TEXAS`, `FEDEX` and `FEDEXCOM`: reads of exactly those words are never auto-approved and are auto-rejected unless the frame holds a plate-shaped read elsewhere.
 - Gold standard: stars in the review page's montage of earlier sightings (verified frames only), the gold frame shown first in the montage, and a "gold standard in this plate's history" line with the crop on the review page.
 - Gold standard frames: mark a verified frame as the clear exemplar of its plate (a star in the plate history, a button on the review page). The history shows it, the review page offers it as a visual comparison for that plate and for near reads, the duplicate merge never drops it, and `lpr score` reports the first pass on gold frames. Saved in `labels/gold.jsonl`.
 - Review page: auto-accept from confidence 0.97 when both passes agree, the shape is plate-like and the plate has a vehicle in the local ticket data (`review.record_accept_conf`). A **matches** button beside the vehicle line records that you saw the car matches the record; the plate then vouches for its other sightings for a year (`review.confirmed_days`). `lpr score` and the self-check measure the new rule.
