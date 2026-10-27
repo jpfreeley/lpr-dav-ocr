@@ -755,7 +755,9 @@ class Store:
             if days >= 1:
                 why.append(f"seen on {days} other day{'s' if days != 1 else ''}")
             score += 4 * min(days, 5) + (2 if i["fits"] else 0)
-            i["value"] = dict(score=score, why=why or ["no strong signal"])
+            if not why:
+                continue                       # nothing else depends on this plate: it does not belong in a queue of plates worth a label
+            i["value"] = dict(score=score, why=why)
             out.append(i)
         out.sort(key=lambda i: (-i["value"]["score"], i["image"]))
         res, taken = [], collections.defaultdict(list)

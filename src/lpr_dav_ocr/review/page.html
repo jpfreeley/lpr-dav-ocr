@@ -273,6 +273,10 @@ function render() {
   const c = D.counts, done = D.all - (c.none || 0);
   statsLine();
   $("empty").hidden = !!it; $("main").hidden = !it;
+  if (!it && F === "value") {
+    $("empty").innerHTML = `<p><b>Nothing here would change your results.</b> No unreviewed plate is on your watchlist, repeats, or has other sightings that one label would settle. What is left is one-off plates. Pick <b>Needs review</b> in the menu to go through them in time order, or leave them: they stay out of your reports until you do.</p>`;
+    return;
+  }
   if (!it) {
     $("empty").innerHTML = `<p><b>${F === "need" || F === "unrev" ? "All caught up." : "Nothing in this view yet."}</b> ${D.all} plates this day, ${D.all - (c.none || 0)} reviewed. New plates appear here as processing continues and their second pass completes${(D.days.find(x => x.day === D.day) || {}).waiting ? ` (${(D.days.find(x => x.day === D.day) || {}).waiting} waiting for it)` : ""}. This page checks every 30 s.</p><button id="toAll">Show everything in time order</button>`;
     $("toAll").onclick = () => { F = "all"; go("", true); };

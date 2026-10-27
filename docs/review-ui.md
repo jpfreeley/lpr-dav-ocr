@@ -306,7 +306,8 @@ is there ("Worth a label: ...").
 | **Repeat plate, the two reads disagree** | a plate that comes back often is worth getting right |
 | **Seen on N days** | regulars carry more weight than one-off passers |
 
-**Last reviewed** in this queue jumps to the label you saved most recently (the other queues jump to the furthest plate in time order). A label removes the plate from the queue at once, and the sightings it approves drop out on the next refresh. The queue
+**Last reviewed** in this queue jumps to the label you saved most recently (the other queues jump to the furthest plate in time order). A plate with no reason to be early (a one-off pass that nothing else depends on) is left out. When no plate has a reason, the
+queue says so and points you to **Needs review**. A label removes the plate from the queue at once, and the sightings it approves drop out on the next refresh. The queue
 is only an ordering: it never labels anything, and the normal **Needs review** queue is unchanged. Auto-approved and
 auto-rejected plates are not in it, and neither are plates still waiting for the second pass.
 

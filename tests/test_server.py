@@ -800,7 +800,8 @@ class ValueQueueTests(unittest.TestCase):
             q = self.store.value_queue()
         names = [i["plate"] for i in q]
         self.assertEqual(names[0], "WATCHED")                                         # a watchlist match always comes first
-        self.assertEqual(names[-1], "ONLYONE")                                        # a one-off read with nothing around it is last
+        self.assertNotIn("ONLYONE", names)                                            # a one-off read with nothing else depending on it is not in the queue
+        self.assertTrue(all(i["value"]["why"] for i in q))                            # every entry says why it is worth a label
         top = q[0]["value"]["why"]
         self.assertIn("watchlist: Taxi", top)
         self.assertEqual(names.count("REPEAT1"), 1)                                  # a plate is listed once, not once per sighting
@@ -820,8 +821,8 @@ class ValueQueueTests(unittest.TestCase):
 
     def test_view_and_limit(self):
         with mock.patch.object(S.WL, "match", self.watch):
-            self.assertEqual(len(self.store.view("2026-01-05", "value")), 3)         # three distinct plates, all days
-            self.assertEqual(len(self.store.value_queue(limit=2)), 2)
+            self.assertEqual(len(self.store.view("2026-01-05", "value")), 2)         # two plates with a reason, all days
+            self.assertEqual(len(self.store.value_queue(limit=1)), 1)
 
     def test_last_labeled_is_the_most_recent_save_not_the_latest_time(self):
         store = S.Store(self.root)
