@@ -18,6 +18,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Montage viewer: click a sighting in the montage for a full-scale view with Left and Right arrow keys, a whole-frame toggle (F), the gold star (S), and links to the frame at native size and to the review page in a new tab. The old click took you away from the montage.
 - Gold standard from any sighting: the montage (now including the sighting under review) and the plate history show a star on every sighting, auto-accepted ones included. Starring a frame you have not verified saves its read as verified. The clarity suggestion also considers auto-accepted sightings.
 - Suggested gold standard: a clarity score (0 to 100: sharpness, plate size, contrast, exposure, read certainty, shape) for each verified sighting, a "suggested" marker on the clearest one in the plate history and the montage, and an Operations line showing how often the suggestion matched your own gold pick. A suggestion only; nothing is marked for you.
 - `review.not_plate_texts` now also lists the clipped misreads of the New York banner (`NEWYOR`, `NEWYORE`, `EWYORK`, `EWYOR`, `WYORK`) and `TEXAS`, `FEDEX` and `FEDEXCOM`: reads of exactly those words are never auto-approved and are auto-rejected unless the frame holds a plate-shaped read elsewhere.

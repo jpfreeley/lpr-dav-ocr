@@ -169,6 +169,12 @@ Mark such a frame as the **gold standard** of its plate. A plate has one at a ti
   standard** button beside **History** and **Watch** does the same: on a frame you have not saved yet it reads "gold when
   saved", and pressing **Correct** or **Save fix** then marks it. A filled star means it is the gold standard; click again to
   remove it.
+- **Compare them at full scale:** in the montage, click any sighting to open a viewer over it. It shows the plate crop
+  enlarged (the **F** key switches to the whole frame with the plate box drawn on it), steps through the sightings with the
+  Left and Right arrow keys, shows each one's time, basis, confidence and clarity, and has the star right there (**S**). Esc
+  closes the viewer, and a second Esc closes the montage. **Frame image, full size** opens the saved frame at its native pixels in a
+  new tab, and the arrow link on each montage cell (or **O** in the viewer, or Ctrl-click on a cell) opens the review page for
+  that plate in a new tab.
 - **See it:** the plate history shows the gold frame at the top, and the montage always shows it first (outlined in amber, even
   when it is outside the day window). On the review page, a reading of that plate (or of a plate one character away, such as
   from a hint) shows a "★ gold standard in this plate's history" line with the gold crop beside the vehicle line, so you can
