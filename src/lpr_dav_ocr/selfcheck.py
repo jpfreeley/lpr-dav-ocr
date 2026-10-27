@@ -30,7 +30,7 @@ except ImportError:                      # the standalone copy in the skill fold
 
 # How right each rule must be on the labels you made. Auto-reject is held higher because its mistake is silent:
 # a real plate is hidden from review.
-FLOORS = {"accept": 0.95, "approve": 0.95, "reject": 0.97}
+FLOORS = {"accept": 0.95, "record": 0.95, "approve": 0.95, "reject": 0.97}
 MIN_LABELS = 50                          # below this many labeled examples a percentage means little
 REPEAT = {"health": 24 * 3600, "rules": 7 * 24 * 3600}
 RULES_EVERY = 7 * 24 * 3600 - 3600
@@ -47,6 +47,9 @@ def rule_precision(root):
     m = re.search(r"Among the \d+ you labeled that match the rule: real plate right (\d+)/(\d+)", text)
     if m:
         out.append(dict(key="accept", name="Auto-accept", right=int(m[1]), total=int(m[2])))
+    m = re.search(r"you labeled that match the ticket-record rule: real plate right (\d+)/(\d+)", text)
+    if m:
+        out.append(dict(key="record", name="Auto-accept with a ticket record", right=int(m[1]), total=int(m[2])))
     m = re.search(r"Read equals a plate you verified: \d+\. Right (\d+)/(\d+)", text)
     if m:
         out.append(dict(key="approve", name="Auto-approve of verified plates", right=int(m[1]), total=int(m[2])))

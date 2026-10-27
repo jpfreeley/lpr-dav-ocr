@@ -64,6 +64,14 @@ DEFAULTS = {
         "reject_aspect": 3.5,
         # Size of the "Most valuable first" queue: the unreviewed plates whose label changes the results most.
         "value_queue": 40,
+        # A plate that has a vehicle in the local ticket index is auto-accepted from this confidence when both passes agree and
+        # the shape is plate-like (see docs/review-ui.md). 0 turns it off. confirmed_days: how far either side of a sighting a
+        # plate whose vehicle you confirmed by eye vouches for other sightings of it.
+        "record_accept_conf": 0.97,
+        "confirmed_days": 365,
+        # Exact texts that are printed on plates but are never the plate itself, such as the state banner. A read of one is
+        # never auto-approved, and is auto-rejected unless the second pass found plate-shaped text elsewhere in the frame.
+        "not_plate_texts": ["NEWYORK"],
     },
     "watch": {
         "poll_seconds": 60,

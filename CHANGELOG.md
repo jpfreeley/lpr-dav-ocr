@@ -6,12 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Fixed
 
+- Review page: in the **Most valuable first** queue, **Last reviewed** jumps to the label you saved most recently, not the furthest plate in time order of one day. The other queues keep the old meaning.
 - Nightly cleanup also writes the storage snapshot and refreshes `reports/accuracy.md` and `confusions.csv`. In the standalone script the snapshot step failed silently under `python -I`, because that mode leaves the script folder off the import path.
 - Reports: the stale-record count counts only marks whose record is unchanged. A mark whose record changed after a refresh is shown separately as no longer applying.
 - History page: searching a plate that has a NYC ticket record failed with "Search failed" because the stale-mark button used a helper that exists only on the reports page.
 
 ### Added
 
+- Gold standard frames: mark a verified frame as the clear exemplar of its plate (a star in the plate history, a button on the review page). The history shows it, the review page offers it as a visual comparison for that plate and for near reads, the duplicate merge never drops it, and `lpr score` reports the first pass on gold frames. Saved in `labels/gold.jsonl`.
+- Review page: auto-accept from confidence 0.97 when both passes agree, the shape is plate-like and the plate has a vehicle in the local ticket data (`review.record_accept_conf`). A **matches** button beside the vehicle line records that you saw the car matches the record; the plate then vouches for its other sightings for a year (`review.confirmed_days`). `lpr score` and the self-check measure the new rule.
+- `review.not_plate_texts` (default `NEWYORK`): exact words that are printed on plates but are never the plate. A read of one is never auto-approved and is auto-rejected unless the second pass found plate-shaped text elsewhere in the frame; then that text becomes the best guess.
+- Review page: when no read fits three letters then four digits but a fix of a digit in a letter position would (0 as D, 6 as G, 2 as Z), a one-click offer shows the fixed read. Never automatic.
 - Review page: **Most valuable first** queue, the top 40 unreviewed plates across all days ranked by how much one label changes the results (watchlist matches, plates where one label approves many more sightings, near-matches of verified plates, repeat plates with disagreeing reads). `review.value_queue` sets the size.
 - Second pass records `elsewhere` and `elsewhere_conf`: a plate-shaped read other than the chosen one, looked for when the chosen read is wide (`--fill-elsewhere` fills older days). Auto-reject no longer hides a frame that has one, and the review page offers it as a button.
 - `lpr selfcheck` and `scripts/install-selfcheck.sh`: an hourly check that sends an ntfy alert only when something needs attention (watcher, jobs, disk, or an automatic rule falling below its floor on your labels). ADR 0019.

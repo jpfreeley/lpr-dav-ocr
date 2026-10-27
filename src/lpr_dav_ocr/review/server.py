@@ -32,7 +32,10 @@ VERDICTS = {"ok", "fix", "notplate", "obstructed", "skip"}
 AUTO_CONF = CFG["review"]["auto_accept_conf"]
 RECENT_DAYS = CFG["review"]["recent_days"]
 REJECT_ASPECT = CFG["review"]["reject_aspect"]
+RECORD_CONF = CFG["review"]["record_accept_conf"]      # a plate that has a ticket record is auto-accepted from this confidence (0 turns it off)
+CONFIRMED_DAYS = CFG["review"]["confirmed_days"]        # a plate whose vehicle you confirmed vouches for its sightings this many days either side
 VALUE_QUEUE = CFG["review"]["value_queue"]      # size of the "most valuable first" queue
+NOT_PLATE_TEXTS = {t.strip().upper() for t in CFG["review"]["not_plate_texts"]}      # words that are never a plate (state banner)
 
 
 
@@ -50,6 +53,23 @@ def tlc_fix(p):
         return None
     c = _TLC_FIRST.get(p[0], p[0]) + "".join(_TLC_MID.get(x, x) for x in p[1:7]) + _TLC_LAST.get(p[7], p[7])
     return c if TLC_RX.fullmatch(c) else None
+
+
+# In the three letter positions of a standard plate (AAANNNN) a digit is a misread letter. On the author's labels a 0 there
+# was really D about 80% of the time, a 6 a G and a 2 a Z about 80 to 90% (an 8 or a 5 was close to a coin flip and a 1
+# had no clear winner, so those are left alone). It is only ever offered, never applied: some real plates do start with a digit.
+_STD_LETTER = {"0": "D", "6": "G", "2": "Z"}
+
+
+def std_fix(p):
+    """The AAANNNN plate this read most likely is, when the last four are digits and the first three are letters or
+    0/6/2 with at least one letter among them. None otherwise."""
+    if not p or len(p) != 7 or not p[3:].isdigit():
+        return None
+    head = p[:3]
+    if not any(c.isalpha() for c in head) or not any(c in _STD_LETTER for c in head) or not all(c.isalpha() or c in _STD_LETTER for c in head):
+        return None
+    return "".join(_STD_LETTER.get(c, c) for c in head) + p[3:]
 
 
 # Plate patterns used as a hint when choosing between reads. NYS standard passenger plates are three letters then four
@@ -135,6 +155,7 @@ class Store:
         (root / "crops").mkdir(parents=True, exist_ok=True)
         self.labels_path = root / "labels" / "labels.jsonl"
         self.dups_path = root / "labels" / "duplicates.jsonl"          # frames merged into another by `dedupe`
+        self.gold_path = root / "labels" / "gold.jsonl"                 # the frame you marked as the clear exemplar of a plate
         self.vflags_path = root / "labels" / "vehicle_flags.jsonl"      # plates whose NYC ticket record you saw is stale
         self.states_path = root / "labels" / "plate_states.jsonl"      # one state per plate, applied to every sighting of it
         self.write_lock = threading.Lock()
@@ -223,18 +244,24 @@ class Store:
             alt = s.get("plate2") or None
             shape = s.get("shape") or None
             rec = self.recent(r["plate"], img)
-            by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok"
-            auto = by_conf or bool(rec and rec["exact"])
+            banner = r["plate"] in NOT_PLATE_TEXTS                # a word printed on plates (NEWYORK), never the plate itself
+            by_conf = conf >= AUTO_CONF and bool(alt) and alt == r["plate"] and shape == "ok" and not banner
+            by_record = bool(RECORD_CONF) and not by_conf and conf >= RECORD_CONF and bool(alt) and alt == r["plate"] and shape == "ok" and not banner and self.has_record(r["plate"])
+            auto = (by_conf or by_record or bool(rec and rec["exact"])) and not banner
             asp = float(s["aspect"]) if s.get("aspect") else None
             elsewhere = s.get("elsewhere") or None          # the second pass found another plate-shaped read in this frame
-            rejected = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT and not auto and not elsewhere)
+            wide = bool(REJECT_ASPECT and asp is not None and asp > REJECT_ASPECT)
+            rejected = bool((wide or banner) and not auto and not elsewhere)
             out.append(dict(
                 image=img, day=day, auto=auto, plate=r["plate"], conf=conf, clip=r["clip"].split("[")[0], time=self._time(img, r.get("frame")),
                 alt=({"plate": alt, "conf": float(s["conf2"])} if alt else None), crop=s.get("plate3") or None, box=box,
                 elsewhere=({"plate": elsewhere, "conf": float(s["elsewhere_conf"] or 0)} if elsewhere else None),
                 tlc=self._tlc(r["plate"], alt, s.get("plate3")),
-                fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "recent" if auto else None),
-                pick=dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None,
+                stdfix=self._stdfix(r["plate"], alt, s.get("plate3")),
+                fits=fits(r["plate"]), rejected=rejected, recent=rec, auto_why=("conf" if by_conf else "record" if by_record else "recent" if auto else None),
+                pick=(dict(plate=elsewhere, why="the first read is the state banner, not a plate") if banner and elsewhere else
+                      dict(zip(("plate", "why"), pick_read(r["plate"], conf, alt, float(s["conf2"]) if alt else 0.0, s.get("plate3") or None) or ())) or None),
+                banner=banner,
                 shape=shape, aspect=s.get("aspect") or None, second_pass=img in sp, ready=img in sp,
                 variants=[v for v in (r.get("variants") or "").split("|") if v and v != r["plate"]],
                 label=labels.get(img),
@@ -251,6 +278,18 @@ class Store:
             f = tlc_fix(p)
             if f:
                 return dict(plate=f, shaped=False)
+        return None
+
+    @staticmethod
+    def _stdfix(p1, p2, p3):
+        """Offer for the review page: {plate, read} when no read fits AAANNNN or the TLC pattern but a letter-position fix of one does."""
+        reads = [p for p in (p1, p2, p3) if p]
+        if any(STD_RX.fullmatch(p) or TLC_RX.fullmatch(p) for p in reads):
+            return None
+        for p in reads:
+            f = std_fix(p)
+            if f:
+                return dict(plate=f, read=p)
         return None
 
     # --- recently verified plates: auto-approve an exact match, offer a one-character correction ----------
@@ -315,8 +354,10 @@ class Store:
         if not plate or not d0 or RECENT_DAYS <= 0:
             return None
         by, near = self.vindex()
-        hits = lambda t: [x for x in by.get(t, []) if x[1] != image and abs(x[0] - d0) <= RECENT_DAYS]
+        hits = lambda t, w=RECENT_DAYS: [x for x in by.get(t, []) if x[1] != image and abs(x[0] - d0) <= w]
         h = hits(plate)
+        if not h and CONFIRMED_DAYS > RECENT_DAYS and self._vflags().get(plate, {}).get("match") and self.confirmed(plate):
+            h = hits(plate, CONFIRMED_DAYS)         # you confirmed the vehicle by eye: the plate vouches for a longer stretch
         if h:
             return dict(plate=plate, n=len(h), exact=True, state=self.state_of(plate))
         if len(plate) < 5:
@@ -365,6 +406,23 @@ class Store:
             self._vflags_key = key
         return self._vflags_map
 
+    def has_record(self, plate):
+        """True when the local ticket index has a vehicle for this plate text, and you have not marked that record
+        verified stale. Cached per plate for the life of the process (cleared when you mark a record)."""
+        c = self.__dict__.setdefault("_rec_cache", {})
+        if plate not in c:
+            v = self.vehicle(plate)
+            c[plate] = bool(v.get("available") and not v.get("none") and not (v.get("stale") and v["stale"]["same_record"]))
+        return c[plate]
+
+    def confirmed(self, plate):
+        """True when you confirmed by eye that the vehicle matches this plate's ticket record, and the record is unchanged."""
+        f = self._vflags().get(plate)
+        if not f or not f.get("match") or f.get("stale"):
+            return False
+        v = self.vehicle(plate)
+        return bool(v.get("confirmed") and v["confirmed"]["same_record"])
+
     def vehicle(self, plate, state=None):
         """What the local NYC ticket index says about a plate (see vehicles.py): {available, make, body, year, color, ...}."""
         db = getattr(self, "_vdb", None)
@@ -379,13 +437,15 @@ class Store:
         flag = self._vflags().get(plate)
         if flag and flag.get("stale"):          # you looked at the car and the record did not match
             out["stale"] = dict(ts=flag["ts"], same_record=flag.get("record") == out["text"], record=flag.get("record"))
+        if flag and flag.get("match"):          # you looked at the car and it matched the record
+            out["confirmed"] = dict(ts=flag["ts"], same_record=flag.get("record") == out["text"])
         return out
 
-    def set_vehicle_stale(self, plate, stale, image=None):
+    def set_vehicle_stale(self, plate, stale, image=None, match=False):
         """Mark (or unmark) the ticket record for a plate as verified stale: you saw the vehicle and it does not match.
         Nothing about the plate or its sightings changes; the record you saw is kept with the mark."""
         v = self.vehicle(plate)
-        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, stale=bool(stale),
+        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, stale=bool(stale), match=bool(match) and not stale,
                    image=image, record=v.get("text") if v.get("available") and not v.get("none") else None)
         with self.write_lock, self.vflags_path.open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
@@ -394,6 +454,8 @@ class Store:
         c = self._cache.get(self.vflags_path)
         if c:
             c[1].append(rec)
+        self.__dict__.pop("_rec_cache", None)
+        self._reads_cache = None               # plate history and the recent-verified window depend on the mark
         return rec
 
     @staticmethod
@@ -439,11 +501,62 @@ class Store:
             c = self._reads_cache = (time.time(), allr)
         return [r for r in c[1] if unverified or r[1] != "unverified"]
 
+    # --- gold standard frames: one very clear, unquestionable image per plate -------------------------------
+    def gold_map(self):
+        """plate -> {image, ts, box} for the frame you marked as the gold standard (latest mark wins, an unmark removes it)."""
+        out = {}
+        for r in self._read(self.gold_path, "jsonl"):
+            if not (r.get("plate") and r.get("image")):
+                continue
+            if r.get("gold"):
+                out[r["plate"]] = r
+            elif out.get(r["plate"], {}).get("image") == r["image"]:
+                del out[r["plate"]]
+        return out
+
+    def set_gold(self, image, on):
+        """Mark (or unmark) a frame as the gold standard for its plate. Only a frame you verified (Correct or Save fix) can be one,
+        because the point is that there is no question what the read is. One gold frame per plate: a new one replaces the old."""
+        day = self.day_of(image)
+        item = next((i for i in self.items(day) if i["image"] == image), None) if day else None
+        lb = item and item["label"]
+        if not lb or lb.get("verdict") not in ("ok", "fix"):
+            raise ValueError("only a frame you verified can be the gold standard")
+        plate = ((lb.get("truth") or "") if lb["verdict"] == "fix" else item["plate"]).upper()
+        if not plate:
+            raise ValueError("no plate text")
+        rec = dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), plate=plate, image=image, gold=bool(on), box=item["box"])
+        with self.write_lock, self.gold_path.open("a") as fh:
+            fh.write(json.dumps(rec) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        c = self._cache.get(self.gold_path)
+        if c:
+            c[1].append(rec)
+        return rec
+
+    def gold_for(self, item):
+        """The gold standard frame to compare this plate with: for its own text, else for the plate it is one character from.
+        {plate, exact, image, box, ts} or None. The frame itself is never offered as its own comparison."""
+        gm = self.gold_map()
+        if not gm:
+            return None
+        truth = ((item["label"] or {}).get("truth") or "").upper()
+        own = truth or item["plate"]
+        texts = [own, item["plate"]] + ([item["recent"]["plate"]] if item.get("recent") else []) + [x["plate"] for x in item.get("like") or []]
+        for t in texts:
+            g = gm.get(t)
+            if g and g["image"] != item["image"]:
+                return dict(plate=t, exact=(t == own), image=g["image"], box=g.get("box"), ts=g["ts"])
+        return None
+
     def sightings(self, plate, unverified=False):
         """Exact-match history of one plate, newest first."""
         plate = re.sub(r"[^A-Z0-9]", "", (plate or "").upper())
+        gm = self.gold_map()
+        goldimg = (gm.get(plate) or {}).get("image")
         rows = [dict(image=i["image"], day=i["day"], time=i["time"], clip=i["clip"], conf=i["conf"], basis=b, box=i["box"],
-                     state=self.eff_state(i, t))
+                     state=self.eff_state(i, t), gold=i["image"] == goldimg)
                 for t, b, i in self.reads(unverified) if t == plate]
         rows.sort(key=lambda r: (r["day"], r["time"]), reverse=True)
         hours = [0] * 24
@@ -456,7 +569,8 @@ class Store:
         return dict(plate=plate, count=len(rows), days=len({r["day"] for r in rows}),
                     first=(rows[-1]["day"] + " " + rows[-1]["time"]) if rows else None,
                     last=(rows[0]["day"] + " " + rows[0]["time"]) if rows else None,
-                    by_hour=hours, states=states, sightings=rows)
+                    by_hour=hours, states=states, sightings=rows,
+                    gold=next((dict(image=r["image"], day=r["day"], time=r["time"], box=r["box"]) for r in rows if r["gold"]), None))
 
     def plate_search(self, q, unverified=False, limit=20):
         """Plates containing q, with sighting counts, most seen first (for the search box)."""
@@ -525,7 +639,7 @@ class Store:
                 score += 1000 if any(x[1] == "exact" for x in m) else 600
                 why.append("watchlist: " + m[0][0]["nickname"])
             o, n = self._ordinal(i["image"]), 0
-            if RECENT_DAYS > 0 and o:
+            if RECENT_DAYS > 0 and o and not i["banner"]:
                 n = sum(1 for x in pend[i["plate"]] if x and abs(x - o) <= RECENT_DAYS) - 1
             if n > 0:
                 score += 12 * min(n, 25)
@@ -547,14 +661,22 @@ class Store:
         res, taken = [], collections.defaultdict(list)
         for i in out:                          # one entry per plate: a label on it approves the rest within RECENT_DAYS
             o = self._ordinal(i["image"])
-            if any(o and x and abs(o - x) <= RECENT_DAYS for x in taken[i["plate"]]):
+            key = i["image"] if i["banner"] else i["plate"]            # banner reads are separate frames, not repeats of a plate
+            if any(o and x and abs(o - x) <= RECENT_DAYS for x in taken[key]):
                 continue
-            taken[i["plate"]].append(o)
+            taken[key].append(o)
             res.append(i)
             if len(res) >= limit:
                 break
         self._value_cache = (time.monotonic(), res, limit)
         return res
+
+    def last_labeled(self):
+        """Image of the label saved most recently (the last line of labels.jsonl), or None."""
+        for r in reversed(self._read(self.labels_path, "jsonl")):
+            if r.get("image"):
+                return r["image"]
+        return None
 
     def add_label(self, rec):
         with self.write_lock, self.labels_path.open("a") as fh:
@@ -687,12 +809,17 @@ def make_handler(store):
                 labeled = [i for i in everything if i["label"]]
                 # furthest reviewed plate in time order (where you stopped), not the most recently edited one
                 last = labeled[-1]["image"] if labeled else None
+                if f == "value":               # the value queue spans days and drops reviewed plates: use the latest label you saved
+                    last = store.last_labeled() or last
                 if pos is not None:
                     it_ = its[pos]
                     lb_ = it_["label"]
                     reads = ([lb_["truth"]] if lb_ and lb_.get("truth") else []) + [it_["plate"]] + ([it_["alt"]["plate"]] if it_["alt"] else [])
                     m_ = WL.match(reads)
                     it_["like"] = store.like(it_)
+                    it_["gold"] = store.gold_for(it_)
+                    gm_ = store.gold_map()
+                    it_["is_gold"] = bool(gm_.get(((lb_ or {}).get("truth") or it_["plate"]).upper(), {}).get("image") == it_["image"])
                     it_["vehicle"] = store.vehicle(((it_["label"] or {}).get("truth") or it_["plate"]).upper(), (it_["label"] or {}).get("state"))
                     it_["watch"] = dict(plate=m_[0][0]["plate"], nickname=m_[0][0]["nickname"], level=m_[0][1]) if m_ else None
                 resp = dict(last_reviewed=last, item=its[pos] if pos is not None else None, n=(pos or 0) + 1, total=len(its),
@@ -713,6 +840,12 @@ def make_handler(store):
             path = urlparse(self.path).path
             if self.headers.get("X-Requested-With") != "lpr-review":
                 return self._send(403, {"error": "forbidden"})
+            if path == "/api/gold":
+                try:
+                    d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                    return self._send(200, store.set_gold(str(d["image"]), bool(d.get("on", True))) | {"ok": True})
+                except (KeyError, ValueError, TypeError) as e:
+                    return self._send(400, {"error": str(e) or "bad gold request"})
             if path == "/api/ops/score":
                 if _OPS.get("score") and _OPS["score"].poll() is None:
                     return self._send(200, {"ok": True, "running": True})
@@ -724,7 +857,7 @@ def make_handler(store):
                     d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
                     plate = re.sub(r"[^A-Z0-9]", "", str(d["plate"]).upper())[:10]
                     assert len(plate) >= 2
-                    return self._send(200, store.set_vehicle_stale(plate, bool(d.get("stale", True)), d.get("image")) | {"ok": True})
+                    return self._send(200, store.set_vehicle_stale(plate, bool(d.get("stale", True)), d.get("image"), bool(d.get("match"))) | {"ok": True})
                 except (KeyError, ValueError, TypeError, AssertionError):
                     return self._send(400, {"error": "bad vehicle flag"})
             if path in ("/api/watch", "/api/watch/remove"):

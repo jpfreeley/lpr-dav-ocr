@@ -156,6 +156,32 @@ have normal shapes.
 - `lpr score` prints how many labeled reads were above the threshold (not counting frames kept for a plate-shaped read elsewhere) and how many were real plates. A threshold of 3.0
   also removes 3 real plates in 162, so the default stays at 3.5. Set `review.reject_aspect = 0` to switch it off.
 
+## Gold standard frames
+
+Some plates in the history are fuzzy but legible, and some frames are perfectly clear: there is no question what the read is.
+Mark such a frame as the **gold standard** of its plate. Only a frame you verified (Correct or Save fix) can be one, and a plate
+has one at a time (a new mark replaces the old). It is saved in `labels/gold.jsonl`.
+
+- **Mark it:** the star on a sighting in the plate history, or the **gold standard** button on the review page when you are
+  looking at a verified frame. A filled star means it is the gold standard; click again to remove it.
+- **See it:** the plate history shows the gold frame at the top. On the review page, a reading of that plate (or of a plate one
+  character away, such as from a hint) shows the gold crop beside the vehicle line, so you can compare a fuzzy read with the
+  clear one.
+- **Protected:** the duplicate merge always keeps the gold frame, so it is never moved to the trash and deleted.
+- **Measured:** `lpr score` reports how the first pass does on your gold frames, a clean test of the reader on clear plates.
+
+## Known non-plate words (the state banner)
+
+Some text is printed on plates but is never the plate: on New York plates the banner reads `NEWYORK`. On the author's
+data every one of the 20 labeled `NEWYORK` reads was wrong (5 not a plate, 12 fixed to the real plate, 3 obstructed), and
+the reader gives it with high confidence. `review.not_plate_texts` (default `["NEWYORK"]`) lists exact words like this:
+
+- A read that is exactly one of these words is **never auto-approved**, even with high confidence and both passes agreeing.
+- It is **auto-rejected**, unless the second pass found plate-shaped text elsewhere in the same frame. Then it stays in
+  review, and the **best guess** is that other text ("the first read is the state banner, not a plate").
+- Only the exact word counts (`NEWYORKS` is not matched), and it is a list you set, not a rule about letters, so ordinary
+  plates are never filtered by their characters. Add other words you see, for example the name of a state or a slogan.
+
 ## "Same last four" hints
 
 For a seven-character read whose last four characters are digits (the AAANNNN shape), the page lists known plates that
@@ -194,6 +220,36 @@ two letters; and a NYS moped plate, three digits, two letters and a digit. A rea
 **set NY** or **set NJ** button that selects the state chip for you, and using the TLC correction ("NYC TLC pattern
 T123456C - use") selects **NY** automatically. These are habits of the plates, not rules: a pattern never rejects or
 changes a plate, and it never picks a state on its own except through that TLC button.
+
+## The ticket record as evidence
+
+A read that exists in the local NYC ticket data is very likely right, because a misread rarely lands on another registered
+plate. On the author's labels 77% of the correct first reads had a ticket record, against 7% of the wrong ones. A read with a
+record was right 93.7% of the time, and a read without one only 24.9%. Two things use that:
+
+- **Auto-accept with a record.** When both passes agree, the shape is plate-like, the confidence is at least
+  `review.record_accept_conf` (default 0.97, below the usual 0.99) and the plate has a vehicle in the ticket data, the plate is
+  auto-accepted. The badge says "both passes agree and the plate has a vehicle in the ticket data". On the author's labels
+  this was right 98.0% of the time (384 of 392; `lpr score` prints it, and the self-check watches it). A record you marked
+  **doesn't match** (verified stale) does not count. Set the key to 0 to turn the rule off.
+- **You confirm the vehicle.** If the ticket data says Subaru and the car in the frame is that Subaru with that plate, press
+  **matches** beside the vehicle line. That is independent evidence the plate is read right, stronger than the text alone.
+  The plate then vouches for its other sightings, exact text only, for `review.confirmed_days` (default 365) either side
+  instead of 30. **undo** removes the confirmation. A confirmation applies to the record you saw: if a refresh changes the
+  record, it no longer counts, as with a stale mark. **matches** only records the vehicle; you still press **Correct** or
+  **Save fix** for the plate itself.
+
+## Digits in letter positions
+
+In a standard plate (three letters then four digits) the first three characters are letters, so a digit there is a
+misread. When no read fits the pattern but one would after a fix, the page offers it as a button: "three letters then four
+digits DAB1234 - use". The fix replaces `0` with `D`, `6` with `G` and `2` with `Z`. I measured on the author's labels
+in two ways (all reads with a digit in a letter position, and only the reads where nothing else fit the pattern, which is
+when the offer appears): a `0` was really `D` 78 to 81% of the time, a `6` a `G` 84 to 94% and a `2` a `Z` 81 to 93%. An `8`
+(53 to 75%) or a `5` (50 to 68%) was close to a coin flip in the offered cases and a `1` had no clear winner (J 29%,
+W 20%), so those are left alone. As a whole plate the offered read was right 50% of the time (33 of 65), against 14% for
+the raw reads it replaces. It is only an offer, never applied, because 8 of the plates you marked correct do start with a
+digit.
 
 ## Pattern fit and "best guess"
 
@@ -234,7 +290,7 @@ is there ("Worth a label: ...").
 | **Repeat plate, the two reads disagree** | a plate that comes back often is worth getting right |
 | **Seen on N days** | regulars carry more weight than one-off passers |
 
-A label removes the plate from the queue at once, and the sightings it approves drop out on the next refresh. The queue
+**Last reviewed** in this queue jumps to the label you saved most recently (the other queues jump to the furthest plate in time order). A label removes the plate from the queue at once, and the sightings it approves drop out on the next refresh. The queue
 is only an ordering: it never labels anything, and the normal **Needs review** queue is unchanged. Auto-approved and
 auto-rejected plates are not in it, and neither are plates still waiting for the second pass.
 

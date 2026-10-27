@@ -45,6 +45,10 @@
   .badge.verified, .badge.fixed { color:var(--ok); border-color:var(--ok); }
   .badge.auto { color:var(--accent); border-color:var(--accent); }
   .badge.unverified { color:var(--warn); border-color:var(--warn); }
+  .goldb { font: inherit; font-size: 13px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+  .goldb:hover { color: var(--text); border-color: var(--muted); }
+  .goldb.on { color: #e3a008; border-color: #e3a008; font-weight: 700; }
+  .goldh { display: flex; gap: 12px; align-items: center; margin: 10px 0 0; font-size: 13px; color: var(--muted); }
   .thumb { width:150px; height:56px; background:#000 no-repeat; border-radius:5px; display:block; }
   .chip { display:inline-flex; align-items:center; gap:2px; background:var(--panel); border:1px solid var(--line); border-radius:7px; }
   .chip a { border:0; background:none; padding:3px 4px 3px 9px; }
@@ -124,18 +128,22 @@ function wireWatch(p) {
   }
 }
 
-function thumb(r) {
+function thumb(r, mw = 150, mh = 56) {
   if (!r.box) return `<span class="thumb"></span>`;
   const [x0, y0, x1, y1] = r.box, bw = x1 - x0, bh = y1 - y0, px = bw * 0.15, py = bh * 0.4;
   const cx = Math.max(0, x0 - px), cy = Math.max(0, y0 - py), cw = Math.min(W, x1 + px) - cx, ch = Math.min(H, y1 + py) - cy;
-  const k = Math.min(150 / cw, 56 / ch);
-  return `<span class="thumb" style="background-image:url('/img/${encodeURIComponent(r.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px"></span>`;
+  const k = Math.min(mw / cw, mh / ch);
+  return `<span class="thumb" style="width:${cw * k}px;height:${ch * k}px;background-image:url('/img/${encodeURIComponent(r.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px"></span>`;
 }
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".goldb"); if (!b) return;
+  try { await fetch("/api/gold", { method: "POST", headers: HDR, body: JSON.stringify({ image: b.dataset.img, on: b.dataset.on === "1" }) }); search(data.plate); } catch (err) { /* the page keeps working */ }
+});
 function rows(from, to) {
   return data.sightings.slice(from, to).map(r => `<tr>
     <td>${esc(r.day)}</td><td class="mono">${esc(r.time)}</td>
     <td><a href="/i/${encodeURIComponent(r.image)}" title="Open in the review page">${thumb(r)}</a></td>
-    <td><span class="badge ${r.basis}">${r.basis}</span></td><td>${r.conf.toFixed(3)}</td><td>${esc(r.state && r.state !== "UNKN" ? r.state : "")}</td></tr>`).join("");
+    <td><span class="badge ${r.basis}">${r.basis}</span></td><td>${r.conf.toFixed(3)}</td><td>${esc(r.state && r.state !== "UNKN" ? r.state : "")}</td><td>${r.basis === "verified" || r.basis === "fixed" ? `<button class="goldb${r.gold ? " on" : ""}" data-img="${esc(r.image)}" data-on="${r.gold ? 0 : 1}" title="${r.gold ? "This is the gold standard frame. Click to remove it." : "Mark as the gold standard: a very clear frame with no question about the read"}">${r.gold ? "\u2605" : "\u2606"}</button>` : ""}</td></tr>`).join("");
 }
 function render() {
   const d = data, out = $("out");
@@ -146,9 +154,10 @@ function render() {
     <span><b>${d.count}</b> sighting${d.count === 1 ? "" : "s"} on <b>${d.days}</b> day${d.days === 1 ? "" : "s"}</span>
     <span>first <b>${esc(d.first)}</b> <span class="camt">CamTime</span></span><span>last <b>${esc(d.last)}</b> <span class="camt">CamTime</span></span>${st ? `<span>state <b>${esc(st)}</b></span>` : ""}</div>
     <div class="note" id="veh" style="margin:8px 0 0"></div>
+    ${d.gold ? `<div class="goldh"><span>\u2605 Gold standard</span><a href="/i/${encodeURIComponent(d.gold.image)}" title="Open the gold standard frame">${thumb(d.gold, 260, 98)}</a><span>${esc(d.gold.day)} ${esc(d.gold.time)} <span class="camt">CamTime</span></span></div>` : ""}
     <div class="hours" title="Sightings by hour of day">${d.by_hour.map((n, h) => `<i style="height:${Math.max(4, n / mx * 100)}%" title="${String(h).padStart(2, "0")}:00  ${n}"></i>`).join("")}</div>
     <div class="hlab"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>
-    <div class="card"><table><thead><tr><th>Day</th><th>Time <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th></tr></thead>
+    <div class="card"><table><thead><tr><th>Day</th><th>Time <span class="camt" title="The camera clock, taken from the clip file name. It can run an hour or more behind the computer clock.">CamTime</span></th><th>Plate</th><th>Basis</th><th>Conf</th><th>State</th><th title="The gold standard frame: very clear, no question about the read">Gold</th></tr></thead>
     <tbody id="tb">${rows(0, PAGE)}</tbody></table><button class="more" id="more" ${d.count <= PAGE ? "hidden" : ""}>Show more</button>
     <p class="hint">CamTime is the camera clock, taken from the clip file names. It may run behind the computer clock.</p></div>`;
   wireWatch(d.plate);
@@ -159,6 +168,7 @@ function render() {
     : "Vehicle on NYC tickets: " + v.text + ". Last in fiscal year " + v.last_fy + (v.others ? "; " + v.others + " other recorded variant(s)" : "") + ". A ticket writer typed it: it can be wrong or out of date, and the city records no model or trim.";
   if (v && v.available && !v.none) {
     const st = v.stale && v.stale.same_record;
+    if (v.confirmed && v.confirmed.same_record) ve.appendChild(document.createTextNode(" You confirmed on " + v.confirmed.ts.slice(0, 10) + " that the vehicle you saw matches this record."));
     if (v.stale) ve.appendChild(document.createTextNode(st ? " Marked verified stale on " + v.stale.ts.slice(0, 10) + ": the vehicle you saw did not match." : " It was marked stale on " + v.stale.ts.slice(0, 10) + ", but the record has changed since."));
     const b = document.createElement("button");
     b.className = "tbtn"; b.style.marginLeft = "8px"; b.textContent = st ? "Undo stale mark" : "Mark verified stale"; ve.appendChild(b);

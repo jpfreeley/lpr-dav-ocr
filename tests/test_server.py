@@ -276,6 +276,26 @@ class HistoryTests(unittest.TestCase):
         self.assertNotIn("DEMO004", [e["plate"] for e in s])   # waiting for a second pass: not confirmed
 
 
+class StdFixTests(unittest.TestCase):
+    """Letter-position digits in an AAANNNN-shaped read are offered as letters (0 as D, 6 as G, 2 as Z)."""
+
+    def test_fix(self):
+        self.assertEqual(S.std_fix("0AB1234"), "DAB1234")
+        self.assertEqual(S.std_fix("A06"+"1234"), "ADG1234")
+        self.assertEqual(S.std_fix("ABC1234"), None)                    # nothing to fix
+        self.assertEqual(S.std_fix("8AB1234"), None)                    # 8 and 5 are coin flips, 1 is ambiguous: not offered
+        self.assertEqual(S.std_fix("0001234"), None)                    # needs at least one letter to anchor the pattern
+        self.assertEqual(S.std_fix("0AB123"), None)                     # wrong length or digits
+        self.assertEqual(S.std_fix("0AB12X4"), None)
+
+    def test_offer_only_when_no_read_already_fits(self):
+        f = S.Store._stdfix
+        self.assertEqual(f("0AB1234", None, None), dict(plate="DAB1234", read="0AB1234"))
+        self.assertEqual(f("0AB1234", "DAB1234", None), None)           # the second pass already fits the pattern
+        self.assertEqual(f("T123456C", None, None), None)               # a TLC plate is not touched
+        self.assertEqual(f("XYZ", "2AB1234", None), dict(plate="ZAB1234", read="2AB1234"))
+
+
 class TlcHintTests(unittest.TestCase):
     def test_common_misreads_are_fixed(self):
         self.assertEqual(S.tlc_fix("11234560"), "T123456C")      # T read as 1, C read as 0
@@ -794,6 +814,17 @@ class ValueQueueTests(unittest.TestCase):
             self.assertEqual(len(self.store.view("2026-01-05", "value")), 3)         # three distinct plates, all days
             self.assertEqual(len(self.store.value_queue(limit=2)), 2)
 
+    def test_last_labeled_is_the_most_recent_save_not_the_latest_time(self):
+        store = S.Store(self.root)
+        store.labels_path = self.root / "labels" / "last.jsonl"
+        store.labels_path.parent.mkdir(exist_ok=True)
+        self.assertIsNone(store.last_labeled())
+        late = "2026-01-06_06.00.00-06.00.00-REPEAT1_0.80.png"
+        early = "2026-01-05_07.00.00-07.00.00-ONLYONE_0.80.png"
+        store.add_label(dict(image=late, verdict="ok", ts="2026-01-07T00:00:00"))
+        store.add_label(dict(image=early, verdict="ok", ts="2026-01-07T00:01:00"))        # saved last, earlier in time order
+        self.assertEqual(store.last_labeled(), early)
+
     def test_a_label_changes_the_queue(self):
         store = S.Store(self.root)
         store.labels_path = self.root / "labels" / "value.jsonl"
@@ -803,3 +834,197 @@ class ValueQueueTests(unittest.TestCase):
             self.assertEqual(first["plate"], "WATCHED")
             store.add_label(dict(image=first["image"], verdict="ok", ts="2026-01-06T00:00:00"))
             self.assertNotIn(first["image"], [i["image"] for i in store.value_queue()])   # labeled plates leave the queue at once
+
+
+class BannerTests(unittest.TestCase):
+    """A read of a known non-plate word (the state banner NEWYORK) is never auto-approved and is auto-rejected unless
+    the second pass found plate-shaped text elsewhere in the frame."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs", "plate3", "conf3", "elsewhere", "elsewhere_conf"]
+        d = cls.root / "frames" / "2026-01-01"
+        d.mkdir(parents=True)
+        rows = [("01.00.00", "NEWYORK", "", ""), ("02.00.00", "NEWYORK", "DEMO010", "0.8800"), ("03.00.00", "NEWYORKS", "", ""), ("04.00.00", "DEMO001", "", "")]
+        with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+            w, v = csv.writer(f), csv.writer(g)
+            w.writerow(hdr_i)
+            v.writerow(hdr_s)
+            for t, p1, el, elc in rows:
+                img = f"2026-01-01_{t}-{t}-{p1}_0.999.png"
+                w.writerow([f"{t}-{t}[M].dav", p1, 0.999, 30, "", img, 500, 1, 3, 5])
+                v.writerow([img, p1, 0.999, p1, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2, "", "", el, elc])    # high confidence, both agree, plate-shaped
+        cls.store = S.Store(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def item(self, plate, hour):
+        return next(i for i in self.store.items("2026-01-01") if i["plate"] == plate and f"_{hour}." in i["image"])
+
+    def test_banner_is_never_auto_approved_and_is_rejected(self):
+        i = self.item("NEWYORK", "01")
+        self.assertEqual((i["auto"], i["rejected"], i["banner"]), (False, True, True))     # conf 0.999 and agreeing would normally approve it
+
+    def test_banner_with_a_plate_elsewhere_stays_in_review_with_that_plate_as_the_guess(self):
+        i = self.item("NEWYORK", "02")
+        self.assertEqual((i["auto"], i["rejected"]), (False, False))
+        self.assertEqual(i["pick"]["plate"], "DEMO010")
+
+    def test_only_the_exact_word_counts(self):
+        self.assertEqual((self.item("NEWYORKS", "03")["banner"], self.item("NEWYORKS", "03")["auto"]), (False, True))
+        self.assertTrue(self.item("DEMO001", "04")["auto"])
+
+
+class TicketRecordTests(unittest.TestCase):
+    """A plate that has a vehicle in the ticket data is auto-accepted at a lower confidence; a vehicle you confirm by eye
+    makes the plate vouch for its other sightings over a longer window."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        plan = {"2026-01-01": [("01.00.00", "DEMO001", 0.98), ("02.00.00", "DEMO002", 0.98), ("03.00.00", "DEMO001", 0.96)],
+                "2026-04-10": [("01.00.00", "DEMO001", 0.80), ("02.00.00", "DEMO003", 0.98)]}
+        cls.img = {}
+        for day, items in plan.items():
+            d = cls.root / "frames" / day
+            d.mkdir(parents=True)
+            with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+                w, v = csv.writer(f), csv.writer(g)
+                w.writerow(hdr_i)
+                v.writerow(hdr_s)
+                for t, p1, conf in items:
+                    img = f"{day}_{t}-{t}-{p1}_{conf:.2f}.png"
+                    cls.img[(day, t)] = img
+                    w.writerow([f"{t}-{t}[M].dav", p1, conf, 30, "", img, 500, 1, 3, 5])
+                    v.writerow([img, p1, conf, p1, 0.99, 1, 100, 100, 340, 220, "2.1", "ok", 2])
+        (cls.root / "labels").mkdir()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def make(self):
+        from tests.test_vehicles import make_db
+        d, db = make_db([("DEMO001", "NY", "SUBAR", "SUBN", 2019, "GY", 3, 2027), ("DEMO003", "NY", "TOYOT", "4DSD", 2020, "WH", 2, 2027)])
+        store = S.Store(self.root)
+        store._vdb = db
+        store.labels_path = self.root / "labels" / "t.jsonl"
+        store.vflags_path = self.root / "labels" / "f.jsonl"
+        for p in (store.labels_path, store.vflags_path):
+            p.unlink(missing_ok=True)
+        self.addCleanup(d.cleanup)
+        return store
+
+    def auto(self, store, day, t):
+        return next(i for i in store.items(day) if i["image"] == self.img[(day, t)])
+
+    def test_record_lowers_the_confidence_needed(self):
+        st = self.make()
+        a = self.auto(st, "2026-01-01", "01.00.00")
+        self.assertEqual((a["auto"], a["auto_why"]), (True, "record"))           # conf 0.98, agree, plate-shaped, has a record
+        self.assertFalse(self.auto(st, "2026-01-01", "02.00.00")["auto"])         # same, but DEMO002 has no record
+        self.assertFalse(self.auto(st, "2026-01-01", "03.00.00")["auto"])         # a record, but 0.96 is under the 0.97 floor
+
+    def test_a_stale_mark_withdraws_the_record(self):
+        st = self.make()
+        st.set_vehicle_stale("DEMO001", True)
+        self.assertFalse(self.auto(st, "2026-01-01", "01.00.00")["auto"])
+
+    def test_confirming_the_vehicle_widens_the_vouching_window(self):
+        st = self.make()
+        st.add_label(dict(image=self.img[("2026-01-01", "01.00.00")], verdict="ok", truth="DEMO001", ts="2026-01-02T00:00:00"))
+        far = self.img[("2026-04-10", "01.00.00")]                                # 99 days later, outside the 30-day window
+        self.assertIsNone(st.recent("DEMO001", far))
+        st.set_vehicle_stale("DEMO001", False, image=far, match=True)             # you saw the Subaru and the plate
+        r = st.recent("DEMO001", far)
+        self.assertTrue(r and r["exact"])
+        self.assertTrue(st.vehicle("DEMO001")["confirmed"]["same_record"])
+        st.set_vehicle_stale("DEMO001", False, image=far, match=False)            # undo
+        self.assertIsNone(st.recent("DEMO001", far))
+
+
+class GoldTests(unittest.TestCase):
+    """A frame you verified can be marked as the gold standard of its plate, one per plate."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        d = cls.root / "frames" / "2026-01-01"
+        d.mkdir(parents=True)
+        cls.img = []
+        with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+            w, v = csv.writer(f), csv.writer(g)
+            w.writerow(hdr_i)
+            v.writerow(hdr_s)
+            for t, p1 in (("01.00.00", "DEMO001"), ("02.00.00", "DEMO001"), ("03.00.00", "DEMO0O1"), ("04.00.00", "DEMO002")):
+                img = f"2026-01-01_{t}-{t}-{p1}_0.80.png"
+                cls.img.append(img)
+                w.writerow([f"{t}-{t}[M].dav", p1, 0.80, 30, "", img, 500, 1, 3, 5])
+                v.writerow([img, p1, 0.80, p1, 0.70, 1, 100, 100, 340, 220, "2.1", "ok", 2])
+        (cls.root / "labels").mkdir()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def make(self):
+        st = S.Store(self.root)
+        for name in ("labels", "gold"):
+            setattr(st, name + "_path", self.root / "labels" / f"g_{name}_{id(st)}.jsonl")
+        return st
+
+    def test_only_a_verified_frame_can_be_gold(self):
+        st = self.make()
+        with self.assertRaises(ValueError):
+            st.set_gold(self.img[0], True)                                                 # not verified yet
+        st.add_label(dict(image=self.img[0], verdict="ok", truth="DEMO001", ts="x"))
+        rec = st.set_gold(self.img[0], True)
+        self.assertEqual((rec["plate"], rec["gold"]), ("DEMO001", True))
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[0])
+
+    def test_one_gold_per_plate_and_unmark(self):
+        st = self.make()
+        for i in (0, 1):
+            st.add_label(dict(image=self.img[i], verdict="ok", truth="DEMO001", ts="x"))
+        st.set_gold(self.img[0], True)
+        st.set_gold(self.img[1], True)                                                     # a new gold replaces the old one
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[1])
+        st.set_gold(self.img[0], False)                                                    # unmarking a frame that is not the gold changes nothing
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[1])
+        st.set_gold(self.img[1], False)
+        self.assertEqual(st.gold_map(), {})
+
+    def test_history_flags_it_and_a_fix_uses_the_truth(self):
+        st = self.make()
+        st.add_label(dict(image=self.img[2], verdict="fix", truth="DEMO001", ts="x"))      # the read said DEMO0O1; you fixed it
+        st.set_gold(self.img[2], True)
+        self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[2])
+        h = st.sightings("DEMO001")
+        self.assertEqual(h["gold"]["image"], self.img[2])
+        self.assertEqual([r["gold"] for r in h["sightings"] if r["image"] == self.img[2]], [True])
+
+    def test_comparison_frame_for_another_sighting_and_for_a_near_read(self):
+        st = self.make()
+        st.add_label(dict(image=self.img[0], verdict="ok", truth="DEMO001", ts="x"))
+        st.set_gold(self.img[0], True)
+        other = next(i for i in st.items("2026-01-01") if i["image"] == self.img[1])
+        g = st.gold_for(other)
+        self.assertEqual((g["plate"], g["exact"], g["image"]), ("DEMO001", True, self.img[0]))
+        own = next(i for i in st.items("2026-01-01") if i["image"] == self.img[0])
+        self.assertIsNone(st.gold_for(own))                                                # the gold frame is not compared with itself
+        near = next(i for i in st.items("2026-01-01") if i["image"] == self.img[2])      # DEMO0O1 is one character from DEMO001
+        near["like"] = [dict(plate="DEMO001")]
+        g2 = st.gold_for(near)
+        self.assertEqual((g2["plate"], g2["exact"]), ("DEMO001", False))
+
