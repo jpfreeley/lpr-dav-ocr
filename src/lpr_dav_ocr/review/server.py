@@ -650,7 +650,7 @@ class Store:
                        state=self.eff_state(i, t), gold=i["image"] == goldimg), i)
                  for t, b, i in self.reads(unverified) if t == plate]
         rows = [r for r, _ in pairs]
-        human = [(r, i) for r, i in pairs if r["basis"] in ("verified", "fixed")]
+        human = [(r, i) for r, i in pairs if r["basis"] in ("verified", "fixed", "auto")]      # a read you confirmed or the rules accepted; an unreviewed one is not sure enough to suggest
         scores, pending = self.clarity_scores([(i, plate) for _, i in human]) if human else ({}, 0)
         for r, _ in human:
             r["clarity"] = scores.get(r["image"])

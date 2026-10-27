@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Gold standard from any sighting: the montage (now including the sighting under review) and the plate history show a star on every sighting, auto-accepted ones included. Starring a frame you have not verified saves its read as verified. The clarity suggestion also considers auto-accepted sightings.
 - Suggested gold standard: a clarity score (0 to 100: sharpness, plate size, contrast, exposure, read certainty, shape) for each verified sighting, a "suggested" marker on the clearest one in the plate history and the montage, and an Operations line showing how often the suggestion matched your own gold pick. A suggestion only; nothing is marked for you.
 - Gold standard: stars in the review page's montage of earlier sightings (verified frames only), the gold frame shown first in the montage, and a "gold standard in this plate's history" line with the crop on the review page.
 - Gold standard frames: mark a verified frame as the clear exemplar of its plate (a star in the plate history, a button on the review page). The history shows it, the review page offers it as a visual comparison for that plate and for near reads, the duplicate merge never drops it, and `lpr score` reports the first pass on gold frames. Saved in `labels/gold.jsonl`.
