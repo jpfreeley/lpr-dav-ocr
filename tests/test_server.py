@@ -875,6 +875,9 @@ class BannerTests(unittest.TestCase):
         self.assertEqual((i["auto"], i["rejected"]), (False, False))
         self.assertEqual(i["pick"]["plate"], "DEMO010")
 
+    def test_the_default_list_has_the_state_banners_and_the_company_name(self):
+        self.assertTrue({"NEWYORK", "EWYORK", "WYORK", "TEXAS", "FEDEX", "FEDEXCOM"} <= S.NOT_PLATE_TEXTS)
+
     def test_only_the_exact_word_counts(self):
         self.assertEqual((self.item("NEWYORKS", "03")["banner"], self.item("NEWYORKS", "03")["auto"]), (False, True))
         self.assertTrue(self.item("DEMO001", "04")["auto"])
@@ -937,6 +940,23 @@ class TicketRecordTests(unittest.TestCase):
         st = self.make()
         st.set_vehicle_stale("DEMO001", True)
         self.assertFalse(self.auto(st, "2026-01-01", "01.00.00")["auto"])
+
+    def test_the_mark_route_returns_the_fresh_vehicle(self):
+        st = self.make()
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), S.make_handler(st))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=10)
+            c.request("POST", "/api/vehicle/flag", body=json.dumps(dict(plate="DEMO001", stale=False, match=True)),
+                      headers={"Content-Type": "application/json", "X-Requested-With": "lpr-review"})
+            r = c.getresponse()
+            body = json.loads(r.read())
+            self.assertEqual(r.status, 200)
+            self.assertTrue(body["vehicle"]["confirmed"]["same_record"])        # the page updates from this, no second request
+            c.close()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
 
     def test_confirming_the_vehicle_widens_the_vouching_window(self):
         st = self.make()
