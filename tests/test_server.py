@@ -1038,6 +1038,26 @@ class GoldTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             st.set_gold(self.img[2], True, verify=True)                                    # you said it is obstructed
 
+    def test_one_off_finds_a_substitution_a_missing_and_an_extra_character(self):
+        f = S.Store._one_off
+        self.assertEqual(f("DEMO0O1", "DEMO001"), [("O", "0")])
+        self.assertEqual(f("DEMO01", "DEMO001"), [("", "0")])
+        self.assertEqual(f("DEMO0001", "DEMO001"), [("0", "")])
+        self.assertIsNone(f("DEMO001", "DEMO001"))
+        self.assertIsNone(f("DEMX0O1", "DEMO001"))                                         # two characters differ
+
+    def test_a_read_one_character_from_a_gold_plate_is_flagged(self):
+        st = self.make()
+        st.add_label(dict(image=self.img[0], verdict="ok", truth="DEMO001", ts="x"))
+        self.assertIsNone(st.gold_flag(next(i for i in st.items("2026-01-01") if i["image"] == self.img[2])))     # no gold frame yet
+        st.set_gold(self.img[0], True)
+        by = {i["image"]: i for i in st.items("2026-01-01")}
+        self.assertIsNone(st.gold_flag(by[self.img[1]]))                                   # reads the gold plate itself
+        flag = st.gold_flag(by[self.img[2]])
+        self.assertEqual((flag["plate"], flag["read"], flag["diff"], flag["image"]), ("DEMO001", "DEMO0O1", ("O", "0"), self.img[0]))
+        st.add_label(dict(image=self.img[2], verdict="fix", truth="DEMO001", ts="x"))
+        self.assertIsNone(st.gold_flag(next(i for i in st.items("2026-01-01") if i["image"] == self.img[2])))     # reviewed: no longer flagged
+
     def test_one_gold_per_plate_and_unmark(self):
         st = self.make()
         for i in (0, 1):

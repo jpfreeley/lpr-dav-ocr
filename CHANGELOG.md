@@ -4,6 +4,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ## [Unreleased]
 
+### Added
+
+- Gold standard check: an unreviewed read that is one character from a plate with a gold standard frame (and no read of the frame says the gold plate) is flagged as a possible misread. The review page shows the differing character, the gold crop and a **use** button. The most valuable queue lists it with the reason "one character from X, a plate with a gold standard frame". Nothing is changed for you.
+
 ### Fixed
 
 - Plate-shaped text elsewhere in the frame: the second pass now stores where that text is (`elsewhere_box`). Clicking the hint on the review page moves the outline and the zoomed crop to that text (Reset puts them back). When you saved that text as the plate, the history, montage and gold crops use its box instead of the badge. `second_pass --fill-elsewhere` backfills older days in the background.

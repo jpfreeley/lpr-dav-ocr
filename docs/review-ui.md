@@ -192,6 +192,7 @@ Mark such a frame as the **gold standard** of its plate. A plate has one at a ti
   may say "measuring N more frames" the first time. On the author's data the top pick was the frame a person would choose for 5
   of 6 plates checked by eye. As you mark real gold standards, the Operations page shows how often the suggestion matched
   your pick, so you can see whether to trust it.
+- **Compared:** an unreviewed read that is one character from a plate with a gold standard frame (a substitution, a missing or an extra character), where no read of the frame says the gold plate, is flagged as a possible misread. The review page shows the differing character in red, the gold crop and a **use** button, and the most valuable queue adds the reason. It only flags. It never changes a read or a label for you, and it is a text comparison: a different vehicle with a similar plate is flagged too.
 - **Protected:** the duplicate merge always keeps the gold frame, so it is never moved to the trash and deleted.
 - **Measured:** `lpr score` reports how the first pass does on your gold frames, a clean test of the reader on clear plates.
 

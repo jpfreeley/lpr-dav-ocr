@@ -200,6 +200,7 @@
           <span id="seen" class="seen"></span>
           <span id="veh" class="seen" hidden></span>
           <span id="goldcard" class="seen" hidden></span>
+          <span id="goldflag" class="seen" hidden></span>
           <span id="editchk" class="seen" hidden></span>
           <button id="watchbtn" class="ghost" style="padding:3px 10px;font-size:12px" title="Alert me when this plate is seen again">&#9734; Watch</button>
           <button id="goldbtn" class="goldb" hidden></button>
@@ -491,6 +492,12 @@ function renderGold() {
     gb.className = "goldb" + (pendingGold ? " on" : ""); gb.textContent = (pendingGold ? "\u2605 gold when saved" : "\u2606 gold standard");
     gb.title = pendingGold ? "This frame will be marked as the gold standard when you save it with Correct or Save fix. Click to cancel." : "An especially clear plate? Click, then save it with Correct or Save fix, and it is marked as the gold standard for its plate.";
     gb.onclick = () => { pendingGold = !pendingGold; renderGold(); };
+  }
+  const gf = it.gold_flag, fl = $("goldflag"); fl.hidden = !gf;
+  if (gf) {
+    const rd = gf.read.split("").map((ch, k) => ch === gf.plate[k] ? ch : `<b style="color:var(--bad)">${ch}</b>`).join("");
+    fl.innerHTML = `\u2605 possible misread of <b>${gf.plate}</b>, a plate with a gold standard frame: this read is ${rd}, one character different <a href="/i/${encodeURIComponent(gf.image)}" title="Open the gold standard frame">${cropThumb(gf.image, gf.box, 240, 90)}</a> <button class="alt" id="goldfix" style="padding:2px 8px;font-size:12px">use ${gf.plate}</button>`;
+    $("goldfix").onclick = () => { buildCells(gf.plate.split("")); focusCell(cells().length - 1); };
   }
   const g = it.gold; gc.hidden = !g;
   if (g) gc.innerHTML = `\u2605 ${g.exact ? "gold standard in this plate's history:" : "gold standard of the plate this is one character from,"} <b>${g.plate}</b> <a href="/i/${encodeURIComponent(g.image)}" title="Open the gold standard frame">${cropThumb(g.image, g.box, 240, 90)}</a>`;

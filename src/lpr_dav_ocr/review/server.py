@@ -576,6 +576,44 @@ class Store:
                 return dict(plate=t, exact=(t == own), image=g["image"], box=g.get("box"), ts=g["ts"])
         return None
 
+    @staticmethod
+    def _one_off(a, b):
+        """Where a read and a gold plate differ when they are one edit apart: [(read char, gold char)] for one substitution, or
+        [("", char)] for a missing character, [(char, "")] for an extra one. None when they are equal or further apart."""
+        if a == b or abs(len(a) - len(b)) > 1:
+            return None
+        if len(a) == len(b):
+            d = [(x, y) for x, y in zip(a, b) if x != y]
+            return d if len(d) == 1 else None
+        s, l = (a, b) if len(a) < len(b) else (b, a)
+        for k in range(len(l)):
+            if l[:k] + l[k + 1:] == s:
+                return [("", l[k])] if len(a) < len(b) else [(l[k], "")]
+        return None
+
+    def gold_flag(self, item):
+        """A read of a frame you have not labeled that is one character from a plate you gave a gold standard frame, while no read
+        of the frame says the gold plate itself. That is a likely misread of the gold plate (or a look-alike plate). Returns
+        {plate, read, diff, image, box} or None. Compares the first read, the second read and the crop read."""
+        if item["label"] or item.get("banner") or item.get("rejected"):
+            return None
+        gm = self.gold_map()
+        if not gm:
+            return None
+        reads = [r for r in (item["plate"], (item.get("alt") or {}).get("plate"), item.get("crop")) if r]
+        if any(r in gm for r in reads):
+            return None
+        for r in reads:
+            if len(r) < 5:
+                continue
+            for g, rec in gm.items():
+                if rec["image"] == item["image"] or len(g) < 5:
+                    continue
+                d = self._one_off(r, g)
+                if d:
+                    return dict(plate=g, read=r, diff=d[0], image=rec["image"], box=rec.get("box"))
+        return None
+
     # --- clarity of verified frames, to suggest which one could be the gold standard ----------------------
     def _clarity_cache(self):
         if self._clarity is None:
@@ -748,6 +786,10 @@ class Store:
             if n > 0:
                 score += 12 * min(n, 25)
                 why.append(f"one label clears {n} more")
+            gf = self.gold_flag(i)
+            if gf:
+                score += 70
+                why.append(f"one character from {gf['plate']}, a plate with a gold standard frame")
             rec = i["recent"]
             if rec and not rec["exact"]:
                 score += 60
@@ -926,6 +968,7 @@ def make_handler(store):
                     m_ = WL.match(reads)
                     it_["like"] = store.like(it_)
                     it_["gold"] = store.gold_for(it_)
+                    it_["gold_flag"] = store.gold_flag(it_)
                     gm_ = store.gold_map()
                     it_["is_gold"] = bool(gm_.get(((lb_ or {}).get("truth") or it_["plate"]).upper(), {}).get("image") == it_["image"])
                     it_["vehicle"] = store.vehicle(((it_["label"] or {}).get("truth") or it_["plate"]).upper(), (it_["label"] or {}).get("state"))
