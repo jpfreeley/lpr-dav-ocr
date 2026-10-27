@@ -346,6 +346,7 @@ function render() {
   buildCells(lb && lb.verdict === "fix" && lb.truth ? lb.truth.split("") : orig.slice());
   $("prev").disabled = !D.prev; $("next").disabled = !D.next;
   $("last").disabled = !D.last_reviewed || D.last_reviewed === it.image;
+  $("last").title = F === "value" ? "Jump to the plate you reviewed most recently (Alt+L)" : "Jump to the furthest plate you have reviewed, in time order (Alt+L)";
   $("nextun").disabled = !D.next_unreviewed;
   $("queue").innerHTML = "";
   D.window.forEach(w => {

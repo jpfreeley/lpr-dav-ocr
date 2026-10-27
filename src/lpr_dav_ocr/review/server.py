@@ -556,6 +556,13 @@ class Store:
         self._value_cache = (time.monotonic(), res, limit)
         return res
 
+    def last_labeled(self):
+        """Image of the label saved most recently (the last line of labels.jsonl), or None."""
+        for r in reversed(self._read(self.labels_path, "jsonl")):
+            if r.get("image"):
+                return r["image"]
+        return None
+
     def add_label(self, rec):
         with self.write_lock, self.labels_path.open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
@@ -687,6 +694,8 @@ def make_handler(store):
                 labeled = [i for i in everything if i["label"]]
                 # furthest reviewed plate in time order (where you stopped), not the most recently edited one
                 last = labeled[-1]["image"] if labeled else None
+                if f == "value":               # the value queue spans days and drops reviewed plates: use the latest label you saved
+                    last = store.last_labeled() or last
                 if pos is not None:
                     it_ = its[pos]
                     lb_ = it_["label"]

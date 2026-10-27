@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Fixed
 
+- Review page: in the **Most valuable first** queue, **Last reviewed** jumps to the label you saved most recently, not the furthest plate in time order of one day. The other queues keep the old meaning.
 - Nightly cleanup also writes the storage snapshot and refreshes `reports/accuracy.md` and `confusions.csv`. In the standalone script the snapshot step failed silently under `python -I`, because that mode leaves the script folder off the import path.
 - Reports: the stale-record count counts only marks whose record is unchanged. A mark whose record changed after a refresh is shown separately as no longer applying.
 - History page: searching a plate that has a NYC ticket record failed with "Search failed" because the stale-mark button used a helper that exists only on the reports page.

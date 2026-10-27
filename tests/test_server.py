@@ -794,6 +794,17 @@ class ValueQueueTests(unittest.TestCase):
             self.assertEqual(len(self.store.view("2026-01-05", "value")), 3)         # three distinct plates, all days
             self.assertEqual(len(self.store.value_queue(limit=2)), 2)
 
+    def test_last_labeled_is_the_most_recent_save_not_the_latest_time(self):
+        store = S.Store(self.root)
+        store.labels_path = self.root / "labels" / "last.jsonl"
+        store.labels_path.parent.mkdir(exist_ok=True)
+        self.assertIsNone(store.last_labeled())
+        late = "2026-01-06_06.00.00-06.00.00-REPEAT1_0.80.png"
+        early = "2026-01-05_07.00.00-07.00.00-ONLYONE_0.80.png"
+        store.add_label(dict(image=late, verdict="ok", ts="2026-01-07T00:00:00"))
+        store.add_label(dict(image=early, verdict="ok", ts="2026-01-07T00:01:00"))        # saved last, earlier in time order
+        self.assertEqual(store.last_labeled(), early)
+
     def test_a_label_changes_the_queue(self):
         store = S.Store(self.root)
         store.labels_path = self.root / "labels" / "value.jsonl"
