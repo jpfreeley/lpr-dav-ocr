@@ -195,6 +195,18 @@ two letters; and a NYS moped plate, three digits, two letters and a digit. A rea
 T123456C - use") selects **NY** automatically. These are habits of the plates, not rules: a pattern never rejects or
 changes a plate, and it never picks a state on its own except through that TLC button.
 
+## Digits in letter positions
+
+In a standard plate (three letters then four digits) the first three characters are letters, so a digit there is a
+misread. When no read fits the pattern but one would after a fix, the page offers it as a button: "three letters then four
+digits DAB1234 - use". The fix replaces `0` with `D`, `6` with `G` and `2` with `Z`. I measured on the author's labels
+in two ways (all reads with a digit in a letter position, and only the reads where nothing else fit the pattern, which is
+when the offer appears): a `0` was really `D` 78 to 81% of the time, a `6` a `G` 84 to 94% and a `2` a `Z` 81 to 93%. An `8`
+(53 to 75%) or a `5` (50 to 68%) was close to a coin flip in the offered cases and a `1` had no clear winner (J 29%,
+W 20%), so those are left alone. As a whole plate the offered read was right 50% of the time (33 of 65), against 14% for
+the raw reads it replaces. It is only an offer, never applied, because 8 of the plates you marked correct do start with a
+digit.
+
 ## Pattern fit and "best guess"
 
 Many New York plates are three letters then four digits (`ABC1234`), and TLC plates follow the pattern above. When the
