@@ -15,6 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- `review.not_plate_texts` now also lists the clipped misreads of the New York banner (`NEWYOR`, `NEWYORE`, `EWYORK`, `EWYOR`, `WYORK`) and `TEXAS`, `FEDEX` and `FEDEXCOM`: reads of exactly those words are never auto-approved and are auto-rejected unless the frame holds a plate-shaped read elsewhere.
 - Gold standard: stars in the review page's montage of earlier sightings (verified frames only), the gold frame shown first in the montage, and a "gold standard in this plate's history" line with the crop on the review page.
 - Gold standard frames: mark a verified frame as the clear exemplar of its plate (a star in the plate history, a button on the review page). The history shows it, the review page offers it as a visual comparison for that plate and for near reads, the duplicate merge never drops it, and `lpr score` reports the first pass on gold frames. Saved in `labels/gold.jsonl`.
 - Review page: auto-accept from confidence 0.97 when both passes agree, the shape is plate-like and the plate has a vehicle in the local ticket data (`review.record_accept_conf`). A **matches** button beside the vehicle line records that you saw the car matches the record; the plate then vouches for its other sightings for a year (`review.confirmed_days`). `lpr score` and the self-check measure the new rule.
