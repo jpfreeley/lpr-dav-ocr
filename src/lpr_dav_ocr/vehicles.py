@@ -210,7 +210,7 @@ def lookup(db, plate, state=None):
         tally = {}
         for r in rows:
             if r[idx] and r[idx] not in skip:
-                tally[r[idx]] = tally.get(r[idx], 0) + r[5]
+                tally[r[idx]] = tally.get(r[idx], 0) + (r[5] or 0)
         return max(tally, key=tally.get) if tally else None
 
     make, body, color, year = top(1), top(2), top(4), top(3, skip=(0,))
