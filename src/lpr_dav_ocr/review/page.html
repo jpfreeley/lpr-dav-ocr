@@ -169,7 +169,7 @@
     <div class="navrow">
       <button id="prev" class="ghost">&larr; Prev <kbd>Alt+&larr;</kbd></button>
       <button id="next" class="ghost">Next <kbd>Alt+&rarr;</kbd></button>
-      <button id="last" class="ghost" title="Jump to the furthest plate you have reviewed, in time order (Alt+L)">Last reviewed <kbd>Alt+L</kbd></button>
+      <button id="last" class="ghost" title="Back to the plate you were just looking at (Alt+B)">Back <kbd>Alt+B</kbd></button>
       <button id="nextun" class="ghost" title="Jump to the next plate with no verdict (Alt+U)">Next unreviewed <kbd>Alt+U</kbd></button>
       <div class="queue" id="queue"></div>
     </div>
@@ -253,12 +253,17 @@ const loadImg = n => imgs[n] || (imgs[n] = new Promise((res, rej) => { const i =
 function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 1500); }
 async function api(url, opt) { const r = await fetch(url, opt); if (!r.ok) throw new Error(url + " " + r.status); return r.json(); }
 
-async function go(name, push) {
+const trail = [];      // the plates you looked at before this one, newest last: what Back returns to
+async function go(name, push, back) {
+  const before = it && it.image;
   D = await api(`/api/item?image=${encodeURIComponent(name || "")}&f=${F}&day=${DAY}`);
   it = D.item; DAY = D.day;
-  if (push !== false && it) history.pushState(null, "", `/i/${encodeURIComponent(it.image)}` + (F ? `?f=${F}` : ""));
+  if (!back && push !== false && it && before && before !== it.image) { trail.push(before); if (trail.length > 300) trail.shift(); }
+  const url = it ? `/i/${encodeURIComponent(it.image)}` + (F ? `?f=${F}` : "") : null;
+  if (url && push !== false && !back) history.pushState(null, "", url); else if (url && back) history.replaceState(null, "", url);
   render();
 }
+function goBack() { const p = trail.pop(); if (p) go(p, false, true); }
 
 function statsLine() {
   const c = D.counts, dd = D.days.find(x => x.day === D.day) || { left: 0, auto: 0, waiting: 0 }, done = D.all - (c.none || 0);
@@ -364,8 +369,7 @@ function render() {
   stateFromRecord(it.vehicle);
   buildCells(lb && lb.verdict === "fix" && lb.truth ? lb.truth.split("") : orig.slice());
   $("prev").disabled = !D.prev; $("next").disabled = !D.next;
-  $("last").disabled = !D.last_reviewed || D.last_reviewed === it.image;
-  $("last").title = F === "value" ? "Jump to the plate you reviewed most recently (Alt+L)" : "Jump to the furthest plate you have reviewed, in time order (Alt+L)";
+  $("last").disabled = !trail.length;
   $("nextun").disabled = !D.next_unreviewed;
   $("queue").innerHTML = "";
   D.window.forEach(w => {
@@ -735,7 +739,7 @@ $("cells").addEventListener("focusin", e => { sel = cells().indexOf(e.target); }
 $("addc").onclick = () => { const n = cells().length, i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i + 1, 0, "")); focusCell(i + 1); };
 $("delc").onclick = () => { const n = cells().length; if (n < 2) return; const i = sel < 0 || sel >= n ? n - 1 : sel; mutate(v => v.splice(i, 1)); focusCell(Math.min(i, n - 2)); };
 $("reset").onclick = () => { buildCells(orig.slice()); focusCell(0); };
-$("last").onclick = () => D.last_reviewed && go(D.last_reviewed); $("nextun").onclick = () => D.next_unreviewed && go(D.next_unreviewed);
+$("last").onclick = goBack; $("nextun").onclick = () => D.next_unreviewed && go(D.next_unreviewed);
 $("prev").onclick = () => D.prev && go(D.prev); $("next").onclick = () => D.next && go(D.next);
 async function poll() {
   if (busy || document.hidden) return;
@@ -748,7 +752,7 @@ async function poll() {
     statsLine();
     $("pos").textContent = `${D.n} of ${D.total}`;
     $("prev").disabled = !D.prev; $("next").disabled = !D.next;
-    $("last").disabled = !D.last_reviewed || D.last_reviewed === it.image; $("nextun").disabled = !D.next_unreviewed;
+    $("last").disabled = !trail.length; $("nextun").disabled = !D.next_unreviewed;
     $("queue").innerHTML = "";
     D.window.forEach(w => { const e = document.createElement("div"); e.className = "dot" + (w.image === it.image ? " cur" : "") + (w.verdict ? " s-" + w.verdict : ""); e.textContent = w.n; e.title = w.plate; e.onclick = () => go(w.image); $("queue").appendChild(e); });
   } catch (e) { /* server restarting; try again next tick */ }
@@ -761,7 +765,7 @@ document.addEventListener("keydown", e => {
   if (e.code === "KeyN") { e.preventDefault(); decide("notplate"); }
   else if (e.code === "KeyO") { e.preventDefault(); decide("obstructed"); }
   else if (e.code === "KeyS") { e.preventDefault(); decide("skip"); }
-  else if (e.code === "KeyL") { e.preventDefault(); D.last_reviewed && go(D.last_reviewed); }
+  else if (e.code === "KeyB" || e.code === "KeyL") { e.preventDefault(); goBack(); }        // Alt+L (the old Last reviewed key) is Back too
   else if (e.code === "KeyU") { e.preventDefault(); D.next_unreviewed && go(D.next_unreviewed); }
   else if (e.key === "ArrowLeft") { e.preventDefault(); D.prev && go(D.prev); }
   else if (e.key === "ArrowRight") { e.preventDefault(); D.next && go(D.next); }
