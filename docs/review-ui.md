@@ -8,7 +8,7 @@ page is for labelling what the pipeline found, which gives you accuracy numbers 
 ## What is on the page
 
 - **Left:** the saved frame with the plate outlined, the clip and approximate time, and navigation: Previous,
-  Next, **Last reviewed** (the furthest plate you have reached in time order) and **Next unreviewed**.
+  Next, **Back** (the plate you were just looking at, like a browser back button, one step at a time) and **Next unreviewed**.
 - **Top right:** a leveled crop of the plate. The letters of the current text are drawn under it, one per plate
   position, so you can compare read against plate. Letters you changed turn amber.
 - **OCR read:** the read and its confidence, a plate-shape warning when the text region is not plate-shaped,
@@ -98,7 +98,7 @@ Validate the rule on your own data before trusting it: `lpr score` prints its pr
 | Enter | Correct, or Save fix when a box was changed |
 | Alt+N / Alt+O / Alt+S | Not a plate / Obstructed / Can't tell |
 | Alt+Left, Alt+Right | Previous, next |
-| Alt+L, Alt+U | Last reviewed, next unreviewed |
+| Alt+B (or Alt+L), Alt+U | Back, next unreviewed |
 | Left, Right, Backspace | Move between character boxes |
 
 Plain letters are not shortcuts because they would clash with typing into the boxes.
@@ -306,7 +306,7 @@ is there ("Worth a label: ...").
 | **Repeat plate, the two reads disagree** | a plate that comes back often is worth getting right |
 | **Seen on N days** | regulars carry more weight than one-off passers |
 
-**Last reviewed** in this queue jumps to the label you saved most recently (the other queues jump to the furthest plate in time order). A plate with no reason to be early (a one-off pass that nothing else depends on) is left out. When no plate has a reason, the
+A plate with no reason to be early (a one-off pass that nothing else depends on) is left out. When no plate has a reason, the
 queue says so and points you to **Needs review**. A label removes the plate from the queue at once, and the sightings it approves drop out on the next refresh. The queue
 is only an ordering: it never labels anything, and the normal **Needs review** queue is unchanged. Auto-approved and
 auto-rejected plates are not in it, and neither are plates still waiting for the second pass.
