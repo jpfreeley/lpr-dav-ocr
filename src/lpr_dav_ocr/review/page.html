@@ -486,8 +486,8 @@ function showVehicle(v) {
   b.title = v.stale && v.stale.same_record ? "Remove the stale mark" : "Mark this record verified stale: the vehicle you see does not match it. Nothing else changes.";
   b.onclick = async () => {
     const stale = !(v.stale && v.stale.same_record);
-    try { await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale, image: it && it.image }) });
-      const fresh = await api("/api/lookup?q=" + encodeURIComponent(v.plate) + "&image=" + encodeURIComponent(it ? it.image : "")); it.vehicle = fresh.vehicle; showVehicle(fresh.vehicle);
+    try { const r = await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale, image: it && it.image }) });
+      it.vehicle = r.vehicle; showVehicle(r.vehicle);
       toast(stale ? "Marked verified stale" : "Stale mark removed"); } catch (e) { toast("Could not save the mark"); }
   };
   el.appendChild(b);
@@ -497,8 +497,8 @@ function showVehicle(v) {
     const mb = document.createElement("button"); mb.className = "vbtn"; mb.textContent = confirmedNow ? "undo" : "matches";
     mb.title = confirmedNow ? "Remove your confirmation" : "The vehicle in the frame matches this record (make, body, color). This is strong evidence the plate is read right, and the plate then vouches for its other sightings for a year.";
     mb.onclick = async () => {
-      try { await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale: false, match: !confirmedNow, image: it && it.image }) });
-        const fresh = await api("/api/lookup?q=" + encodeURIComponent(v.plate) + "&image=" + encodeURIComponent(it ? it.image : "")); it.vehicle = fresh.vehicle; showVehicle(fresh.vehicle);
+      try { const r = await api("/api/vehicle/flag", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ plate: v.plate, stale: false, match: !confirmedNow, image: it && it.image }) });
+        it.vehicle = r.vehicle; showVehicle(r.vehicle);
         toast(confirmedNow ? "Confirmation removed" : "Vehicle confirmed"); } catch (e) { toast("Could not save the confirmation"); }
     };
     el.appendChild(mb);

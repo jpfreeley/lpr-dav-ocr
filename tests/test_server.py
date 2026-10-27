@@ -938,6 +938,23 @@ class TicketRecordTests(unittest.TestCase):
         st.set_vehicle_stale("DEMO001", True)
         self.assertFalse(self.auto(st, "2026-01-01", "01.00.00")["auto"])
 
+    def test_the_mark_route_returns_the_fresh_vehicle(self):
+        st = self.make()
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), S.make_handler(st))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=10)
+            c.request("POST", "/api/vehicle/flag", body=json.dumps(dict(plate="DEMO001", stale=False, match=True)),
+                      headers={"Content-Type": "application/json", "X-Requested-With": "lpr-review"})
+            r = c.getresponse()
+            body = json.loads(r.read())
+            self.assertEqual(r.status, 200)
+            self.assertTrue(body["vehicle"]["confirmed"]["same_record"])        # the page updates from this, no second request
+            c.close()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
     def test_confirming_the_vehicle_widens_the_vouching_window(self):
         st = self.make()
         st.add_label(dict(image=self.img[("2026-01-01", "01.00.00")], verdict="ok", truth="DEMO001", ts="2026-01-02T00:00:00"))
