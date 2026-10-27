@@ -93,6 +93,7 @@ Every one of these is also a `lpr process` flag (`lpr process -h`).
 |---|---|---|
 | `port` | 8770 | The review page listens on `127.0.0.1` at this port. Pick a free one. |
 | `reject_aspect` | 3.5 | A read whose text region has a length/height ratio above this is auto-rejected: it leaves the review queue, is not counted in plate history and never triggers a watchlist alert. US plates are about 2:1 and plate reads cluster at 1.8 to 2.4. On the author's labels every one of 120 reads above 3.5 was not a usable plate. Check `lpr score` on your own data. 0 switches it off. |
+| `value_queue` | 40 | How many plates the **Most valuable first** queue lists (see [the review page](review-ui.md#review-by-value)). |
 | `recent_days` | 30 | A read identical to a plate you verified (Correct or Save fix) within this many days of the sighting is auto-approved. Plates one character away from such a plate get a one-click correction instead. Set 0 to switch it off. |
 | `auto_accept_conf` | 0.99 | A plate at or above this confidence, with both passes agreeing and a plate-like shape, skips the review queue. **Validate this on your own labels first**: `lpr score` prints the rule's precision. Set it above 1.0 to switch auto-accept off. |
 

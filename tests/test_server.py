@@ -4,6 +4,7 @@ import json
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
@@ -740,3 +741,65 @@ class PlateStateTests(unittest.TestCase):
         self.assertIsNone(self.store.state_of("QRS5678"))
         st, body = self.post(self.img["04.00.00"], "NY", verdict="notplate")
         self.assertEqual((body["plate"], body["applied"]), (None, 0))                                         # not a plate: no plate to spread to
+
+
+class ValueQueueTests(unittest.TestCase):
+    """The "most valuable first" queue ranks unreviewed plates by how much one label changes the results."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        hdr_i = ["clip", "plate", "conf", "frame", "variants", "image", "frames", "segments", "ocr_frames", "secs"]
+        hdr_s = ["image", "plate1", "conf1", "plate2", "conf2", "agree", "x0", "y0", "x1", "y1", "aspect", "shape", "secs"]
+        plan = {"2026-01-05": [("06.00.00", "REPEAT1", "REPEAT1"), ("07.00.00", "ONLYONE", "ONLYONE"), ("08.00.00", "REPEAT1", "REPEAX1"), ("09.00.00", "WATCHED", "WATCHED")],
+                "2026-01-06": [("06.00.00", "REPEAT1", "REPEAT1")]}
+        for day, items in plan.items():
+            d = cls.root / "frames" / day
+            d.mkdir(parents=True)
+            with (d / "index.csv").open("w", newline="") as f, (d / "second_pass.csv").open("w", newline="") as g:
+                w, v = csv.writer(f), csv.writer(g)
+                w.writerow(hdr_i)
+                v.writerow(hdr_s)
+                for t, p1, p2 in items:
+                    img = f"{day}_{t}-{t}-{p1}_0.80.png"
+                    w.writerow([f"{t}-{t}[M].dav", p1, 0.80, 30, "", img, 500, 1, 3, 5])
+                    v.writerow([img, p1, 0.80, p2, 0.70, int(p1 == p2), 100, 100, 340, 220, "2.1", "ok", 2])    # conf 0.80: never auto-accepted
+        cls.store = S.Store(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    @staticmethod
+    def watch(cands, entries=None):
+        return [({"plate": "WATCHED", "nickname": "Taxi"}, "exact", "WATCHED")] if "WATCHED" in cands else []
+
+    def test_order_and_reasons(self):
+        with mock.patch.object(S.WL, "match", self.watch):
+            q = self.store.value_queue()
+        names = [i["plate"] for i in q]
+        self.assertEqual(names[0], "WATCHED")                                         # a watchlist match always comes first
+        self.assertEqual(names[-1], "ONLYONE")                                        # a one-off read with nothing around it is last
+        top = q[0]["value"]["why"]
+        self.assertIn("watchlist: Taxi", top)
+        self.assertEqual(names.count("REPEAT1"), 1)                                  # a plate is listed once, not once per sighting
+        rep = next(i for i in q if i["plate"] == "REPEAT1")
+        self.assertIn("one label clears 2 more", rep["value"]["why"])               # the other two REPEAT1 reads are within 30 days
+        self.assertIn("repeat plate, the two reads disagree", rep["value"]["why"])
+        self.assertIn("seen on 2 days", rep["value"]["why"])
+
+    def test_view_and_limit(self):
+        with mock.patch.object(S.WL, "match", self.watch):
+            self.assertEqual(len(self.store.view("2026-01-05", "value")), 3)         # three distinct plates, all days
+            self.assertEqual(len(self.store.value_queue(limit=2)), 2)
+
+    def test_a_label_changes_the_queue(self):
+        store = S.Store(self.root)
+        store.labels_path = self.root / "labels" / "value.jsonl"
+        store.labels_path.parent.mkdir(exist_ok=True)
+        with mock.patch.object(S.WL, "match", self.watch):
+            first = store.value_queue()[0]
+            self.assertEqual(first["plate"], "WATCHED")
+            store.add_label(dict(image=first["image"], verdict="ok", ts="2026-01-06T00:00:00"))
+            self.assertNotIn(first["image"], [i["image"] for i in store.value_queue()])   # labeled plates leave the queue at once

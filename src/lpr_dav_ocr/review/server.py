@@ -32,6 +32,7 @@ VERDICTS = {"ok", "fix", "notplate", "obstructed", "skip"}
 AUTO_CONF = CFG["review"]["auto_accept_conf"]
 RECENT_DAYS = CFG["review"]["recent_days"]
 REJECT_ASPECT = CFG["review"]["reject_aspect"]
+VALUE_QUEUE = CFG["review"]["value_queue"]      # size of the "most valuable first" queue
 
 
 
@@ -478,6 +479,8 @@ class Store:
                     and i["alt"] and i["alt"]["plate"] != i["plate"] and i["shape"] == "ok")
 
     def view(self, day, f):
+        if f == "value":       # most valuable first, across all days
+            return self.value_queue()
         its = self.items(day)
         if f == "need":          # default queue: second pass done, no verdict yet, not auto-accepted
             its = [i for i in its if i["ready"] and not i["label"] and not i["auto"] and not i["rejected"]]
@@ -493,6 +496,66 @@ class Store:
             its = [i for i in its if i["flagged"]]
         return its
 
+    def value_queue(self, limit=None):
+        """Unreviewed plates whose label would change the results most, best first, across all days. A watchlist match
+        ranks highest, then plates where one label approves many other sightings of the same text (within RECENT_DAYS),
+        a read one character from a plate you verified, and repeat plates whose two reads disagree. A plate appears once
+        (a label on it approves its other sightings within RECENT_DAYS). Each item gets value={score, why}. Short-lived cache, dropped when a label is saved."""
+        limit = limit or VALUE_QUEUE
+        c = getattr(self, "_value_cache", None)
+        if c and time.monotonic() - c[0] < 20 and c[2] == limit:
+            return c[1]
+        cands, same = [], collections.defaultdict(list)
+        for d in self._day_names():
+            for i in self.items(d):
+                if i["rejected"]:
+                    continue
+                same[i["plate"]].append(i)
+                if i["ready"] and not i["label"] and not i["auto"]:
+                    cands.append(i)
+        pend = collections.defaultdict(list)
+        for i in cands:
+            pend[i["plate"]].append(self._ordinal(i["image"]))
+        out = []
+        for i in cands:
+            why, score = [], 0
+            reads = [i["plate"]] + ([i["alt"]["plate"]] if i["alt"] else []) + ([i["crop"]] if i["crop"] else [])
+            m = WL.match(reads)
+            if m:
+                score += 1000 if any(x[1] == "exact" for x in m) else 600
+                why.append("watchlist: " + m[0][0]["nickname"])
+            o, n = self._ordinal(i["image"]), 0
+            if RECENT_DAYS > 0 and o:
+                n = sum(1 for x in pend[i["plate"]] if x and abs(x - o) <= RECENT_DAYS) - 1
+            if n > 0:
+                score += 12 * min(n, 25)
+                why.append(f"one label clears {n} more")
+            rec = i["recent"]
+            if rec and not rec["exact"]:
+                score += 60
+                why.append(f"one character from {rec['plate']} you verified")
+            days = len({x["day"] for x in same[i["plate"]]})
+            if i["alt"] and i["alt"]["plate"] != i["plate"] and (n > 0 or days >= 2):
+                score += 40
+                why.append("repeat plate, the two reads disagree")
+            if days >= 2:
+                why.append(f"seen on {days} days")
+            score += 4 * min(days, 5) + (2 if i["fits"] else 0)
+            i["value"] = dict(score=score, why=why or ["no strong signal"])
+            out.append(i)
+        out.sort(key=lambda i: (-i["value"]["score"], i["image"]))
+        res, taken = [], collections.defaultdict(list)
+        for i in out:                          # one entry per plate: a label on it approves the rest within RECENT_DAYS
+            o = self._ordinal(i["image"])
+            if any(o and x and abs(o - x) <= RECENT_DAYS for x in taken[i["plate"]]):
+                continue
+            taken[i["plate"]].append(o)
+            res.append(i)
+            if len(res) >= limit:
+                break
+        self._value_cache = (time.monotonic(), res, limit)
+        return res
+
     def add_label(self, rec):
         with self.write_lock, self.labels_path.open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
@@ -502,6 +565,7 @@ class Store:
         if c:                                  # keep the cached read consistent with what was just written
             c[1].append(rec)
         self._reads_cache = None               # plate history rebuilds from the new label
+        self._value_cache = None
 
     def save_crop(self, item, truth):
         """Leveled plate crop beside the label, for later training. Best effort."""

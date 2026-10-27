@@ -140,6 +140,7 @@
   <select id="daysel" aria-label="Day"></select>
   <select id="filter" aria-label="Queue">
     <option value="need">Needs review (default)</option>
+    <option value="value">Most valuable first (about 20 a day)</option>
     <option value="auto">Auto-accepted: spot check</option>
     <option value="rejected">Auto-rejected: spot check</option>
     <option value="recheck">Re-check: 'not a plate' that may hold a plate</option>
@@ -185,6 +186,7 @@
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
         </span>
         <span class="badge" id="rechkb" hidden style="border-color:var(--warn);color:var(--warn)"></span>
+        <span class="badge" id="whyval" hidden style="border-color:var(--accent);color:var(--accent)" title="Why this plate is near the top of the Most valuable first queue"></span>
         <span class="badge" id="rejb" hidden style="border-color:var(--bad);color:var(--bad)" title="The text region is much wider than a plate. 120 of 120 such reads were not usable on the author's labels. Mark it Correct if it is a plate."></span>
         <span class="badge" id="autob" hidden style="border-color:var(--ok);color:var(--ok)" title="Confidence 0.99 or higher, both passes agree, plate-shaped. 99.6% right on your labels.">auto-accepted</span>
         <div id="like" hidden style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"></div>
@@ -282,6 +284,9 @@ function render() {
   $("autob").hidden = !(it.auto && !it.label);
   const rc = F === "recheck" && it.label && it.label.verdict === "notplate";
   $("rechkb").hidden = !rc;
+  const wv = $("whyval");
+  wv.hidden = !(F === "value" && it.value);
+  if (!wv.hidden) wv.textContent = "Worth a label: " + it.value.why.join(" \u00b7 ");
   if (rc) $("rechkb").textContent = `you marked this Not a plate, but the second pass found plate-like text${it.alt ? " (" + it.alt.plate + ")" : ""}: is there a plate in the frame?`;
   $("rejb").hidden = !(it.rejected && !it.label); $("rejb").textContent = `auto-rejected: not plate-shaped (aspect ${it.aspect})`;
   $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : "auto-accepted";
