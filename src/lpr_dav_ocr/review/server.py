@@ -20,6 +20,7 @@ from .. import config as _config
 from .. import watchlist as WL
 from . import reports as _reports
 from .. import vehicles as _veh
+from .. import clarity as _clarity
 from .. import ops as _ops
 
 CFG = _config.load()
@@ -155,6 +156,8 @@ class Store:
         (root / "crops").mkdir(parents=True, exist_ok=True)
         self.labels_path = root / "labels" / "labels.jsonl"
         self.dups_path = root / "labels" / "duplicates.jsonl"          # frames merged into another by `dedupe`
+        self.clarity_path = _config.home(CFG) / "clarity.json"           # measured frames (see clarity.py)
+        self._clarity, self._clarity_busy = None, False
         self.gold_path = root / "labels" / "gold.jsonl"                 # the frame you marked as the clear exemplar of a plate
         self.vflags_path = root / "labels" / "vehicle_flags.jsonl"      # plates whose NYC ticket record you saw is stale
         self.states_path = root / "labels" / "plate_states.jsonl"      # one state per plate, applied to every sighting of it
@@ -568,14 +571,91 @@ class Store:
                 return dict(plate=t, exact=(t == own), image=g["image"], box=g.get("box"), ts=g["ts"])
         return None
 
+    # --- clarity of verified frames, to suggest which one could be the gold standard ----------------------
+    def _clarity_cache(self):
+        if self._clarity is None:
+            try:
+                self._clarity = json.loads(self.clarity_path.read_text())
+            except (OSError, ValueError):
+                self._clarity = {}
+        return self._clarity
+
+    def _measure(self, items, budget=None):
+        """Measure frames missing from the cache, stopping after `budget` seconds (None = no limit). Returns how many are still missing."""
+        c, t0, new, left = self._clarity_cache(), time.monotonic(), 0, 0
+        for i in items:
+            if i["image"] in c:
+                continue
+            if budget is not None and time.monotonic() - t0 > budget:
+                left += 1
+                continue
+            path = self.frames(i["day"]) / i["image"]
+            if not path.is_file():
+                continue                                    # moved to the trash or on an unmounted share: try again later, cache nothing
+            c[i["image"]] = _clarity.frame_stats(path, i["box"]) or {}
+            new += 1
+        if new:
+            try:
+                tmp = self.clarity_path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(c))
+                os.replace(tmp, self.clarity_path)
+            except OSError:
+                pass
+        return left
+
+    def clarity_scores(self, pairs):
+        """{image: 0..100} for [(item, truth)] pairs of verified sightings. A few frames are measured now; the rest in the
+        background (the next call has them). Returns (scores, frames still being measured)."""
+        c = self._clarity_cache()
+        missing = [i for i, _ in pairs if i["image"] not in c]
+        left = self._measure(missing, budget=1.5) if missing else 0
+        if left and not self._clarity_busy:
+            self._clarity_busy = True
+
+            def work():
+                try:
+                    self._measure(missing)
+                finally:
+                    self._clarity_busy = False
+            threading.Thread(target=work, daemon=True).start()
+        stats = [s for s in c.values() if s]
+        if not stats:
+            return {}, left
+        pop = _clarity.Population(stats)
+        out = {}
+        for i, truth in pairs:
+            a = i["alt"]
+            right = i["plate"] == truth                  # the reader got it right: only then does its confidence say anything about clarity
+            out[i["image"]] = _clarity.score(c.get(i["image"]), i["conf"] if right else 0.0, bool(a and a["plate"] == truth),
+                                             bool(i["crop"] and i["crop"] == truth), float(i["aspect"] or 0) or None, pop)
+        return out, left
+
+    def gold_check(self, limit=50):
+        """How well does the clarity suggestion agree with your own gold standard picks? {plates, top1, ranks}: for each plate
+        with a gold frame and at least two verified sightings, the rank of your pick by clarity (1 = the suggestion)."""
+        ranks = []
+        for plate, g in list(self.gold_map().items())[:limit]:
+            h = self.sightings(plate)
+            scored = sorted([r for r in h["sightings"] if r.get("clarity") is not None], key=lambda r: -r["clarity"])
+            if len(scored) >= 2 and any(r["image"] == g["image"] for r in scored):
+                ranks.append(1 + [r["image"] for r in scored].index(g["image"]))
+        return dict(plates=len(ranks), top1=sum(1 for k in ranks if k == 1), ranks=ranks)
+
     def sightings(self, plate, unverified=False):
         """Exact-match history of one plate, newest first."""
         plate = re.sub(r"[^A-Z0-9]", "", (plate or "").upper())
         gm = self.gold_map()
         goldimg = (gm.get(plate) or {}).get("image")
-        rows = [dict(image=i["image"], day=i["day"], time=i["time"], clip=i["clip"], conf=i["conf"], basis=b, box=i["box"],
-                     state=self.eff_state(i, t), gold=i["image"] == goldimg)
-                for t, b, i in self.reads(unverified) if t == plate]
+        pairs = [(dict(image=i["image"], day=i["day"], time=i["time"], clip=i["clip"], conf=i["conf"], basis=b, box=i["box"],
+                       state=self.eff_state(i, t), gold=i["image"] == goldimg), i)
+                 for t, b, i in self.reads(unverified) if t == plate]
+        rows = [r for r, _ in pairs]
+        human = [(r, i) for r, i in pairs if r["basis"] in ("verified", "fixed")]
+        scores, pending = self.clarity_scores([(i, plate) for _, i in human]) if human else ({}, 0)
+        for r, _ in human:
+            r["clarity"] = scores.get(r["image"])
+        scored = [r for r, _ in human if r.get("clarity") is not None]
+        suggest = max(scored, key=lambda r: (r["clarity"], r["day"], r["time"]))["image"] if not goldimg and len(human) >= 2 and scored else None
         rows.sort(key=lambda r: (r["day"], r["time"]), reverse=True)
         hours = [0] * 24
         for r in rows:
@@ -587,7 +667,7 @@ class Store:
         return dict(plate=plate, count=len(rows), days=len({r["day"] for r in rows}),
                     first=(rows[-1]["day"] + " " + rows[-1]["time"]) if rows else None,
                     last=(rows[0]["day"] + " " + rows[0]["time"]) if rows else None,
-                    by_hour=hours, states=states, sightings=rows,
+                    by_hour=hours, states=states, sightings=rows, suggest=suggest, clarity_pending=pending,
                     gold=next((dict(image=r["image"], day=r["day"], time=r["time"], box=r["box"]) for r in rows if r["gold"]), None))
 
     def plate_search(self, q, unverified=False, limit=20):
