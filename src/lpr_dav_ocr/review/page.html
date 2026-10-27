@@ -535,6 +535,8 @@ async function openMontage() {
   const list = earlier(r).reverse();      // oldest first
   const gold = r.sightings.find(x => x.gold && x.image !== me);       // the gold standard is always shown first, even outside the window
   if (gold) { const k = list.findIndex(x => x.image === gold.image); if (k >= 0) list.splice(k, 1); list.unshift(gold); }
+  const cur = r.sightings.find(x => x.image === me);                  // this sighting too, so it can be starred from here
+  if (cur) { list.unshift(Object.assign({}, cur, { me: true })); }
   $("montn").textContent = `${list.length} other sighting${list.length === 1 ? "" : "s"} within ${seenDays ? seenDays + " days" : "(all time)"}, oldest first. Click one to open it.`;
   $("montg").innerHTML = list.map(s => {
     let st = "";
@@ -544,10 +546,11 @@ async function openMontage() {
       const k = Math.min(230 / cw, 86 / ch);
       st = `background-image:url('/img/${encodeURIComponent(s.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px`;
     }
-    const star = s.basis === "verified" || s.basis === "fixed"
-      ? `<span class="cstar${s.gold ? " on" : ""}" role="button" data-img="${s.image}" data-on="${s.gold ? 0 : 1}" title="${s.gold ? "The gold standard for this plate. Click to remove it." : "Mark as the gold standard: a very clear frame with no question about the read"}">${s.gold ? "\u2605" : "\u2606"}</span>` : "";
+    const human = s.basis === "verified" || s.basis === "fixed", pend = s.me && !it.label;       // the frame under review and not saved yet: mark it for when you save
+    const on = s.gold || (pend && pendingGold);
+    const star = `<span class="cstar${on ? " on" : ""}" role="button" data-img="${s.image}" data-on="${s.gold ? 0 : 1}"${human || pend ? "" : ' data-verify="1"'}${pend ? ' data-cur="1"' : ""} title="${s.gold ? "The gold standard for this plate. Click to remove it." : pend ? "Mark this frame as the gold standard when you save it with Correct or Save fix" : "Mark as the gold standard: a very clear frame with no question about the read" + (human ? "" : ". This also saves the read as verified.")}">${on ? "\u2605" : "\u2606"}</span>`;
     const sug = !r.gold && r.suggest === s.image;
-    return `<div class="cell${s.gold ? " goldc" : sug ? " sugg" : ""}" data-i="${s.image}">${star}<span class="th" style="${st}"></span><small>${s.day} ${s.time} CamTime &middot; ${s.basis}${s.clarity != null ? " &middot; clarity " + s.clarity : ""}${s.gold ? " &middot; \u2605 gold standard" : sug ? " &middot; suggested gold" : ""}</small></div>`;
+    return `<div class="cell${s.gold ? " goldc" : sug ? " sugg" : ""}" data-i="${s.image}">${star}<span class="th" style="${st}"></span><small>${s.me ? "this sighting &middot; " : ""}${s.day} ${s.time} CamTime &middot; ${s.basis}${s.clarity != null ? " &middot; clarity " + s.clarity : ""}${s.gold ? " &middot; \u2605 gold standard" : sug ? " &middot; suggested gold" : ""}</small></div>`;
   }).join("");
 }
 const closeMontage = () => { $("mont").hidden = true; };
@@ -561,7 +564,8 @@ $("mont").addEventListener("click", async e => {
   const star = e.target.closest(".cstar");
   if (star) {
     e.stopPropagation();
-    try { await api("/api/gold", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ image: star.dataset.img, on: star.dataset.on === "1" }) });
+    if (star.dataset.cur === "1") { pendingGold = !pendingGold; renderGold(); toast(pendingGold ? "Will be marked as the gold standard when you save it" : "Gold standard on save cancelled"); await openMontage(); return; }
+    try { await api("/api/gold", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ image: star.dataset.img, on: star.dataset.on === "1", verify: star.dataset.verify === "1" }) });
       toast(star.dataset.on === "1" ? "Marked as the gold standard" : "Gold standard removed"); await openMontage(); refreshGold(); } catch (err) { toast("Could not save the gold standard"); }
     return;
   }

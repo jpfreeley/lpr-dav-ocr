@@ -1025,6 +1025,18 @@ class GoldTests(unittest.TestCase):
         self.assertEqual((rec["plate"], rec["gold"]), ("DEMO001", True))
         self.assertEqual(st.gold_map()["DEMO001"]["image"], self.img[0])
 
+    def test_starring_an_unreviewed_frame_verifies_it_but_not_a_non_plate(self):
+        st = self.make()
+        with self.assertRaises(ValueError):
+            st.set_gold(self.img[3], True)                                                 # unreviewed, and no verify requested
+        rec = st.set_gold(self.img[3], True, verify=True)                                  # starred from the montage: saved as verified too
+        self.assertEqual((rec["plate"], rec["gold"]), ("DEMO002", True))
+        lb = st.labels()[self.img[3]]
+        self.assertEqual((lb["verdict"], lb["truth"], lb.get("via")), ("ok", "DEMO002", "gold"))
+        st.add_label(dict(image=self.img[2], verdict="obstructed", ts="x"))
+        with self.assertRaises(ValueError):
+            st.set_gold(self.img[2], True, verify=True)                                    # you said it is obstructed
+
     def test_one_gold_per_plate_and_unmark(self):
         st = self.make()
         for i in (0, 1):

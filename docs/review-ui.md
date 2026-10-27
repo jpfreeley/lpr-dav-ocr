@@ -159,19 +159,21 @@ have normal shapes.
 ## Gold standard frames
 
 Some plates in the history are fuzzy but legible, and some frames are perfectly clear: there is no question what the read is.
-Mark such a frame as the **gold standard** of its plate. Only a frame you verified (Correct or Save fix) can be one, and a plate
-has one at a time (a new mark replaces the old). It is saved in `labels/gold.jsonl`.
+Mark such a frame as the **gold standard** of its plate. A plate has one at a time (a new mark replaces the old). It is saved in `labels/gold.jsonl`.
 
-- **Mark it:** where you look over all the sightings of a plate: the star on a verified sighting in the **montage** (click the
-  "seen N other times" number on the review page) or in the plate history. For an especially clear frame you are reviewing, the
-  **gold standard** button beside **History** and **Watch** on the review page does the same: on a frame you have not saved yet it
-  reads "gold when saved", and pressing **Correct** or **Save fix** then marks the frame as the gold standard. A filled star means it is the gold standard; click again to
-  remove it. Only sightings you verified have a star.
+- **Mark it:** where you look over all the sightings of a plate: the star on any sighting in the **montage** (click the "seen N
+  other times" number on the review page, which also lists the sighting under review) or in the plate history. Auto-accepted
+  sightings are often the clearest, so every sighting has a star, whether you verified it or not. Starring a frame you have
+  not verified also saves its read as verified (Correct), because you are saying there is no question what it says. A frame you
+  marked not a plate, obstructed or can't tell cannot be one. For an especially clear frame you are reviewing, the **gold
+  standard** button beside **History** and **Watch** does the same: on a frame you have not saved yet it reads "gold when
+  saved", and pressing **Correct** or **Save fix** then marks it. A filled star means it is the gold standard; click again to
+  remove it.
 - **See it:** the plate history shows the gold frame at the top, and the montage always shows it first (outlined in amber, even
   when it is outside the day window). On the review page, a reading of that plate (or of a plate one character away, such as
   from a hint) shows a "★ gold standard in this plate's history" line with the gold crop beside the vehicle line, so you can
   compare a fuzzy read with the clear one.
-- **Suggested:** for a plate with two or more verified sightings and no gold frame yet, the history page and the montage point
+- **Suggested:** for a plate with two or more verified or auto-accepted sightings and no gold frame yet, the history page and the montage point
   at the clearest verified sighting ("suggested", dashed amber outline) and show each one's **clarity score** from 0 to 100.
   One click on the star, or on **Make it the gold standard**, accepts it. Nothing is ever marked for you. The score combines
   sharpness (variance of the Laplacian in the plate box, 30%), plate size in pixels (20%), how certain the reader was and whether

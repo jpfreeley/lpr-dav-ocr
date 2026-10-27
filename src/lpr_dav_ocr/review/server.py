@@ -518,14 +518,32 @@ class Store:
                 del out[r["plate"]]
         return out
 
-    def set_gold(self, image, on):
-        """Mark (or unmark) a frame as the gold standard for its plate. Only a frame you verified (Correct or Save fix) can be one,
-        because the point is that there is no question what the read is. One gold frame per plate: a new one replaces the old."""
+    def _verify_ok(self, item):
+        """Save the first-pass read of a frame as verified (Correct). Used when you mark an unreviewed or auto-accepted frame as the
+        gold standard: you looked at it, and there is no question what it says."""
+        self.add_label(dict(ts=datetime.now().astimezone().isoformat(timespec="seconds"), image=item["image"], clip=item["clip"], day=item["day"],
+                            plate_ocr=item["plate"], conf=item["conf"], plate_second=(item["alt"] or {}).get("plate"), shape=item["shape"],
+                            verdict="ok", truth=item["plate"], state="UNKN", via="gold"))
+        self.save_crop(item, item["plate"])
+
+    def set_gold(self, image, on, verify=False):
+        """Mark (or unmark) a frame as the gold standard for its plate: the frame where there is no question what the read is.
+        A frame you verified qualifies. With verify=True an unreviewed or auto-accepted frame qualifies too, and is saved as verified
+        (Correct) as part of marking it. A frame you marked not a plate, obstructed or can't tell cannot be one. One gold frame per plate:
+        a new one replaces the old."""
         day = self.day_of(image)
         item = next((i for i in self.items(day) if i["image"] == image), None) if day else None
-        lb = item and item["label"]
-        if not lb or lb.get("verdict") not in ("ok", "fix"):
-            raise ValueError("only a frame you verified can be the gold standard")
+        if item is None:
+            raise ValueError("unknown frame")
+        lb = item["label"]
+        if lb and lb.get("verdict") not in ("ok", "fix"):
+            raise ValueError("a frame you marked not a plate, obstructed or can't tell cannot be the gold standard")
+        if not lb:
+            if not (verify and on):
+                raise ValueError("only a frame you verified can be the gold standard")
+            self._verify_ok(item)
+            item = next(i for i in self.items(day) if i["image"] == image)
+            lb = item["label"]
         plate = ((lb.get("truth") or "") if lb["verdict"] == "fix" else item["plate"]).upper()
         if not plate:
             raise ValueError("no plate text")
@@ -633,7 +651,7 @@ class Store:
                        state=self.eff_state(i, t), gold=i["image"] == goldimg), i)
                  for t, b, i in self.reads(unverified) if t == plate]
         rows = [r for r, _ in pairs]
-        human = [(r, i) for r, i in pairs if r["basis"] in ("verified", "fixed")]
+        human = [(r, i) for r, i in pairs if r["basis"] in ("verified", "fixed", "auto")]      # a read you confirmed or the rules accepted; an unreviewed one is not sure enough to suggest
         scores, pending = self.clarity_scores([(i, plate) for _, i in human]) if human else ({}, 0)
         for r, _ in human:
             r["clarity"] = scores.get(r["image"])
@@ -925,7 +943,7 @@ def make_handler(store):
             if path == "/api/gold":
                 try:
                     d = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-                    return self._send(200, store.set_gold(str(d["image"]), bool(d.get("on", True))) | {"ok": True})
+                    return self._send(200, store.set_gold(str(d["image"]), bool(d.get("on", True)), bool(d.get("verify"))) | {"ok": True})
                 except (KeyError, ValueError, TypeError) as e:
                     return self._send(400, {"error": str(e) or "bad gold request"})
             if path == "/api/ops/score":

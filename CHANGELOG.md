@@ -16,6 +16,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Gold standard from any sighting: the montage (now including the sighting under review) and the plate history show a star on every sighting, auto-accepted ones included. Starring a frame you have not verified saves its read as verified. The clarity suggestion also considers auto-accepted sightings.
 - Suggested gold standard: a clarity score (0 to 100: sharpness, plate size, contrast, exposure, read certainty, shape) for each verified sighting, a "suggested" marker on the clearest one in the plate history and the montage, and an Operations line showing how often the suggestion matched your own gold pick. A suggestion only; nothing is marked for you.
 - `review.not_plate_texts` now also lists the clipped misreads of the New York banner (`NEWYOR`, `NEWYORE`, `EWYORK`, `EWYOR`, `WYORK`) and `TEXAS`, `FEDEX` and `FEDEXCOM`: reads of exactly those words are never auto-approved and are auto-rejected unless the frame holds a plate-shaped read elsewhere.
 - Gold standard: stars in the review page's montage of earlier sightings (verified frames only), the gold frame shown first in the montage, and a "gold standard in this plate's history" line with the crop on the review page.
