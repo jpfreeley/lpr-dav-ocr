@@ -90,7 +90,7 @@ def load_registry(root):
     return out
 
 
-def candidates(day_dir, labels, skip, reject_aspect=3.5, fps=FPS, not_plate_texts=("NEWYORK",)):
+def candidates(day_dir, labels, skip, reject_aspect=3.5, fps=FPS, not_plate_texts=("NEWYORK", "TEXAS", "FEDEX", "FEDEXCOM")):
     """The reads of one day that may be merged: dicts with plate, t, conf, agree, human, box, image."""
     sp = {r["image"]: r for r in _rows(Path(day_dir) / "second_pass.csv")}
     out, seen = [], set()

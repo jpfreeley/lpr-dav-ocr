@@ -875,6 +875,9 @@ class BannerTests(unittest.TestCase):
         self.assertEqual((i["auto"], i["rejected"]), (False, False))
         self.assertEqual(i["pick"]["plate"], "DEMO010")
 
+    def test_the_default_list_has_the_state_banners_and_the_company_name(self):
+        self.assertTrue({"NEWYORK", "TEXAS", "FEDEX", "FEDEXCOM"} <= S.NOT_PLATE_TEXTS)
+
     def test_only_the_exact_word_counts(self):
         self.assertEqual((self.item("NEWYORKS", "03")["banner"], self.item("NEWYORKS", "03")["auto"]), (False, True))
         self.assertTrue(self.item("DEMO001", "04")["auto"])
