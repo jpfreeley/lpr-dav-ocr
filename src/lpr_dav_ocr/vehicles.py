@@ -202,15 +202,15 @@ def lookup(db, plate, state=None):
                       + (" AND state=?" if state else "") + " GROUP BY state, make, body, year, color", args).fetchall()
     if not rows:
         return None
-    best_state = max({r[0] for r in rows}, key=lambda s: sum(r[5] for r in rows if r[0] == s))
+    best_state = max({r[0] for r in rows}, key=lambda s: sum((r[5] or 0) for r in rows if r[0] == s))
     rows = [r for r in rows if r[0] == best_state]
-    tickets = sum(r[5] for r in rows)
+    tickets = sum((r[5] or 0) for r in rows)
 
     def top(idx, skip=()):
         tally = {}
         for r in rows:
             if r[idx] and r[idx] not in skip:
-                tally[r[idx]] = tally.get(r[idx], 0) + r[5]
+                tally[r[idx]] = tally.get(r[idx], 0) + (r[5] or 0)
         return max(tally, key=tally.get) if tally else None
 
     make, body, color, year = top(1), top(2), top(4), top(3, skip=(0,))
