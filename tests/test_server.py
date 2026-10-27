@@ -807,7 +807,16 @@ class ValueQueueTests(unittest.TestCase):
         rep = next(i for i in q if i["plate"] == "REPEAT1")
         self.assertIn("one label clears 2 more", rep["value"]["why"])               # the other two REPEAT1 reads are within 30 days
         self.assertIn("repeat plate, the two reads disagree", rep["value"]["why"])
-        self.assertIn("seen on 2 days", rep["value"]["why"])
+        self.assertIn("seen on 1 other day", rep["value"]["why"])
+
+    def test_a_sighting_you_marked_obstructed_is_not_a_repeat(self):
+        store = S.Store(self.root)
+        store.labels_path = self.root / "labels" / "obstructed.jsonl"
+        store.labels_path.parent.mkdir(exist_ok=True)
+        store.add_label(dict(image="2026-01-06_06.00.00-06.00.00-REPEAT1_0.80.png", verdict="obstructed", ts="2026-01-07T00:00:00"))
+        with mock.patch.object(S.WL, "match", self.watch):
+            rep = next(i for i in store.value_queue() if i["plate"] == "REPEAT1")
+        self.assertFalse(any(w.startswith("seen on") for w in rep["value"]["why"]))      # the history would not show it either
 
     def test_view_and_limit(self):
         with mock.patch.object(S.WL, "match", self.watch):
