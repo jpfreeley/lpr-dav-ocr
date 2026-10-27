@@ -62,6 +62,8 @@ DEFAULTS = {
         # A read whose text region is wider than this (length / height) is auto-rejected as not plate-shaped. US plates
         # are about 2. 0 switches it off. Validate on your own labels (lpr score prints the precision).
         "reject_aspect": 3.5,
+        # Size of the "Most valuable first" queue: the unreviewed plates whose label changes the results most.
+        "value_queue": 40,
     },
     "watch": {
         "poll_seconds": 60,

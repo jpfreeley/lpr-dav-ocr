@@ -219,6 +219,25 @@ also set on 3 other sightings of ..."). A sighting you labeled with its own stat
 in two states, the last one you set is used for the sightings without their own state. For plates labeled before this
 existed, the state you used most often on that plate is used.
 
+## Review by value
+
+When you cannot keep up with every plate, review the ones that matter most. Choose **Most valuable first** in the queue
+menu. It lists the top 40 unreviewed plates across all days (`review.value_queue`), each plate once (a label on it approves its other sightings), ranked by how much one label changes
+your results. Reviewing about 20 a day from the top keeps the history clean. The badge above the buttons says why a plate
+is there ("Worth a label: ...").
+
+| Signal | Why it ranks high |
+|---|---|
+| **Watchlist match** (exact, then one character off) | an alert depends on the right plate |
+| **One label clears N more** | N other unreviewed reads of exactly the same text lie within 30 days, so one verification approves them all ([Recently verified plates](#recently-verified-plates)) |
+| **One character from a plate you verified** | one click on the offer settles it |
+| **Repeat plate, the two reads disagree** | a plate that comes back often is worth getting right |
+| **Seen on N days** | regulars carry more weight than one-off passers |
+
+A label removes the plate from the queue at once, and the sightings it approves drop out on the next refresh. The queue
+is only an ordering: it never labels anything, and the normal **Needs review** queue is unchanged. Auto-approved and
+auto-rejected plates are not in it, and neither are plates still waiting for the second pass.
+
 ## Re-checking "not a plate" labels
 
 The **Re-check** view lists plates you marked **Not a plate** where the second pass found different, plate-shaped text
