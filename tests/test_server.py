@@ -1037,6 +1037,24 @@ class GoldTests(unittest.TestCase):
         self.assertEqual(h["gold"]["image"], self.img[2])
         self.assertEqual([r["gold"] for r in h["sightings"] if r["image"] == self.img[2]], [True])
 
+    def test_clarity_suggestion_and_agreement_with_your_pick(self):
+        st = self.make()
+        for i in (0, 1):
+            st.add_label(dict(image=self.img[i], verdict="ok", truth="DEMO001", ts="x"))
+        sharp = dict(sharp=3000.0, h=80, w=160, contrast=150.0, clip=0.0)
+        soft = dict(sharp=40.0, h=30, w=60, contrast=30.0, clip=0.0)
+        st._clarity = {self.img[0]: soft, self.img[1]: sharp, self.img[2]: soft, self.img[3]: soft}     # pretend the frames were measured
+        h = st.sightings("DEMO001")
+        by = {r["image"]: r["clarity"] for r in h["sightings"]}
+        self.assertGreater(by[self.img[1]], by[self.img[0]])
+        self.assertEqual(h["suggest"], self.img[1])                                  # the sharper verified frame is suggested
+        self.assertEqual(h["clarity_pending"], 0)
+        st.set_gold(self.img[0], True)                                               # you picked the other one
+        self.assertIsNone(st.sightings("DEMO001")["suggest"])                        # nothing to suggest once there is a gold
+        self.assertEqual(st.gold_check(), dict(plates=1, top1=0, ranks=[2]))         # your pick was the second clearest
+        st.set_gold(self.img[1], True)
+        self.assertEqual(st.gold_check()["top1"], 1)
+
     def test_comparison_frame_for_another_sighting_and_for_a_near_read(self):
         st = self.make()
         st.add_label(dict(image=self.img[0], verdict="ok", truth="DEMO001", ts="x"))
