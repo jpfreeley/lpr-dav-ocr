@@ -156,6 +156,18 @@ have normal shapes.
 - `lpr score` prints how many labeled reads were above the threshold (not counting frames kept for a plate-shaped read elsewhere) and how many were real plates. A threshold of 3.0
   also removes 3 real plates in 162, so the default stays at 3.5. Set `review.reject_aspect = 0` to switch it off.
 
+## Known non-plate words (the state banner)
+
+Some text is printed on plates but is never the plate: on New York plates the banner reads `NEWYORK`. On the author's
+data every one of the 20 labeled `NEWYORK` reads was wrong (5 not a plate, 12 fixed to the real plate, 3 obstructed), and
+the reader gives it with high confidence. `review.not_plate_texts` (default `["NEWYORK"]`) lists exact words like this:
+
+- A read that is exactly one of these words is **never auto-approved**, even with high confidence and both passes agreeing.
+- It is **auto-rejected**, unless the second pass found plate-shaped text elsewhere in the same frame. Then it stays in
+  review, and the **best guess** is that other text ("the first read is the state banner, not a plate").
+- Only the exact word counts (`NEWYORKS` is not matched), and it is a list you set, not a rule about letters, so ordinary
+  plates are never filtered by their characters. Add other words you see, for example the name of a state or a slogan.
+
 ## "Same last four" hints
 
 For a seven-character read whose last four characters are digits (the AAANNNN shape), the page lists known plates that
