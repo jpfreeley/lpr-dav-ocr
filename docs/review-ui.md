@@ -164,7 +164,8 @@ has one at a time (a new mark replaces the old). It is saved in `labels/gold.jso
 
 - **Mark it:** where you look over all the sightings of a plate: the star on a verified sighting in the **montage** (click the
   "seen N other times" number on the review page) or in the plate history. For an especially clear frame you are reviewing, the
-  **gold standard** button on the review page does the same. A filled star means it is the gold standard; click again to
+  **gold standard** button beside **History** and **Watch** on the review page does the same: on a frame you have not saved yet it
+  reads "gold when saved", and pressing **Correct** or **Save fix** then marks the frame as the gold standard. A filled star means it is the gold standard; click again to
   remove it. Only sightings you verified have a star.
 - **See it:** the plate history shows the gold frame at the top, and the montage always shows it first (outlined in amber, even
   when it is outside the day window). On the review page, a reading of that plate (or of a plate one character away, such as

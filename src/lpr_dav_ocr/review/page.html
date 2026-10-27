@@ -187,10 +187,10 @@
           <a id="histlink" class="ghost" href="/history" style="padding:3px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;color:var(--text);text-decoration:none" title="Every time this plate was seen">History</a>
           <span id="seen" class="seen"></span>
           <span id="veh" class="seen" hidden></span>
-          <button id="goldbtn" class="goldb" hidden></button>
           <span id="goldcard" class="seen" hidden></span>
           <span id="editchk" class="seen" hidden></span>
           <button id="watchbtn" class="ghost" style="padding:3px 10px;font-size:12px" title="Alert me when this plate is seen again">&#9734; Watch</button>
+          <button id="goldbtn" class="goldb" hidden></button>
           <span id="watchform" hidden style="display:inline-flex;gap:4px"><input id="wnick" placeholder="nickname" maxlength="40" style="width:120px;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:12px"><button id="wadd" class="ok" style="padding:3px 10px;font-size:12px">Add</button></span>
         </span>
         <span class="badge" id="rechkb" hidden style="border-color:var(--warn);color:var(--warn)"></span>
@@ -307,6 +307,7 @@ function render() {
   sh.hidden = !(it.shape && it.shape !== "ok");
   sh.textContent = `shape ${it.shape} (${it.aspect})`; sh.title = "US plates are 2:1. This text region is not plate-shaped, so it may not be a plate.";
   showVehicle(it.vehicle);
+  pendingGold = false;
   renderGold();
   updateSeen();
   $("histlink").href = "/history?q=" + encodeURIComponent((it.label && it.label.truth) || it.plate);
@@ -456,16 +457,21 @@ function cropThumb(image, box, mw, mh) {
   return `<span style="display:inline-block;width:${cw * k}px;height:${ch * k}px;background:#000 url('/img/${encodeURIComponent(image)}') no-repeat;background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px;border-radius:5px;vertical-align:middle"></span>`;
 }
 /* the gold standard: a frame you verified and marked as the clear exemplar of its plate */
+let pendingGold = false;          // mark the frame under review as the gold standard when it is saved as Correct or Save fix
 function renderGold() {
   const gb = $("goldbtn"), gc = $("goldcard"), lb = it.label, human = !!(lb && (lb.verdict === "ok" || lb.verdict === "fix"));
-  gb.hidden = !human;
-  if (human) {
+  gb.hidden = !!(lb && !human);      // a plate you marked not a plate, obstructed or can't tell cannot be a gold standard
+  if (!gb.hidden && human) {
     gb.className = "goldb" + (it.is_gold ? " on" : ""); gb.textContent = (it.is_gold ? "\u2605" : "\u2606") + " gold standard";
-    gb.title = it.is_gold ? "This frame is the gold standard for its plate. Click to remove it." : "For an especially clear frame: mark it as the gold standard for its plate (no question what the read is). You can also mark one from the montage of all sightings (click the seen-N-times number). Other sightings and similar reads are compared with it.";
+    gb.title = it.is_gold ? "This frame is the gold standard for its plate. Click to remove it." : "Mark this frame as the gold standard for its plate: very clear, no question what the read is. You can also mark one from the montage of all sightings (click the seen-N-times number). Other sightings and similar reads are compared with it.";
     gb.onclick = async () => {
       try { await api("/api/gold", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ image: it.image, on: !it.is_gold }) });
         it.is_gold = !it.is_gold; renderGold(); toast(it.is_gold ? "Marked as the gold standard" : "Gold standard removed"); } catch (e) { toast("Could not save the gold standard"); }
     };
+  } else if (!gb.hidden) {
+    gb.className = "goldb" + (pendingGold ? " on" : ""); gb.textContent = (pendingGold ? "\u2605 gold when saved" : "\u2606 gold standard");
+    gb.title = pendingGold ? "This frame will be marked as the gold standard when you save it with Correct or Save fix. Click to cancel." : "An especially clear plate? Click, then save it with Correct or Save fix, and it is marked as the gold standard for its plate.";
+    gb.onclick = () => { pendingGold = !pendingGold; renderGold(); };
   }
   const g = it.gold; gc.hidden = !g;
   if (g) gc.innerHTML = `\u2605 ${g.exact ? "gold standard in this plate's history:" : "gold standard of the plate this is one character from,"} <b>${g.plate}</b> <a href="/i/${encodeURIComponent(g.image)}" title="Open the gold standard frame">${cropThumb(g.image, g.box, 240, 90)}</a>`;
@@ -703,6 +709,9 @@ async function decide(verdict, truth) {
                               body: JSON.stringify({ image: it.image, verdict, truth, state: getState(), recheck: F === "recheck" }) });
     const msg = { ok: "Correct", fix: `Fixed: ${it.plate} \u2192 ${truth}`, notplate: "Not a plate", obstructed: "Obstructed", skip: "Can't tell" }[verdict];
     toast("Saved: " + msg + (saved && saved.applied ? ` \u00b7 state ${saved.state} also set on ${saved.applied} other sighting${saved.applied === 1 ? "" : "s"} of ${saved.plate}` : ""));
+    if (pendingGold && (verdict === "ok" || verdict === "fix")) {
+      try { await api("/api/gold", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" }, body: JSON.stringify({ image: it.image, on: true }) }); toast("Saved and marked as the gold standard"); } catch (e) { toast("Saved, but the gold standard was not recorded"); }
+    }
     const nxt = D.next_unreviewed || D.next;
     if (nxt) await go(nxt); else { await go(it.image, false); toast("Caught up. New plates appear as processing continues."); }
   } catch (e) { toast("Save failed, not recorded"); }
