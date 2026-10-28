@@ -159,6 +159,10 @@ have normal shapes.
 - `lpr score` prints how many labeled reads were above the threshold (not counting frames kept for a plate-shaped read elsewhere) and how many were real plates. A threshold of 3.0
   also removes 3 real plates in 162, so the default stays at 3.5. Set `review.reject_aspect = 0` to switch it off.
 
+## Pair check
+
+The **Pair check** view lists, across all days, the weaker plate of each pair of verified or auto-accepted plates that are one character apart (a substitution, a missing or an extra character). The weaker plate has less support: no vehicle in the ticket data against one with a record, then not verified against verified, then fewer sightings. The banner names the other plate and how well supported each one is. Saving a label from this view marks the plate as checked, so it does not come back. Two cars can really have similar plates, so a pair is a question, not an error.
+
 ## Gold standard frames
 
 Some plates in the history are fuzzy but legible, and some frames are perfectly clear: there is no question what the read is.

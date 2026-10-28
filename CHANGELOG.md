@@ -4,6 +4,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ## [Unreleased]
 
+### Added
+
+- Review page, **Pair check** view: for every pair of verified or auto-accepted plates that are one character apart, it shows the plate with less support (a vehicle in the ticket data, then verified by you, then more sightings), with the other plate named in the reason. Saving a label from this view marks the plate as checked and it leaves the queue.
+
 ### Fixed
 
 - Plate-shaped text elsewhere in the frame: the second pass now stores where that text is (`elsewhere_box`). Clicking the hint on the review page moves the outline and the zoomed crop to that text (Reset puts them back). When you saved that text as the plate, the history, montage and gold crops use its box instead of the badge. `second_pass --fill-elsewhere` backfills older days in the background.

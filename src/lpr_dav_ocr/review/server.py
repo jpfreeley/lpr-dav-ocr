@@ -698,6 +698,8 @@ class Store:
     def view(self, day, f):
         if f == "value":       # most valuable first, across all days
             return self.value_queue()
+        if f == "pairs":       # the weaker plate of each near-identical pair, across all days
+            return self.pair_queue()
         its = self.items(day)
         if f == "need":          # default queue: second pass done, no verdict yet, not auto-accepted
             its = [i for i in its if i["ready"] and not i["label"] and not i["auto"] and not i["rejected"]]
@@ -712,6 +714,58 @@ class Store:
         elif f == "flag":
             its = [i for i in its if i["flagged"]]
         return its
+
+    def pair_queue(self):
+        """Plates (verified or auto-accepted) that are one character from another such plate: for each pair, the frame of the plate
+        with less support, so you can check whether it is a misread of the other. Support, strongest first: a vehicle in the ticket
+        data, then verified by you, then how many sightings. A plate you already checked from this queue is left out.
+        Each item gets value={score, why}. Cached for a few seconds, dropped when a label is saved."""
+        c = getattr(self, "_pair_cache", None)
+        if c and time.monotonic() - c[0] < 20:
+            return c[1]
+        info = {}
+        for d in self._day_names():
+            for i in self.items(d):
+                kind, t = self.basis(i)
+                if kind not in ("verified", "fixed", "auto") or not t or len(t) < 5:
+                    continue
+                e = info.setdefault(t, dict(human=0, auto=0, rep=None))
+                if kind == "auto":
+                    e["auto"] += 1
+                else:
+                    e["human"] += 1
+                done = bool(i["label"] and i["label"].get("pair_checked"))
+                score = (bool(i["label"]), i["day"], i["time"])        # show a frame you labeled, else the latest
+                if e["rep"] is None or score > e["rep"][0]:
+                    e["rep"] = (score, i)
+                e["done"] = e.get("done", False) or done
+        bk = collections.defaultdict(list)
+        for t in info:
+            for v in _variants(t):
+                bk[v].append(t)
+        strength = lambda t: (self.has_record(t), info[t]["human"] > 0, info[t]["human"] + info[t]["auto"])
+        say = lambda t: "{}, {}".format("ticket record" if self.has_record(t) else "no ticket record",
+                                        "verified {}x".format(info[t]["human"]) if info[t]["human"] else "auto-accepted {}x".format(info[t]["auto"]))
+        weak = {}
+        for ts in bk.values():
+            for a in ts:
+                for b in ts:
+                    if a < b and one_off(a, b):
+                        lo, hi = (a, b) if (strength(a), a) < (strength(b), b) else (b, a)
+                        gap = (strength(hi)[0] - strength(lo)[0]) * 3 + (strength(hi)[1] - strength(lo)[1]) * 2
+                        cur = weak.get(lo)
+                        if cur is None or gap > cur[0]:
+                            weak[lo] = (gap, hi)
+        out = []
+        for lo, (gap, hi) in weak.items():
+            if info[lo].get("done"):
+                continue
+            i = info[lo]["rep"][1]
+            i["value"] = dict(score=gap, why=["one character from {} ({}); this plate: {}".format(hi, say(hi), say(lo))])
+            out.append(i)
+        out.sort(key=lambda i: (-i["value"]["score"], i["image"]))
+        self._pair_cache = (time.monotonic(), out)
+        return out
 
     def value_queue(self, limit=None):
         """Unreviewed plates whose label would change the results most, best first, across all days. A watchlist match
@@ -794,6 +848,7 @@ class Store:
             c[1].append(rec)
         self._reads_cache = None               # plate history rebuilds from the new label
         self._value_cache = None
+        self._pair_cache = None
 
     def save_crop(self, item, truth):
         """Leveled plate crop beside the label, for later training. Best effort."""
@@ -917,7 +972,7 @@ def make_handler(store):
                 labeled = [i for i in everything if i["label"]]
                 # furthest reviewed plate in time order (where you stopped), not the most recently edited one
                 last = labeled[-1]["image"] if labeled else None
-                if f == "value":               # the value queue spans days and drops reviewed plates: use the latest label you saved
+                if f in ("value", "pairs"):    # these queues span days and drop reviewed plates: use the latest label you saved
                     last = store.last_labeled() or last
                 if pos is not None:
                     it_ = its[pos]
@@ -1002,7 +1057,8 @@ def make_handler(store):
                                  clip=it["clip"], day=it["day"], plate_ocr=it["plate"], conf=it["conf"],
                                  plate_second=(it["alt"] or {}).get("plate"), shape=it["shape"],
                                  verdict=verdict, truth=truth, state=state,
-                                 **({"rechecked": True} if d.get("recheck") and verdict == "notplate" else {})))
+                                 **({"rechecked": True} if d.get("recheck") and verdict == "notplate" else {}),
+                                 **({"pair_checked": True} if d.get("pair") else {})))
             if plate_t and state != "UNKN":
                 store.set_plate_state(plate_t, state, it["image"])
             if truth:
