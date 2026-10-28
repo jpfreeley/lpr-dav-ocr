@@ -108,6 +108,9 @@ def pick_read(p1, c1, p2, c2, p3):
     return best, "more confident"
 
 
+_VLOCK = threading.Lock()
+
+
 def one_off(a, b):
     """True when a and b differ by exactly one substituted, inserted or deleted character."""
     if a == b or abs(len(a) - len(b)) > 1:
@@ -432,12 +435,13 @@ class Store:
 
     def vehicle(self, plate, state=None):
         """What the local NYC ticket index says about a plate (see vehicles.py): {available, make, body, year, color, ...}."""
-        db = getattr(self, "_vdb", None)
-        if db is None:
-            db = self._vdb = _veh.open_db()              # None until `vehicles import` has been run
-        if db is None:
-            return dict(available=False)
-        v = _veh.lookup(db, plate, state)
+        with _VLOCK:                                     # one sqlite handle is shared by every request thread: use it one at a time
+            db = getattr(self, "_vdb", None)
+            if db is None:
+                db = self._vdb = _veh.open_db()          # None until `vehicles import` has been run
+            if db is None:
+                return dict(available=False)
+            v = _veh.lookup(db, plate, state)
         if not v:
             return dict(available=True, none=True)
         out = dict(available=True, text=_veh.describe(v), **v)
