@@ -6,9 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Operations page: the review note shows how many plates are in the pair check queue.
 - Review page, **Pair check** view: for every pair of verified or auto-accepted plates that are one character apart, it shows the plate with less support (a vehicle in the ticket data, then verified by you, then more sightings), with the other plate named in the reason. Saving a label from this view marks the plate as checked and it leaves the queue.
 
 ### Fixed
+- Review server: ticket-index lookups run one at a time (the shared database handle raised random errors under parallel requests).
+- Review page: each page request rebuilt the plate-state list and recounted every day from scratch, which took 2 to 3 seconds. The list is now cached until its file changes, and the day counts are kept for 3 seconds (a save clears them).
 
 - Plate-shaped text elsewhere in the frame: the second pass now stores where that text is (`elsewhere_box`). Clicking the hint on the review page moves the outline and the zoomed crop to that text (Reset puts them back). When you saved that text as the plate, the history, montage and gold crops use its box instead of the badge. `second_pass --fill-elsewhere` backfills older days in the background.
 - Most valuable queue: a plate with no reason to review it early (no "no strong signal" entries any more) is not listed. When none is left, the queue says nothing would change your results and points to Needs review.

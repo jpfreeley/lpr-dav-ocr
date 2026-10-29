@@ -233,7 +233,7 @@ def review(store):
                            waiting=d["waiting"]) for d in ds[-14:]],
                 labels=len(_jsonl(reg / "labels.jsonl")), merged=len(_jsonl(reg / "duplicates.jsonl")),
                 states=len(_jsonl(reg / "plate_states.jsonl")), gold=store.gold_check(), stale=len({r["plate"] for r in flags if r.get("stale")}),
-                left=sum(d["left"] for d in ds), waiting=sum(d["waiting"] for d in ds), recheck=sum(d["recheck"] for d in ds))
+                left=sum(d["left"] for d in ds), waiting=sum(d["waiting"] for d in ds), recheck=sum(d["recheck"] for d in ds), pairs=len(store.pair_queue()))
 
 
 def alerts(home, now=None):

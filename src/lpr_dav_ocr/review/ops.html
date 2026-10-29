@@ -352,7 +352,7 @@ const PAINT = {
     const S = [["Labeled or approved", "--s1", x => Math.max(0, x.total - x.auto - x.rejected - x.left - x.waiting)], ["Auto", "--s2", x => x.auto], ["Auto-rejected", "--s3", x => x.rejected], ["Left to review", "--s4", x => x.left], ["Waiting for second pass", "--s5", x => x.waiting]];
     TABLES.rev = { cols: ["Day", ...S.map(s => s[0]), "Re-check"], rows: days.map(x => [x.day, ...S.map(s => s[2](x)), x.recheck]) };
     hbars(h, { labels: days.map(x => x.day.slice(5)), stacked: true, left: 50, rowH: 26, series: S.map(s => ({ name: s[0], c: s[1], values: days.map(s[2]) })), aria: "What happened to each read per day" });
-    html("div", { class: "note" }, h, fmt(r.labels) + " labels, " + fmt(r.merged) + " duplicate frames merged, " + (r.gold && r.gold.plates ? "the clarity suggestion matched your gold standard pick for " + r.gold.top1 + " of " + r.gold.plates + " plates, " : "") + fmt(r.states) + " plate states, " + r.stale + " vehicle record(s) marked stale, " + r.recheck + " waiting for a re-check.");
+    html("div", { class: "note" }, h, fmt(r.labels) + " labels, " + fmt(r.merged) + " duplicate frames merged, " + (r.gold && r.gold.plates ? "the clarity suggestion matched your gold standard pick for " + r.gold.top1 + " of " + r.gold.plates + " plates, " : "") + fmt(r.states) + " plate states, " + r.stale + " vehicle record(s) marked stale, " + r.recheck + " waiting for a re-check, " + (r.pairs || 0) + " in the pair check queue.");
   },
   alerts(h) {
     const a = DATA.alerts; if (!a.by_day.length) return empty(h, "No alert in the last 14 days.");
