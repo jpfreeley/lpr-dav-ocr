@@ -207,7 +207,10 @@ class Store:
         return {r["image"]: r for r in self._read(self.labels_path, "jsonl")}
 
     def days(self):
-        """Every day folder with an index.csv, oldest first, with review counts."""
+        """Every day folder with an index.csv, oldest first, with review counts. Kept 3 s: every page request asks for it."""
+        c = getattr(self, "_days_cache", None)
+        if c and time.monotonic() - c[0] < 3:
+            return c[1]
         names = sorted(p.name for p in self.base.iterdir() if re.fullmatch(r"\d{4}-\d\d-\d\d", p.name) and (p / "index.csv").exists()) if self.base.is_dir() else []
         out = []
         for d in names:
@@ -217,6 +220,7 @@ class Store:
                             rejected=sum(1 for i in its if i["rejected"] and not i["label"]),
                             recheck=sum(1 for i in its if self.needs_recheck(i)),
                             waiting=sum(1 for i in its if not i["ready"] and not i["label"])))
+        self._days_cache = (time.monotonic(), out)
         return out
 
     def pick_day(self, want=None):
@@ -323,7 +327,11 @@ class Store:
 
     def registry(self):
         """plate -> the state you last set on it (latest line wins)."""
-        return {r["plate"]: r["state"] for r in self._read(self.states_path, "jsonl") if r.get("plate") and r.get("state")}
+        rows = self._read(self.states_path, "jsonl")
+        key = (id(rows), len(rows))
+        if getattr(self, "_reg", (None,))[0] != key:          # rebuilt only when the file was re-read or a line was added
+            self._reg = (key, {r["plate"]: r["state"] for r in rows if r.get("plate") and r.get("state")})
+        return self._reg[1]
 
     def state_of(self, plate):
         """The state of a plate: the one you last set on it, else the one you set most often on its verified sightings."""
@@ -853,6 +861,7 @@ class Store:
         self._reads_cache = None               # plate history rebuilds from the new label
         self._value_cache = None
         self._pair_cache = None
+        self._days_cache = None
 
     def save_crop(self, item, truth):
         """Leveled plate crop beside the label, for later training. Best effort."""
