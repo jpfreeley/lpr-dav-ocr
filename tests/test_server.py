@@ -1038,6 +1038,18 @@ class GoldTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             st.set_gold(self.img[2], True, verify=True)                                    # you said it is obstructed
 
+    def test_pair_queue_offers_the_weaker_plate_of_a_near_pair_until_checked(self):
+        st = self.make()
+        for i in (0, 1):
+            st.add_label(dict(image=self.img[i], verdict="ok", truth="DEMO001", ts="x"))          # DEMO001 verified twice
+        st.add_label(dict(image=self.img[3], verdict="ok", truth="DEMO002", ts="x"))              # DEMO002 once, one character away
+        q = st.pair_queue()
+        self.assertEqual([i["image"] for i in q], [self.img[3]])
+        self.assertIn("one character from DEMO001", q[0]["value"]["why"][0])
+        st.add_label(dict(image=self.img[3], verdict="ok", truth="DEMO002", ts="y", pair_checked=True))
+        st._pair_cache = None
+        self.assertEqual(st.pair_queue(), [])                                                      # checked: it leaves the queue
+
     def test_one_gold_per_plate_and_unmark(self):
         st = self.make()
         for i in (0, 1):

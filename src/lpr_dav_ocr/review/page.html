@@ -159,6 +159,7 @@
   <select id="filter" aria-label="Queue">
     <option value="need">Needs review (default)</option>
     <option value="value">Most valuable first (about 20 a day)</option>
+    <option value="pairs">Pair check: the weaker plate of each near-identical pair</option>
     <option value="auto">Auto-accepted: spot check</option>
     <option value="rejected">Auto-rejected: spot check</option>
     <option value="recheck">Re-check: 'not a plate' that may hold a plate</option>
@@ -290,6 +291,10 @@ function render() {
   const c = D.counts, done = D.all - (c.none || 0);
   statsLine();
   $("empty").hidden = !!it; $("main").hidden = !it;
+  if (!it && F === "pairs") {
+    $("empty").innerHTML = `<p><b>No near-identical pairs left to check.</b> Every plate that is one character from another verified or auto-accepted plate has been looked at. New pairs appear here as plates come in.</p>`;
+    return;
+  }
   if (!it && F === "value") {
     $("empty").innerHTML = `<p><b>Nothing here would change your results.</b> No unreviewed plate is on your watchlist, repeats, or has other sightings that one label would settle. What is left is one-off plates. Pick <b>Needs review</b> in the menu to go through them in time order, or leave them: they stay out of your reports until you do.</p>`;
     return;
@@ -311,8 +316,8 @@ function render() {
   const rc = F === "recheck" && it.label && it.label.verdict === "notplate";
   $("rechkb").hidden = !rc;
   const wv = $("whyval");
-  wv.hidden = !(F === "value" && it.value);
-  if (!wv.hidden) wv.textContent = "Worth a label: " + it.value.why.join(" \u00b7 ");
+  wv.hidden = !((F === "value" || F === "pairs") && it.value);
+  if (!wv.hidden) wv.textContent = (F === "pairs" ? "Pair check: " : "Worth a label: ") + it.value.why.join(" \u00b7 ");
   if (rc) $("rechkb").textContent = `you marked this Not a plate, but the second pass found plate-like text${it.alt ? " (" + it.alt.plate + ")" : ""}: is there a plate in the frame?`;
   $("rejb").hidden = !(it.rejected && !it.label); $("rejb").textContent = `auto-rejected: not plate-shaped (aspect ${it.aspect})`;
   $("autob").textContent = it.auto_why === "recent" ? `auto-approved: you verified ${it.recent.plate} ${it.recent.n} other time${it.recent.n === 1 ? "" : "s"} nearby` : it.auto_why === "record" ? "auto-accepted: both passes agree and the plate has a vehicle in the ticket data" : "auto-accepted";
@@ -786,7 +791,7 @@ async function decide(verdict, truth) {
   busy = true;
   try {
     const saved = await api("/api/label", { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "lpr-review" },
-                              body: JSON.stringify({ image: it.image, verdict, truth, state: getState(), recheck: F === "recheck" }) });
+                              body: JSON.stringify({ image: it.image, verdict, truth, state: getState(), recheck: F === "recheck", pair: F === "pairs" }) });
     const msg = { ok: "Correct", fix: `Fixed: ${it.plate} \u2192 ${truth}`, notplate: "Not a plate", obstructed: "Obstructed", skip: "Can't tell" }[verdict];
     toast("Saved: " + msg + (saved && saved.applied ? ` \u00b7 state ${saved.state} also set on ${saved.applied} other sighting${saved.applied === 1 ? "" : "s"} of ${saved.plate}` : ""));
     if (pendingGold && (verdict === "ok" || verdict === "fix")) {
