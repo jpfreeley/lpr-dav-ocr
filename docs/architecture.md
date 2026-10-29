@@ -105,6 +105,9 @@ found nothing.
 
 A `ThreadingHTTPServer` bound to `127.0.0.1`. Reads of the CSV and label files use a short-lived cache with
 background refresh, because file modification times on network shares are not reliable and reads can be slow.
+The plate-state list is rebuilt only when its file is re-read or gains a line, and the per-day counts are kept for 3 seconds
+(a saved label clears them). The ticket-index handle is one sqlite connection shared by every request thread, so lookups
+run one at a time under a lock. The review queues are described in [ADR 0020](adr/0020-review-queues-value-gold-and-pair-check.md).
 The JSON API: `GET /api/item`, `GET /api/config`, `GET /api/watch`, `POST /api/label`, `POST /api/watch`,
 `POST /api/watch/remove`, `GET /img/<name>`. Pages are `/` (redirects to the first plate that needs review)
 and `/i/<image>`.

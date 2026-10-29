@@ -14,7 +14,7 @@ The page rebuilds its numbers in the background every 30 seconds and answers fro
 | Storage | size of each part of the data root, free space, growth per day, days until full | `storage_history.jsonl` (one line a day) and the disk |
 | Confidence and accuracy | exact-match rate by confidence band, agreement, night versus day | `reports/accuracy.md` from `lpr score` |
 | Confusion matrix | 36 by 36 heatmap of which characters the reader swaps, plus the top pairs | `reports/confusions.csv` |
-| Review and labels | per-day split of every read, label counts, stale vehicle marks, re-check queue | the review store |
+| Review and labels | per-day split of every read, label counts, stale vehicle marks, re-check queue, pair check queue size | the review store |
 | Alerts | alerts sent per day | `alerts.jsonl` (the page never sends one) |
 | Machine | load, swap, process counts | the operating system |
 
