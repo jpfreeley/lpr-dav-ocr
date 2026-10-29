@@ -161,6 +161,8 @@ have normal shapes.
 
 ## Pair check
 
+Why these queues exist: [ADR 0020](adr/0020-review-queues-value-gold-and-pair-check.md).
+
 The **Pair check** view lists, across all days, the weaker plate of each pair of verified or auto-accepted plates that are one character apart (a substitution, a missing or an extra character). The weaker plate has less support: no vehicle in the ticket data against one with a record, then not verified against verified, then fewer sightings. The banner names the other plate and how well supported each one is. Saving a label from this view marks the plate as checked, so it does not come back. Two cars can really have similar plates, so a pair is a question, not an error.
 
 ## Gold standard frames

@@ -25,3 +25,4 @@ from where the decision shows up.
 | [0017](0017-lossless-gray-storage-and-nightly-cleanup.md) | Single-channel PNG frames and a nightly cleanup |
 | [0018](0018-operations-page-and-storage-snapshots.md) | Operations page fed by cheap reads and a daily snapshot |
 | [0019](0019-self-check-alerts-only-on-trouble.md) | A self-check that speaks only when something needs attention |
+| [0020](0020-review-queues-value-gold-and-pair-check.md) | Review queues that spend human time where it changes the most |

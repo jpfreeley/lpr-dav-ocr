@@ -1103,3 +1103,39 @@ class GoldTests(unittest.TestCase):
         g2 = st.gold_for(near)
         self.assertEqual((g2["plate"], g2["exact"]), ("DEMO001", False))
 
+
+
+class CacheTests(unittest.TestCase):
+    """The plate-state list and the day list are kept between requests, and a write clears or refreshes them."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.imgs = write_day(self.tmp.name)
+        self.store = S.Store(Path(self.tmp.name))
+
+    def test_registry_is_reused_until_a_state_is_saved(self):
+        first = self.store.registry()
+        self.assertIs(self.store.registry(), first)                              # same object: not rebuilt per call
+        self.store.set_plate_state("DEMO002", "NJ", self.imgs[1])
+        self.assertEqual(self.store.registry(), {"DEMO002": "NJ"})               # the new line shows at once
+        self.assertEqual(first, {})                                              # the old read was not edited in place
+
+    def test_registry_follows_the_latest_state_of_a_plate(self):
+        self.store.set_plate_state("DEMO002", "NJ", self.imgs[1])
+        self.store.set_plate_state("DEMO002", "CT", self.imgs[1])
+        self.assertEqual(self.store.registry()["DEMO002"], "CT")
+
+    def test_days_is_kept_briefly_and_a_label_clears_it(self):
+        before = self.store.days()
+        self.assertIs(self.store.days(), before)
+        left = before[0]["left"]
+        self.store.add_label(dict(image=self.imgs[1], verdict="ok", truth="DEMO002", state="NY", ts="2026-01-01T00:00:00"))
+        after = self.store.days()
+        self.assertIsNot(after, before)
+        self.assertEqual(after[0]["left"], left - 1)                             # the saved plate no longer counts as waiting
+
+    def test_days_is_rebuilt_after_the_keep_time(self):
+        before = self.store.days()
+        with mock.patch.object(S.time, "monotonic", return_value=S.time.monotonic() + 10):
+            self.assertIsNot(self.store.days(), before)

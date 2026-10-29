@@ -199,3 +199,38 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NullCountTests(unittest.TestCase):
+    def test_a_row_with_no_ticket_count_counts_as_zero(self):
+        d, db = make_db([("ABC1234", "NY", "TOYOT", "SUBN", 2019, "WH", None, 2027),
+                         ("ABC1234", "NY", "HONDA", "SEDN", 2018, "BK", 3, 2026)])
+        with d:
+            v = V.lookup(db, "ABC1234")
+            self.assertEqual((v["tickets"], v["make_code"]), (3, "HONDA"))
+
+
+class ParallelLookupTests(unittest.TestCase):
+    def test_many_threads_can_look_up_plates_through_one_store_without_errors(self):
+        import threading
+        rows = [(f"AB{n:05d}", "NY", "TOYOT", "SUBN", 2019, "WH", n % 5, 2027) for n in range(300)]
+        d, db = make_db(rows)
+        errors = []
+        with d, tempfile.TemporaryDirectory() as tmp:
+            store = S.Store(Path(tmp))
+            store._vdb = db
+
+            def work(k):
+                try:
+                    for n in range(k, 300, 6):
+                        v = store.vehicle(f"AB{n:05d}")
+                        assert v["available"] and (v.get("none") or v["make"] == "Toyota"), v
+                except Exception as e:           # noqa: BLE001 - collect every failure from the threads
+                    errors.append(repr(e))
+
+            threads = [threading.Thread(target=work, args=(k,)) for k in range(6)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        self.assertEqual(errors, [])
