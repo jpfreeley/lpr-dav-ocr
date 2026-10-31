@@ -687,6 +687,20 @@ class Store:
                     by_hour=hours, states=states, sightings=rows, suggest=suggest, clarity_pending=pending,
                     gold=next((dict(image=r["image"], day=r["day"], time=r["time"], box=r["box"]) for r in rows if r["gold"]), None))
 
+    def by_hour(self, day, unverified=False):
+        """Every plate read on one day, grouped by CamTime hour (0 to 23), in time order. Same basis rule as the history."""
+        hours = [dict(hour=h, count=0, plates=0, rows=[]) for h in range(24)]
+        for t, b, i in self.reads(unverified):
+            if i["day"] != day or not i["time"]:
+                continue
+            h = hours[int(i["time"][:2])]
+            h["rows"].append(dict(image=i["image"], plate=t, time=i["time"], conf=i["conf"], basis=b, box=i["box"], state=self.eff_state(i, t)))
+        for h in hours:
+            h["rows"].sort(key=lambda r: r["time"])
+            h["count"], h["plates"] = len(h["rows"]), len({r["plate"] for r in h["rows"]})
+        return dict(day=day, days=[d["day"] for d in self.days()], total=sum(h["count"] for h in hours),
+                    plates=len({r["plate"] for h in hours for r in h["rows"]}), hours=hours)
+
     def plate_search(self, q, unverified=False, limit=20):
         """Plates containing q, with sighting counts, most seen first (for the search box)."""
         q = re.sub(r"[^A-Z0-9]", "", (q or "").upper())
@@ -949,6 +963,10 @@ def make_handler(store):
                 return self._send(200, _reports.build(store, days or None, (q.get("unverified") or ["0"])[0] == "1", WL.load()))
             if u.path == "/history":
                 return self._send(200, (HERE / "history.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/day":
+                return self._send(200, (HERE / "day.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/day":
+                return self._send(200, store.by_hour(store.pick_day((q.get("day") or [None])[0]), (q.get("unverified") or ["0"])[0] == "1"))
             if u.path == "/api/history":
                 h = store.sightings((q.get("q") or [""])[0], (q.get("unverified") or ["0"])[0] == "1")
                 st = max(h["states"], key=h["states"].get) if h["states"] else None

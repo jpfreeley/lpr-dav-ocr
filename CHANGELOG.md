@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- **By hour** page (`/day`, `/api/day`): every plate read on one date, grouped by camera hour, with an hourly traffic strip, a day picker, an option to include unreviewed reads, and thumbnails that open the review page. Linked from the header of the review, history, reports and operations pages.
 - ADR 0020 (review queues), notes on the server caches and lock in the architecture doc, the pair check count in the operations doc, and tests for the caches, the null ticket count and parallel lookups.
 - Operations page: the review note shows how many plates are in the pair check queue.
 - Review page, **Pair check** view: for every pair of verified or auto-accepted plates that are one character apart, it shows the plate with less support (a vehicle in the ticket data, then verified by you, then more sightings), with the other plate named in the reason. Saving a label from this view marks the plate as checked and it leaves the queue.
