@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plates by hour</title>
+<style>
+  :root { --bg:#101216; --panel:#181b21; --panel2:#1f232b; --line:#2b303a; --text:#e8eaee; --muted:#8b93a1; --accent:#4c9eff; --ok:#3ecf8e; --warn:#f5b942; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f3f4f7; --panel:#fff; --panel2:#f0f2f6; --line:#d9dde5; --text:#1b1f27; --muted:#667085; --accent:#1f6feb; --ok:#13a36a; --warn:#b9770e; } }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { display:flex; gap:10px 18px; align-items:center; flex-wrap:wrap; padding:8px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:14px; margin:0; font-weight:600; }
+  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+  main { max-width:1100px; margin:0 auto; padding:14px 16px 40px; }
+  .bar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font:inherit; font-weight:600; }
+  label.opt { color:var(--muted); font-size:13px; display:flex; gap:6px; align-items:center; }
+  .tot { color:var(--muted); font-size:13px; } .tot b { color:var(--text); }
+  .strip { display:flex; align-items:flex-end; gap:3px; height:54px; margin:14px 0 2px; }
+  .strip a { flex:1; display:flex; align-items:flex-end; height:100%; }
+  .strip i { display:block; width:100%; background:var(--accent); opacity:.75; min-height:2px; border-radius:2px 2px 0 0; }
+  .strip a:hover i { opacity:1; }
+  .slab { display:flex; gap:3px; color:var(--muted); font-size:10.5px; } .slab span { flex:1; text-align:center; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-top:12px; }
+  section h2 { font-size:15px; margin:0; display:flex; gap:10px; align-items:baseline; cursor:pointer; }
+  section h2 small { color:var(--muted); font-weight:400; font-size:12.5px; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; }
+  th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; font-size:12px; }
+  td.mono { font-family:var(--mono); font-weight:600; letter-spacing:.06em; }
+  .thumb { width:150px; height:56px; background:#000 no-repeat; border-radius:5px; display:block; }
+  .badge { font-size:11px; border-radius:99px; padding:1px 8px; border:1px solid var(--line); color:var(--muted); }
+  .badge.verified, .badge.fixed { color:var(--ok); border-color:var(--ok); }
+  .badge.auto { color:var(--accent); border-color:var(--accent); }
+  .badge.unverified { color:var(--warn); border-color:var(--warn); }
+  .camt { font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:3px; }
+  .empty { color:var(--muted); padding:14px 0; }
+</style>
+</head>
+<body>
+<header><h1>Plates by hour</h1><a href="/">&larr; Review queue</a><a href="/history">History</a><a href="/reports">Reports</a><a href="/ops">Operations</a></header>
+<main>
+  <div class="bar">
+    <select id="day" aria-label="Day"></select>
+    <label class="opt"><input type="checkbox" id="unv"> include unreviewed reads</label>
+    <label class="opt"><input type="checkbox" id="thumbs" checked> show crops</label>
+    <span class="tot" id="tot"></span>
+  </div>
+  <div class="strip" id="strip"></div>
+  <div class="slab" id="slab"></div>
+  <div id="out"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const W = 1920, H = 1080;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const KEY = "lpr.day.opts";
+let data = null;
+function thumb(r, mw = 150, mh = 56) {
+  if (!r.box) return `<span class="thumb"></span>`;
+  const [x0, y0, x1, y1] = r.box, bw = x1 - x0, bh = y1 - y0, px = bw * 0.15, py = bh * 0.4;
+  const cx = Math.max(0, x0 - px), cy = Math.max(0, y0 - py), cw = Math.min(W, x1 + px) - cx, ch = Math.min(H, y1 + py) - cy;
+  const k = Math.min(mw / cw, mh / ch);
+  return `<span class="thumb" style="width:${cw * k}px;height:${ch * k}px;background-image:url('/img/${encodeURIComponent(r.image)}');background-size:${W * k}px ${H * k}px;background-position:${-cx * k}px ${-cy * k}px"></span>`;
+}
+const hh = h => String(h).padStart(2, "0");
+function render() {
+  const d = data, th = $("thumbs").checked, max = Math.max(1, ...d.hours.map(h => h.count));
+  $("tot").innerHTML = `<b>${d.total}</b> read${d.total === 1 ? "" : "s"}, <b>${d.plates}</b> distinct plate${d.plates === 1 ? "" : "s"} <span class="camt">CamTime</span>`;
+  $("strip").innerHTML = d.hours.map(h => `<a href="#h${h.hour}" title="${hh(h.hour)}:00  ${h.count} read(s)"><i style="height:${h.count ? Math.max(6, 100 * h.count / max) : 0}%"></i></a>`).join("");
+  $("slab").innerHTML = d.hours.map(h => `<span>${h.hour % 3 === 0 ? hh(h.hour) : ""}</span>`).join("");
+  $("out").innerHTML = d.total ? d.hours.filter(h => h.count).map(h => `<section id="h${h.hour}"><h2>${hh(h.hour)}:00 to ${hh(h.hour)}:59 <small>${h.count} read${h.count === 1 ? "" : "s"}, ${h.plates} plate${h.plates === 1 ? "" : "s"}</small></h2>
+    <table><tr>${th ? "<th></th>" : ""}<th>Time</th><th>Plate</th><th>State</th><th>Conf</th><th>Basis</th></tr>${h.rows.map(r => `<tr>
+      ${th ? `<td><a href="/i/${encodeURIComponent(r.image)}" title="Open in the review page">${thumb(r)}</a></td>` : ""}
+      <td>${esc(r.time)}</td><td class="mono"><a href="/history?q=${encodeURIComponent(r.plate)}" title="Every sighting of this plate">${esc(r.plate)}</a></td>
+      <td>${esc(r.state || "")}</td><td>${r.conf != null ? Number(r.conf).toFixed(2) : ""}</td><td><span class="badge ${esc(r.basis)}">${esc(r.basis)}</span></td></tr>`).join("")}</table></section>`).join("")
+    : `<p class="empty">No plates for this day.</p>`;
+}
+async function load(day) {
+  const unv = $("unv").checked ? "&unverified=1" : "";
+  try { data = await (await fetch(`/api/day?day=${encodeURIComponent(day || "")}${unv}`)).json(); }
+  catch (e) { $("out").innerHTML = `<p class="empty">Could not load. Is the server running?</p>`; return; }
+  $("day").innerHTML = data.days.slice().reverse().map(x => `<option${x === data.day ? " selected" : ""}>${x}</option>`).join("");
+  history.replaceState(null, "", `?day=${data.day}${unv}`);
+  render();
+}
+const qs = new URLSearchParams(location.search);
+$("unv").checked = qs.get("unverified") === "1";
+try { $("thumbs").checked = localStorage.getItem(KEY) !== "0"; } catch (e) { /* storage blocked: keep default */ }
+$("day").onchange = () => load($("day").value);
+$("unv").onchange = () => load($("day").value);
+$("thumbs").onchange = () => { try { localStorage.setItem(KEY, $("thumbs").checked ? "1" : "0"); } catch (e) {} if (data) render(); };
+load(qs.get("day"));
+</script>
+</body>
+</html>

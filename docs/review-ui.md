@@ -383,6 +383,18 @@ From the command line: `lpr seen ABC1234 --days 30 [--unverified]`.
 Sightings are read from the same files as the queue, so a plate appears as soon as it is processed. The first
 search after a start can take a few seconds on a slow share.
 
+## Plates by hour
+
+`/day` (the **By hour** link in the header of every page) lists every plate read on one date, grouped by hour of the
+camera clock. A bar strip at the top shows the day's traffic by hour; click a bar to jump to that hour. Each hour shows
+how many reads and how many distinct plates it holds, then one row per read: a crop of the plate, the time, the plate
+(a link to its [history](#plate-history)), the state, the confidence and the basis.
+
+The day picker lists the newest day first, and `/day?day=YYYY-MM-DD` opens a date directly. The same rule as the plate
+history applies: only plates you confirmed, corrected or that the auto-accept rule passed are listed. Tick "include
+unreviewed reads" to add the rest, each marked `unverified`. "Show crops" hides the thumbnails for a shorter page, and the
+browser remembers the choice. Clicking a crop opens that frame in the review page. The data comes from `/api/day`.
+
 ## Safety
 
 - The server binds `127.0.0.1` only.

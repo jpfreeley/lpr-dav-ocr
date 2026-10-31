@@ -33,6 +33,7 @@ network use is a one-time download of the OCR models and, if you turn it on, pus
   are approved, and reads of badges and signs are rejected, all with the clearer frame kept and your labels always winning.
 - **Knows the vehicle.** A local index built from public NYC parking-ticket data gives make, body type, year and color for
   many plates, with no plate sent to anyone. See [ADR 0016](docs/adr/0016-local-vehicle-index-from-ticket-data.md).
+- **Plates by hour.** `/day` lists every plate read on a date, grouped by hour, with a crop, state and confidence per read. See [plates by hour](docs/review-ui.md#plates-by-hour).
 - **Reports and operations pages.** Traffic, repeat visitors, plate mix and fleet mix on `/reports`; watcher health, jobs,
   disk use, accuracy and a confusion matrix on `/ops`.
 - **Looks after itself.** A nightly cleanup stores frames losslessly in a third of the space and trims caches.

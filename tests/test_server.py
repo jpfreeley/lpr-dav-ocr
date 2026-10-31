@@ -99,6 +99,19 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertIn(b"Plate history", page)
 
+    # -- plates by hour of day
+    def test_day_routes(self):
+        st, body = self.call("GET", f"/api/day?day={DAY}")
+        self.assertEqual((st, body["day"], len(body["hours"])), (200, DAY, 24))
+        self.assertIn("DEMO001", [r["plate"] for r in body["hours"][1]["rows"]])      # the 01:00 read, auto-accepted
+        self.assertEqual(body["total"], sum(h["count"] for h in body["hours"]))
+        self.assertTrue(all(h["count"] == len(h["rows"]) for h in body["hours"]))
+        st, more = self.call("GET", f"/api/day?day={DAY}&unverified=1")
+        self.assertGreaterEqual(more["total"], body["total"])                         # unreviewed reads only add
+        st, page = self.call("GET", "/day")
+        self.assertEqual(st, 200)
+        self.assertIn(b"Plates by hour", page)
+
     # -- live check while editing the boxes
     def test_lookup_route(self):
         st, body = self.call("GET", "/api/lookup?q=demo%2D001&image=" + self.images[0])
