@@ -336,7 +336,7 @@ def build(store, home, cam_dir=None):
              accuracy=accuracy(root), confusion=confusion(root), review=review(store), alerts=alerts(home), machine=machine())
     if cam_dir:
         d["lag"] = lag(cam_dir, Path(store.base))
-    d["watcher"]["busy"] = bool(pr.get("process_day"))
+    d["watcher"]["busy"] = any(pr.get(k) for k in ("process_day", "second_pass", "cleanup", "vehicles"))      # any step of the watcher cycle
     d["attention"] = attention(d)
     return d
 
