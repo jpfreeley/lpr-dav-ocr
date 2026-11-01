@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- `scripts/check-private-data.sh` reads your own identifier patterns from a file outside the repository (`LPR_PRIVATE_PATTERNS`) and checks tracked files and history against them.
 - **By hour** page (`/day`, `/api/day`): every plate read on one date, grouped by camera hour, with an hourly traffic strip, a day picker, an option to include unreviewed reads, and thumbnails that open the review page. Linked from the header of the review, history, reports and operations pages.
 - ADR 0020 (review queues), notes on the server caches and lock in the architecture doc, the pair check count in the operations doc, and tests for the caches, the null ticket count and parallel lookups.
 - Operations page: the review note shows how many plates are in the pair check queue.

@@ -36,5 +36,26 @@ if git grep -nIE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}\.[0-9]{2}\.[0-9]{2}-[0-9]{
   bad=1
 fi
 
+# your own identifiers (host names, share and camera names, addresses, user names), one regular expression per line.
+# The file lives outside the repository so the values never appear in it. Set LPR_PRIVATE_PATTERNS to its path.
+# Without it this check cannot know your values, and CI cannot either, so run the script locally before you push.
+pf="${LPR_PRIVATE_PATTERNS:-}"
+if [ -n "$pf" ]; then
+  if [ ! -r "$pf" ]; then
+    fail "LPR_PRIVATE_PATTERNS is set but the file cannot be read"
+  else
+    while IFS= read -r pat; do
+      case "$pat" in ''|'#'*) continue;; esac
+      # file contents of tracked files, then the commit messages and added lines of every commit
+      if git grep -nIiE -e "$pat" -- . >/dev/null 2>&1; then
+        echo "BLOCKED: a private pattern matches tracked files (run: git grep -nIiE -f $pf)"; bad=1
+      fi
+      if [ -n "$(git log --all -i -G"$pat" --format=%h 2>/dev/null | head -1)" ]; then
+        echo "BLOCKED: a private pattern appears in git history (run: git log --all -i -G<pattern> --oneline)"; bad=1
+      fi
+    done < "$pf"
+  fi
+fi
+
 if [ "$bad" -eq 0 ]; then echo "ok: no private data patterns found"; fi
 exit "$bad"
