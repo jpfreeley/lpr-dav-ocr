@@ -284,7 +284,7 @@ def lag(cam_dir, frames_root, now=None):
     if not Path(cam_dir).is_dir():      # a missing folder globs as empty, which looked like "no clips" and hid the unmounted share
         return dict(available=False, share_missing=True)
     try:
-        clips = sorted(p.name for p in (Path(cam_dir) / day).glob("*.dav"))
+        clips = sorted({p.name for p in (Path(cam_dir) / day).glob("*.dav")})      # a big SMB folder can list each file several times
     except OSError:
         return dict(available=False)
     done = set()
@@ -298,6 +298,11 @@ def lag(cam_dir, frames_root, now=None):
                 newest_clip=clips[-1][:17] if clips else None, oldest_waiting=pending[0][:17] if pending else None)
 
 
+def _ago(t):
+    m = max(0, round((time.time() - t) / 60))
+    return f"{m} min ago" if m < 120 else f"{m // 60} h ago"
+
+
 def attention(d):
     """The short list at the top of the page: [{key, level, text}], worst first. `key` names the kind of problem and
     stays the same while its numbers change, so a scheduler can tell a new problem from a continuing one."""
@@ -305,10 +310,10 @@ def attention(d):
     w = d["watcher"]
     if d.get("lag", {}).get("share_missing"):
         out.append(dict(key="share-missing", level="critical", text="The camera share is not mounted. New clips cannot be read until it is. Mount it in Finder (Go, Connect to Server); the watcher resumes on its own."))
-    if w["idle_s"] is None or w["idle_s"] > 600:
+    if w["idle_s"] is None or w["idle_s"] > (3600 if w.get("busy") else 600):    # a cycle that is reading a big backlog does not touch the heartbeat until it ends
         out.append(dict(key="watcher-quiet", level="critical", text="The watcher log has been quiet for " + (f"{w['idle_s'] // 60} minutes." if w["idle_s"] else "a long time.") + " It may not be running."))
     if w["errors_24h"]:
-        out.append(dict(key="watcher-errors", level="warning", text=f"{w['errors_24h']} watcher error(s) in the last 24 hours. Last: {w['recent_errors'][-1]['text']}"))
+        out.append(dict(key="watcher-errors", level="warning", text=f"{w['errors_24h']} watcher error(s) in the last 24 hours. Last ({_ago(w['recent_errors'][-1]['t'])}): {w['recent_errors'][-1]['text']}"))
     lg = d.get("lag", {})
     if lg.get("available") and lg["waiting"] > 15:
         out.append(dict(key="clips-waiting", level="warning", text=f"{lg['waiting']} clips on the share are not processed yet (oldest {lg['oldest_waiting']} CamTime)."))
@@ -331,6 +336,7 @@ def build(store, home, cam_dir=None):
              accuracy=accuracy(root), confusion=confusion(root), review=review(store), alerts=alerts(home), machine=machine())
     if cam_dir:
         d["lag"] = lag(cam_dir, Path(store.base))
+    d["watcher"]["busy"] = any(pr.get(k) for k in ("process_day", "second_pass", "cleanup", "vehicles"))      # any step of the watcher cycle
     d["attention"] = attention(d)
     return d
 

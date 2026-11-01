@@ -319,7 +319,7 @@ def main(argv=None):
         clips = [Path(l.strip()) for l in open(a.files_from) if l.strip()]
     else:
         src = Path(a.src)
-        clips = [src] if src.is_file() else sorted(src.glob("*.dav"))
+        clips = [src] if src.is_file() else sorted(set(src.glob("*.dav")))
     stamp0 = clip_stamp(clips[0]) if clips else "x"
     out = Path(a.out) if a.out else default_out(clips[0], stamp0.split("_")[0]) if clips else Path(a.out or ".")
     out.mkdir(parents=True, exist_ok=True)

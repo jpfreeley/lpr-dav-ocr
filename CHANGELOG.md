@@ -15,6 +15,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 - Review page, **Pair check** view: for every pair of verified or auto-accepted plates that are one character apart, it shows the plate with less support (a vehicle in the ticket data, then verified by you, then more sightings), with the other plate named in the reason. Saving a label from this view marks the plate as checked and it leaves the queue.
 
 ### Fixed
+- Watcher: the heartbeat is also touched every 30 seconds while a reading or second-pass step runs, so a large backlog is not mistaken for a stopped watcher. As a fallback for the detached cleanup and vehicle jobs, the Operations page allows up to 60 minutes of quiet while one of them runs. The watcher error line now says how long ago the error happened.
+- A clip is counted once when the SMB folder lists it several times (seen on a folder of about 250 clips that listed 4,096 entries). It inflated the clips-waiting count and could hand the same clip to the reader repeatedly.
 - Watcher quiet alert: the watcher writes `watch_heartbeat` every cycle and the page measures idle time from it, so a night with no traffic no longer looks like a stopped watcher.
 - Free disk space on an SMB share is read with `df -k`. `shutil.disk_usage` wraps at 4 TiB there, which reported about 20 GB free on a share with over 4 TB free and raised a false low-disk alert.
 - Review server: ticket-index lookups run one at a time (the shared database handle raised random errors under parallel requests).

@@ -52,6 +52,18 @@ class LogTests(unittest.TestCase):
         items = ops.attention(d)
         self.assertEqual([(x["key"], x["level"]) for x in items], [("share-missing", "critical")])
 
+    def test_lag_counts_a_clip_once_when_the_share_lists_it_twice(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            cam = Path(d) / "cam"
+            day = datetime.now().date().isoformat()
+            (cam / day).mkdir(parents=True)
+            names = ["00.00.01-00.00.20[M][0@0][0].dav", "00.01.01-00.01.20[M][0@0][0].dav"]
+            listed = [cam / day / n for n in names + names + names]          # the share repeats each entry
+            with mock.patch.object(Path, "glob", return_value=iter(listed)):
+                lg = ops.lag(cam, Path(d) / "frames")
+            self.assertEqual((lg["on_share"], lg["waiting"]), (2, 2))
+
 
 class JobsAndAttentionTests(unittest.TestCase):
     def test_late_job_and_attention(self):
