@@ -35,6 +35,40 @@ def log(*a):
     print(datetime.now().strftime("%H:%M:%S"), *a, flush=True)
 
 
+def share_host(mount_point):
+    """The server name of the SMB mount, read from `mount` while it is mounted (it is gone from the table once it drops)."""
+    try:
+        out = subprocess.run(["mount"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"//(?:[^@/]+@)?([^/ ]+)/\S+ on " + re.escape(str(mount_point)), out)
+    if not m:
+        return None
+    return m[1].replace("._smb._tcp.local", ".local")       # the Bonjour service name is not a host name; NAME.local is
+
+
+def probe_share(host, mount_point):
+    """One log line saying why the share may be gone: is the server up (ping), is its SMB port open, is this Mac's network up.
+    Written when the share first disappears and every 10 minutes after, so the next drop shows which side failed."""
+    def run(cmd):
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.SubprocessError):
+            return None
+    out = []
+    if host:
+        r = run(["ping", "-c", "2", "-t", "4", host])
+        out.append("ping " + ("ok" if r and r.returncode == 0 else "FAIL"))
+        r = run(["nc", "-z", "-G", "3", host, "445"])
+        out.append("smb port " + ("open" if r and r.returncode == 0 else "CLOSED"))
+    r = run(["route", "-n", "get", "default"])
+    m = r and re.search(r"interface: (\S+)", r.stdout)
+    out.append("default route " + (m[1] if m else "NONE"))
+    r = run(["mount"])
+    out.append("mounted " + ("yes" if r and str(mount_point) in r.stdout else "no"))
+    log("share probe:", (host or "host unknown") + ",", ", ".join(out))
+
+
 def clip_end(day, name):
     m = NAME.match(name)
     if not m:
@@ -230,19 +264,24 @@ def main(argv=None):
         print(f"{n} alert(s) {'sent' if a.send else 'that would be sent'}")
         return
 
-    state = {"sizes": {}, "last_ok": time.time(), "down_since": None, "down_alert": 0}
+    state = {"sizes": {}, "last_ok": time.time(), "down_since": None, "down_alert": 0, "probed": 0, "host": share_host(cam.parent)}
     log(f"watching {cam}  poll {a.poll}s  lookback {a.lookback} min  watchlist {len(W.load())} plate(s)")
     while True:
         try:
             if cam.is_dir():
                 if state["down_since"]:
-                    log("share is back")
+                    log(f"share is back after {round((time.time() - state['down_since']) / 60)} min")
+                    state["host"] = share_host(cam.parent) or state["host"]
                 state["down_since"] = None
                 cycle(cam, a, state)
                 maybe_refresh_vehicles()
                 maybe_cleanup()
             else:
                 state["down_since"] = state["down_since"] or time.time()
+                if time.time() - state["probed"] > 600 and not a.dry_run:
+                    state["probed"] = time.time()
+                    log("share not visible:", cam)
+                    probe_share(state["host"], cam.parent)
                 if time.time() - state["down_since"] > 1800 and time.time() - state["down_alert"] > 21600 and not a.dry_run:
                     try:
                         W.notify("LPR watcher: share unreachable", f"Cannot see {cam} since {datetime.fromtimestamp(state['down_since']):%H:%M}. New clips are not being read.", 3, "warning")
@@ -251,6 +290,10 @@ def main(argv=None):
                         pass
         except Exception as ex:      # never let one bad cycle kill an unattended job
             log("cycle error:", repr(ex))
+        try:
+            (W.HOME / "watch_heartbeat").touch()    # the log only grows when clips arrive; ops.py reads this for liveness
+        except OSError:
+            pass
         if a.once:
             return
         time.sleep(a.poll)

@@ -161,3 +161,22 @@ class CleanupScheduleTests(unittest.TestCase):
         finally:
             WT.CL.due, WT.subprocess.Popen = real_due, real_popen
             WT._ctry[0] = 0.0
+
+
+class ShareProbeTests(unittest.TestCase):
+    def test_share_host_reads_the_mount_table(self):
+        import subprocess
+        from unittest import mock
+        table = "//user@NAS-1._smb._tcp.local/camera-share on /Volumes/camera-share (smbfs, nodev)\n/dev/disk3s1 on / (apfs)\n"
+        with mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, table, "")):
+            self.assertEqual(WT.share_host("/Volumes/camera-share"), "NAS-1.local")      # the Bonjour name becomes a host name
+            self.assertIsNone(WT.share_host("/Volumes/other"))
+
+    def test_probe_logs_one_line_and_never_raises(self):
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            WT.probe_share(None, "/Volumes/camera-share")
+        self.assertIn("share probe:", buf.getvalue())
+        self.assertIn("host unknown", buf.getvalue())

@@ -72,6 +72,10 @@ def watcher(home, now=None):
     merges = sum(int(m[1]) for t, x in ev if t >= day and (m := re.search(r"merged (\d+) duplicate", x)))
     alerts = [t for t, x in ev if x.startswith("ALERT sent")]
     last = ev[-1][0] if ev else None
+    try:    # the watcher touches this every cycle; the log alone goes quiet on a road with no traffic
+        last = max(last or 0, (Path(home) / "watch_heartbeat").stat().st_mtime) or None
+    except OSError:
+        pass
     return dict(last_line=last, idle_s=max(0, round(now - last)) if last else None, errors_24h=len(errs),
                 recent_errors=[dict(t=t, text=x[:160]) for t, x in errs[-6:]], clips_24h=sum(n for t, n in clips if t >= day),
                 clips_per_hour=per_hour, merged_24h=merges, alerts_24h=sum(1 for t in alerts if t >= day),
@@ -144,14 +148,25 @@ def jobs(home, root, pr, now=None):
     return rows
 
 
+def disk_free(p):
+    """(total, free) in bytes. shutil.disk_usage wraps at 4 TiB on an SMB mount (32-bit block counts), so read df -k first."""
+    try:
+        r = subprocess.run(["df", "-k", str(p)], capture_output=True, text=True, timeout=20).stdout.splitlines()[-1].split()
+        i = next(i for i, x in enumerate(r) if x.endswith("%"))
+        return int(r[i - 3]) * 1024, int(r[i - 1]) * 1024
+    except Exception:
+        u = shutil.disk_usage(p)
+        return u.total, u.free
+
+
 def storage(home, root):
     home, root = Path(home), Path(root)
     hist = _jsonl(home / "storage_history.jsonl")
     out = dict(history=hist[-60:])
     for name, p in (("data", root), ("home", home)):
         try:
-            u = shutil.disk_usage(p)
-            out[name + "_disk"] = dict(total=u.total, free=u.free)
+            total, free = disk_free(p)
+            out[name + "_disk"] = dict(total=total, free=free)
         except OSError:
             pass
     out["local"] = {"vehicle index": _size(home / "vehicles.sqlite"), "image cache": _tree(home / "imgcache")}
@@ -266,6 +281,8 @@ def lag(cam_dir, frames_root, now=None):
     """Minutes between the newest clip on the share and the newest clip in the day's index (both read from file names)."""
     now = now or datetime.now()
     day = now.date().isoformat()
+    if not Path(cam_dir).is_dir():      # a missing folder globs as empty, which looked like "no clips" and hid the unmounted share
+        return dict(available=False, share_missing=True)
     try:
         clips = sorted(p.name for p in (Path(cam_dir) / day).glob("*.dav"))
     except OSError:
@@ -286,6 +303,8 @@ def attention(d):
     stays the same while its numbers change, so a scheduler can tell a new problem from a continuing one."""
     out = []
     w = d["watcher"]
+    if d.get("lag", {}).get("share_missing"):
+        out.append(dict(key="share-missing", level="critical", text="The camera share is not mounted. New clips cannot be read until it is. Mount it in Finder (Go, Connect to Server); the watcher resumes on its own."))
     if w["idle_s"] is None or w["idle_s"] > 600:
         out.append(dict(key="watcher-quiet", level="critical", text="The watcher log has been quiet for " + (f"{w['idle_s'] // 60} minutes." if w["idle_s"] else "a long time.") + " It may not be running."))
     if w["errors_24h"]:

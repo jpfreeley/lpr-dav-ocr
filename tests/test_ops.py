@@ -27,6 +27,31 @@ class LogTests(unittest.TestCase):
             self.assertEqual(w["clips_per_hour"][11], 3)
             self.assertEqual(w["idle_s"], 30)
 
+    def test_heartbeat_keeps_a_quiet_log_alive(self):
+        with tempfile.TemporaryDirectory() as d:
+            home = Path(d)
+            (home / "logs").mkdir()
+            now = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+            (home / "logs" / "watch.log").write_text("03:00:00 2026-01-05: 1 new clip(s): a\n")    # nine hours old
+            self.assertGreater(ops.watcher(home, now.timestamp())["idle_s"], 600)
+            beat = home / "watch_heartbeat"
+            beat.touch()
+            self.assertLess(ops.watcher(home, time.time() + 5)["idle_s"], 60)
+
+    def test_disk_free_reads_df(self):
+        with tempfile.TemporaryDirectory() as d:
+            total, free = ops.disk_free(d)
+            self.assertGreater(total, free)
+            self.assertGreater(free, 0)
+
+    def test_missing_share_is_critical(self):
+        lg = ops.lag("/nonexistent/camera-share/cam", "/nonexistent/frames")
+        self.assertEqual((lg["available"], lg.get("share_missing")), (False, True))
+        d = dict(watcher=dict(idle_s=5, errors_24h=0, recent_errors=[]), lag=lg, storage={}, jobs=[], review={}, alerts={},
+                 machine=dict(load=[0, 0, 0], cpus=8))
+        items = ops.attention(d)
+        self.assertEqual([(x["key"], x["level"]) for x in items], [("share-missing", "critical")])
+
 
 class JobsAndAttentionTests(unittest.TestCase):
     def test_late_job_and_attention(self):
