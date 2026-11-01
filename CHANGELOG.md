@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Operations page: a red banner and a critical "share not mounted" item when the camera folder is missing. A missing folder used to look like a day with no clips.
+- Watcher: a `share probe:` log line (ping, SMB port, default route, mount present) when the share disappears and every 10 minutes after, and `share is back after N min`.
 - `scripts/check-private-data.sh` reads your own identifier patterns from a file outside the repository (`LPR_PRIVATE_PATTERNS`) and checks tracked files and history against them.
 - **By hour** page (`/day`, `/api/day`): every plate read on one date, grouped by camera hour, with an hourly traffic strip, a day picker, an option to include unreviewed reads, and thumbnails that open the review page. Linked from the header of the review, history, reports and operations pages.
 - ADR 0020 (review queues), notes on the server caches and lock in the architecture doc, the pair check count in the operations doc, and tests for the caches, the null ticket count and parallel lookups.
@@ -13,6 +15,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 - Review page, **Pair check** view: for every pair of verified or auto-accepted plates that are one character apart, it shows the plate with less support (a vehicle in the ticket data, then verified by you, then more sightings), with the other plate named in the reason. Saving a label from this view marks the plate as checked and it leaves the queue.
 
 ### Fixed
+- Watcher quiet alert: the watcher writes `watch_heartbeat` every cycle and the page measures idle time from it, so a night with no traffic no longer looks like a stopped watcher.
+- Free disk space on an SMB share is read with `df -k`. `shutil.disk_usage` wraps at 4 TiB there, which reported about 20 GB free on a share with over 4 TB free and raised a false low-disk alert.
 - Review server: ticket-index lookups run one at a time (the shared database handle raised random errors under parallel requests).
 - Review page: each page request rebuilt the plate-state list and recounted every day from scratch, which took 2 to 3 seconds. The list is now cached until its file changes, and the day counts are kept for 3 seconds (a save clears them).
 

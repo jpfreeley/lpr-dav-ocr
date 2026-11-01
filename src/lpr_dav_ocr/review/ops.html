@@ -85,6 +85,8 @@
   footer { color: var(--muted); font-size: 12px; margin-top: 18px; max-width: 80ch; }
 
   .st { display: inline-flex; gap: 5px; align-items: center; font-weight: 600; font-size: 12.5px; }
+  .redbar { background: #b42318; color: #fff; border-radius: 8px; padding: 12px 16px; margin: 0 0 14px; font-weight: 600; }
+  .redbar b { display: block; margin-bottom: 2px; letter-spacing: .02em; }
   .st.good { color: var(--good); } .st.warn { color: #9a6700; } .st.bad { color: #b42318; } .st.off { color: var(--muted); }
   @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .st.warn { color: #e0a53a; } :root:where(:not([data-theme="light"])) .st.bad { color: #f2796b; } }
   .att { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
@@ -100,6 +102,7 @@
   <nav class="sections" aria-label="Sections"><a href="#pipeline">Pipeline</a><a href="#jobs">Jobs</a><a href="#storage">Storage</a><a href="#accuracy">Accuracy</a><a href="#confusion">Confusions</a><a href="#review">Review</a><a href="#machine">Machine</a></nav>
 </header>
 <main>
+  <div class="redbar" id="redbar" role="alert" hidden></div>
   <div class="filters">
     <button class="chip" id="refresh" title="Reload the numbers now">&#8635; Refresh</button>
     <label class="opt"><input type="checkbox" id="auto" checked> auto-refresh (30 s)</label>
@@ -371,6 +374,9 @@ function empty(h, msg) { html("div", { class: "empty" }, h, msg || "Nothing to s
 const HDR = { "Content-Type": "application/json", "X-Requested-With": "lpr-review" };
 function paintAll() {
   Object.keys(PAINT).forEach(paint); kpis();
+  const rb = $("redbar"), crit = DATA.attention.filter(x => x.level === "critical");
+  rb.replaceChildren(); rb.hidden = !crit.length;
+  crit.forEach(x => { const p = html("div", {}, rb); html("b", {}, p, x.key === "share-missing" ? "\u25B2 Camera share not mounted" : "\u25B2 Critical"); html("span", {}, p, x.text); });
   const a = $("att"); a.replaceChildren();
   if (!DATA.attention.length) { const li = html("li", {}, a); status(li, "good", "All clear"); html("span", {}, li, "No job is late, the watcher is active and disk space is fine."); }
   DATA.attention.forEach(x => { const li = html("li", {}, a); status(li, x.level === "critical" ? "bad" : "warn", x.level === "critical" ? "Critical" : "Warning"); html("span", {}, li, x.text); });

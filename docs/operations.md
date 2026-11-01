@@ -7,7 +7,7 @@ The page rebuilds its numbers in the background every 30 seconds and answers fro
 
 | Panel | What it shows | Where the numbers come from |
 |---|---|---|
-| Needs attention | a short list, worst first: watcher quiet over 10 minutes, watcher errors in 24 h, more than 15 clips waiting, under 20 GB free, a job late, machine overloaded | computed from the panels below |
+| Needs attention | a short list, worst first: the camera share is not mounted (also shown as a red banner at the top of the page), watcher quiet over 10 minutes, watcher errors in 24 h, more than 15 clips waiting, under 20 GB free, a job late, machine overloaded | computed from the panels below |
 | Pipeline and watcher | clips on the share today, read so far, waiting, errors | the camera share and the watcher log |
 | Clips processed by hour | new clips per hour over 24 h | the watcher log |
 | Scheduled jobs | watcher, vehicle index refresh, nightly cleanup, duplicate merge; status, last run, off switch | stamp files and lock files in the local state folder, `duplicates.jsonl` |
@@ -20,6 +20,8 @@ The page rebuilds its numbers in the background every 30 seconds and answers fro
 
 A job shows **Late** when it has not run in twice its usual interval, **Off** when its switch file exists
 (`no_vehicle_refresh`, `no_cleanup`, `no_dedupe` in the state folder), and **Never run** when no stamp exists yet.
+
+The watcher touches `<home>/watch_heartbeat` every cycle. "Quiet" is measured from the newer of that file and the last log line, because the log only grows when a clip arrives and a road can be empty for an hour. Disk space is read with `df -k`, since Python's `shutil.disk_usage` wraps at 4 TiB on an SMB mount and reports a nearly full share when it is not.
 
 ## Storage snapshots
 

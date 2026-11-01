@@ -62,6 +62,8 @@ on a day while the watcher is also processing it, or both may process the same c
 
 If the share is unreachable for 30 minutes the watcher sends one "share unreachable" alert (at most every 6 hours).
 
+When the share disappears the watcher also logs `share not visible` and a `share probe:` line, and repeats the probe every 10 minutes until the share is back. The probe records whether the server answers ping, whether its SMB port (445) is open, which interface carries the default route, and whether the mount still exists. Read it after a drop: ping failing points at the network or the server; ping working with the port closed points at the server's file service; both working with the share gone points at the session or the Mac's mount. When the share returns it logs `share is back after N min`. macOS does not remount a dropped share on its own, so mount it again in Finder.
+
 ## Running it unattended (macOS)
 
 ```bash
