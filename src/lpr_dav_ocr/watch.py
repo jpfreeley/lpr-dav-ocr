@@ -203,7 +203,7 @@ def cycle(cam, a, state):
         frames = db_frames(cam, day)
         done = done_clips(frames)
         batch = []
-        for c in sorted(d.glob("*.dav")):
+        for c in sorted(set(d.glob("*.dav"))):       # set: macOS can list a file on a big SMB folder more than once
             end = clip_end(day, c.name)
             if c.name in done or not end or end < now - timedelta(minutes=a.lookback) or end > now - timedelta(seconds=a.settle):
                 continue
