@@ -92,8 +92,26 @@ def done_clips(frames):
     return {r["clip"] for r in read_csv(p)}
 
 
+HEARTBEAT_S = 30       # seconds between heartbeat touches while a helper script runs
+
+
+def beat():
+    """Touch the heartbeat file. ops.py reads it for liveness, because the log only grows when clips arrive."""
+    try:
+        (W.HOME / "watch_heartbeat").touch()
+    except OSError:
+        pass
+
+
 def run(*cmd):
-    return subprocess.run([sys.executable, "-I", *map(str, cmd)], capture_output=True, text=True)
+    """Run a helper script and wait for it, touching the heartbeat every HEARTBEAT_S seconds so a long step is not mistaken for a stopped watcher."""
+    proc = subprocess.Popen([sys.executable, "-I", *map(str, cmd)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    while True:
+        try:
+            out, err = proc.communicate(timeout=HEARTBEAT_S)
+            return subprocess.CompletedProcess(proc.args, proc.returncode, out, err)
+        except subprocess.TimeoutExpired:
+            beat()
 
 
 def check_matches(frames, clips, send, label=""):
@@ -290,10 +308,7 @@ def main(argv=None):
                         pass
         except Exception as ex:      # never let one bad cycle kill an unattended job
             log("cycle error:", repr(ex))
-        try:
-            (W.HOME / "watch_heartbeat").touch()    # the log only grows when clips arrive; ops.py reads this for liveness
-        except OSError:
-            pass
+        beat()
         if a.once:
             return
         time.sleep(a.poll)

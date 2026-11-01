@@ -180,3 +180,19 @@ class ShareProbeTests(unittest.TestCase):
             WT.probe_share(None, "/Volumes/camera-share")
         self.assertIn("share probe:", buf.getvalue())
         self.assertIn("host unknown", buf.getvalue())
+
+
+class HeartbeatTests(unittest.TestCase):
+    def test_run_touches_the_heartbeat_while_a_helper_works(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            old_home, old_beat = W.HOME, WT.HEARTBEAT_S
+            W.HOME, WT.HEARTBEAT_S = Path(d), 0.2
+            try:
+                script = Path(d) / "slow.py"
+                script.write_text("import time; time.sleep(1.0); print('done')")
+                r = WT.run(script)
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, "done"))
+                self.assertTrue((Path(d) / "watch_heartbeat").exists())             # touched while the helper ran
+            finally:
+                W.HOME, WT.HEARTBEAT_S = old_home, old_beat
