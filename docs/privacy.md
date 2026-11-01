@@ -54,6 +54,11 @@ before pushing, and consider making it a pre-commit hook:
 ln -s ../../scripts/check-private-data.sh .git/hooks/pre-commit
 ```
 
+To also catch your own identifiers, put one regular expression per line in a file outside the repository (host name,
+share name, camera ID, home network addresses, local user name) and point `LPR_PRIVATE_PATTERNS` at it. The script then
+checks the tracked files and the whole history against each line, and prints only that a pattern matched, never the value.
+CI does not have your file, so this check is for your machine.
+
 **Rules for contributors**
 
 - Tests, documentation, screenshots and demo data must be synthetic. `lpr demo` generates all of it. Plate
