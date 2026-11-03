@@ -114,7 +114,17 @@ Every one of these is also a `lpr process` flag (`lpr process -h`).
 | `cache_mb` | 1024 | Size limit for the review page's image cache. |
 | `trash_keep_days` | 0 | Delete frames that `lpr dedupe` merged away after this many days. 0 keeps them until you run `lpr dedupe --purge`. |
 | `dedupe_window` | 30 | Seconds. Reads of one plate this close together are one sighting. |
-| `workers` | 1 | Workers for the watcher's batches. Keep it low. |
+| `workers` | 1 | Day workers for the watcher's batches. Keep it low. |
+| `day_threads` | 2 | Day: threads per worker, and for the second pass. Caps the detector threads (`LPR_THREADS`), so a batch does not use every core. |
+| `day_nice` | 10 | Day: priority of the helper steps (`nice`). 0 is normal. |
+| `night_start`, `night_end` | 21, 7 | Local hours. Between them the watcher runs at full speed (see below). Equal values switch the schedule off, and the day settings apply all day. |
+| `night_workers` | 2 | Night: workers per batch, at normal priority, with the threads shared by the cores. |
+| `night_lookback_minutes` | 840 | Night: also pick up clips that ended this recently, so clips left behind by the gentle day pace are caught up. |
+
+**Day and night.** By day the watcher keeps the laptop cool: `workers` worker, `day_threads` threads, low priority. From
+`night_start` to `night_end` it uses `night_workers` workers at normal priority and catches up on the day's backlog. The weekly
+vehicle index refresh also waits for night. If the day pace cannot keep up with new clips, they wait until night; the
+longer night lookback covers them.
 
 ## `[ntfy]`
 

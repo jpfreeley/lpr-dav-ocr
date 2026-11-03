@@ -76,7 +76,13 @@ vehicles_refresh_days = 7 # refresh the local vehicle index (lpr vehicles) this 
 cleanup_days = 1          # once a day at night: gray frames (lossless), image cache and log trim, index compaction; 0 = off
 cache_mb = 1024           # keep the review page image cache under this size
 trash_keep_days = 0       # delete merged-away frames after this many days (0 = keep until you run lpr dedupe --purge)
-workers = 1               # keep low: the watcher runs next to everything else
+workers = 1               # day: workers for the watcher's batches (keep low: it runs next to everything else)
+day_threads = 2           # day: threads per worker and per second pass, so the laptop stays cool
+day_nice = 10             # day: lower priority for the helper steps (0 = normal)
+night_start = 21          # local hours; night_start = night_end switches the day/night schedule off
+night_end = 7
+night_workers = 2         # night: workers at normal priority, threads shared by the cores
+night_lookback_minutes = 840   # night: also catch up on clips this recent
 
 [ntfy]
 enabled = true

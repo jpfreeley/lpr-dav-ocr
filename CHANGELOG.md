@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Watcher: a day and night schedule. By day (07:00 to 21:00 by default) a batch and its second pass run one worker on 2 threads at low priority, so the laptop stays cool. At night they run 2 workers at normal priority and also catch up on clips from the last 14 hours. The weekly vehicle refresh waits for night. Settings: `day_threads`, `day_nice`, `night_start`, `night_end`, `night_workers`, `night_lookback_minutes`. `LPR_THREADS` caps the detector threads.
 - Operations page: a red banner and a critical "share not mounted" item when the camera folder is missing. A missing folder used to look like a day with no clips.
 - Watcher: a `share probe:` log line (ping, SMB port, default route, mount present) when the share disappears and every 10 minutes after, and `share is back after N min`.
 - `scripts/check-private-data.sh` reads your own identifier patterns from a file outside the repository (`LPR_PRIVATE_PATTERNS`) and checks tracked files and history against them.

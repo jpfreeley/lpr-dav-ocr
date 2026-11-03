@@ -103,9 +103,27 @@ def beat():
         pass
 
 
-def run(*cmd):
+def night(now=None):
+    """True from watch.night_start to watch.night_end (local hours; the span may cross midnight). Equal hours: never."""
+    a, b, h = WCFG["night_start"], WCFG["night_end"], (now or datetime.now()).hour
+    if a == b:
+        return False
+    return (h >= a or h < b) if a > b else (a <= h < b)
+
+
+def profile(now=None):
+    """(workers, threads per process, nice) for a helper step. Night: night_workers at normal priority, threads shared
+    by the cores. Day: `workers` workers, day_threads threads each, low priority, so the laptop stays cool."""
+    if night(now):
+        return WCFG["night_workers"], None, 0
+    return WCFG["workers"], WCFG["day_threads"], WCFG["day_nice"]
+
+
+def run(*cmd, nice=0, threads=None):
     """Run a helper script and wait for it, touching the heartbeat every HEARTBEAT_S seconds so a long step is not mistaken for a stopped watcher."""
-    proc = subprocess.Popen([sys.executable, "-I", *map(str, cmd)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    env = dict(os.environ, LPR_THREADS=str(threads)) if threads else None
+    proc = subprocess.Popen([sys.executable, "-I", *map(str, cmd)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            env=env, preexec_fn=(lambda: os.nice(nice)) if nice else None)
     while True:
         try:
             out, err = proc.communicate(timeout=HEARTBEAT_S)
@@ -183,7 +201,7 @@ def maybe_refresh_vehicles():
     """About weekly, refresh the current fiscal year of the local vehicle index in the background (vehicles.py).
     Never stops the watcher; a failed start is retried after an hour."""
     try:
-        if time.time() - _vtry[0] < 3600 or not WCFG["vehicles_refresh_days"] > 0:
+        if time.time() - _vtry[0] < 3600 or not WCFG["vehicles_refresh_days"] > 0 or not (night() or WCFG["night_start"] == WCFG["night_end"]):
             return
         if V.refresh_due(WCFG["vehicles_refresh_days"]):
             _vtry[0] = time.time()
@@ -214,6 +232,7 @@ def maybe_cleanup():
 
 def cycle(cam, a, state):
     now = datetime.now()
+    lookback = max(a.lookback, WCFG["night_lookback_minutes"]) if night(now) else a.lookback     # at night, catch up on clips the gentle day pace left behind
     for day in (now.date(), now.date() - timedelta(days=1)):
         d = cam / day.isoformat()
         if not d.is_dir():
@@ -223,7 +242,7 @@ def cycle(cam, a, state):
         batch = []
         for c in sorted(set(d.glob("*.dav"))):       # set: macOS can list a file on a big SMB folder more than once
             end = clip_end(day, c.name)
-            if c.name in done or not end or end < now - timedelta(minutes=a.lookback) or end > now - timedelta(seconds=a.settle):
+            if c.name in done or not end or end < now - timedelta(minutes=lookback) or end > now - timedelta(seconds=a.settle):
                 continue
             size = c.stat().st_size
             if state["sizes"].get(c) == size:       # same size on two polls: the camera is done with it
@@ -235,11 +254,12 @@ def cycle(cam, a, state):
         W.HOME.mkdir(parents=True, exist_ok=True)
         lst = W.HOME / "watch_batch.txt"
         lst.write_text("\n".join(str(c) for c in batch) + "\n")
-        r = run("-m", "lpr_dav_ocr.pipeline", "--files-from", lst, "--workers", str(WCFG["workers"]))
+        workers, threads, nice = profile()
+        r = run("-m", "lpr_dav_ocr.pipeline", "--files-from", lst, "--workers", str(workers), nice=nice, threads=threads)
         if r.returncode:
             log("process_day failed:", (r.stderr or r.stdout)[-300:])
             continue
-        run("-m", "lpr_dav_ocr.second_pass", frames)
+        run("-m", "lpr_dav_ocr.second_pass", frames, nice=nice, threads=threads)
         names = {c.name for c in batch}
         check_matches(frames, names, send=not a.dry_run)
         if WCFG["dedupe"] and not a.dry_run:

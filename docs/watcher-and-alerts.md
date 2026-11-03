@@ -54,7 +54,7 @@ network is down, an alert is not recorded as sent and is retried on the next cyc
 1. Look at today's and yesterday's folders (so a clip that crosses midnight is found).
 2. Keep clips whose **end time, taken from the file name,** is within `lookback_minutes`, that are not in
    `index.csv` yet, and whose **size is unchanged since the previous poll**. A clip still being written is skipped.
-3. Run the pipeline on that batch with `watch.workers` workers, then the second pass, then check the watchlist, then
+3. Run the pipeline on that batch (by day `watch.workers` workers on `day_threads` threads at low priority, from `night_start` to `night_end` `night_workers` workers at full speed), then the second pass, then check the watchlist, then
    merge duplicate sightings of the same vehicle (`watch.dedupe`, see [usage.md](usage.md#duplicate-sightings)).
 
 Clips older than `lookback_minutes` are not touched. Process those with `lpr process`. Do not run `lpr process`

@@ -128,6 +128,7 @@ def full_frames(ff, clip, W, H, idx):
 def make_ocr(threads=None, side=640):
     from paddleocr import PaddleOCR
     # det side capped (native 1080p is 4x slower). 640 needs --deskew; un-rotated plates need ~960
+    threads = threads or int(os.environ.get("LPR_THREADS", 0)) or None      # LPR_THREADS: set by the watcher to cool the laptop by day
     kw = dict(cpu_threads=threads) if threads else {}
     return PaddleOCR(use_doc_orientation_classify=False, use_doc_unwarping=False,
                      use_textline_orientation=False, text_det_limit_type="max",
@@ -337,7 +338,7 @@ def main(argv=None):
     todo = [c for c in clips if c.name not in done][:a.limit]
     print(f"{len(clips)} clips, {len(todo)} to do, out={out}", flush=True)
     t_all = time.time()
-    threads = max(1, (os.cpu_count() or 4) // a.workers)
+    threads = int(os.environ.get("LPR_THREADS", 0)) or max(1, (os.cpu_count() or 4) // a.workers)
     ctx = mp.get_context("spawn")
     with ctx.Pool(a.workers, _init, (a, threads)) as pool:
         for n, (clip, r, err) in enumerate(pool.imap_unordered(_work, [(str(c), str(out)) for c in todo]), 1):
