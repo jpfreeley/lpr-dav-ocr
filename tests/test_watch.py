@@ -124,11 +124,15 @@ class MergeDuplicatesTests(unittest.TestCase):
 class VehicleRefreshTests(unittest.TestCase):
     def test_refresh_starts_only_when_due_and_never_raises(self):
         started = []
-        real_due, real_start = WT.V.refresh_due, WT.V.start_refresh
+        real_due, real_start, real_night = WT.V.refresh_due, WT.V.start_refresh, WT.night
         WT.V.refresh_due = lambda days, home=None, now=None: True
         WT.V.start_refresh = lambda argv, home=None: started.append(argv) or object()
+        WT.night = lambda now=None: False
         try:
             WT._vtry[0] = 0.0
+            WT.maybe_refresh_vehicles()
+            self.assertEqual(started, [])                            # by day the refresh waits for night
+            WT.night = lambda now=None: True
             WT.maybe_refresh_vehicles()
             self.assertEqual(len(started), 1)
             self.assertIn("refresh", started[0])
@@ -138,7 +142,7 @@ class VehicleRefreshTests(unittest.TestCase):
             WT.V.refresh_due = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
             WT.maybe_refresh_vehicles()                              # an error is logged, not raised
         finally:
-            WT.V.refresh_due, WT.V.start_refresh = real_due, real_start
+            WT.V.refresh_due, WT.V.start_refresh, WT.night = real_due, real_start, real_night
             WT._vtry[0] = 0.0
 
 
@@ -180,6 +184,39 @@ class ShareProbeTests(unittest.TestCase):
             WT.probe_share(None, "/Volumes/camera-share")
         self.assertIn("share probe:", buf.getvalue())
         self.assertIn("host unknown", buf.getvalue())
+
+
+class DayNightTests(unittest.TestCase):
+    def setUp(self):
+        self.old = dict(WT.WCFG)
+        WT.WCFG.update(night_start=21, night_end=7, workers=1, day_threads=2, day_nice=10, night_workers=2)
+
+    def tearDown(self):
+        WT.WCFG.clear()
+        WT.WCFG.update(self.old)
+
+    def test_night_hours_cross_midnight(self):
+        hours = {h: WT.night(datetime(2026, 11, 3, h)) for h in range(24)}
+        self.assertEqual([h for h, v in hours.items() if not v], list(range(7, 21)))
+
+    def test_profile_is_gentle_by_day_and_full_at_night(self):
+        self.assertEqual(WT.profile(datetime(2026, 11, 3, 12)), (1, 2, 10))
+        self.assertEqual(WT.profile(datetime(2026, 11, 3, 22)), (2, None, 0))
+
+    def test_equal_hours_switch_the_schedule_off(self):
+        WT.WCFG.update(night_start=0, night_end=0)
+        self.assertFalse(WT.night(datetime(2026, 11, 3, 3)))
+
+    def test_same_day_window(self):
+        WT.WCFG.update(night_start=1, night_end=5)
+        self.assertEqual([h for h in range(24) if WT.night(datetime(2026, 11, 3, h))], [1, 2, 3, 4])
+
+    def test_run_applies_nice_and_thread_cap(self):
+        with tempfile.TemporaryDirectory() as d:
+            script = Path(d) / "probe.py"
+            script.write_text("import os; print(os.nice(0), os.environ.get('LPR_THREADS'))")
+            r = WT.run(script, nice=10, threads=2)
+            self.assertEqual(r.stdout.split(), ["10", "2"])
 
 
 class HeartbeatTests(unittest.TestCase):

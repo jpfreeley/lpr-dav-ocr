@@ -78,7 +78,17 @@ DEFAULTS = {
         "lookback_minutes": 90,
         "settle_seconds": 45,
         "cooldown_seconds": 600,
+        # Day and night. From night_start to night_end (local hours) a batch runs night_workers workers at normal priority and the
+        # watcher also catches up on clips from the last night_lookback_minutes. The rest of the day it runs `workers`
+        # workers on day_threads threads each at nice day_nice, so the laptop stays cool, and the weekly vehicle refresh waits for night.
+        # night_start = night_end switches the schedule off (always the day settings).
         "workers": 1,
+        "day_threads": 2,
+        "day_nice": 10,
+        "night_start": 21,
+        "night_end": 7,
+        "night_workers": 2,
+        "night_lookback_minutes": 840,
         # After each batch, merge duplicate sightings of one plate (same plate within dedupe_window seconds, or a
         # misread of it in the same clip): the clearer frame is kept, the others go to <data_root>/trash. See `lpr dedupe`.
         "dedupe": True,
