@@ -57,12 +57,18 @@ network is down, an alert is not recorded as sent and is retried on the next cyc
 3. Run the pipeline on that batch (by day `watch.workers` workers on `day_threads` threads at low priority, from `night_start` to `night_end` `night_workers` workers at full speed), then the second pass, then check the watchlist, then
    merge duplicate sightings of the same vehicle (`watch.dedupe`, see [usage.md](usage.md#duplicate-sightings)).
 
-Clips older than `lookback_minutes` are not touched. Process those with `lpr process`. Do not run `lpr process`
+A batch holds at most `max_batch` clips, newest first. The rest go in the next batches.
+
+Clips older than `lookback_minutes` are not touched, except right after a share outage (see below). Process those with `lpr process`. Do not run `lpr process`
 on a day while the watcher is also processing it, or both may process the same clip.
 
 If the share is unreachable for 30 minutes the watcher sends one "share unreachable" alert (at most every 6 hours).
 
-When the share disappears the watcher also logs `share not visible` and a `share probe:` line, and repeats the probe every 10 minutes until the share is back. The probe records whether the server answers ping, whether its SMB port (445) is open, which interface carries the default route, and whether the mount still exists. Read it after a drop: ping failing points at the network or the server; ping working with the port closed points at the server's file service; both working with the share gone points at the session or the Mac's mount. When the share returns it logs `share is back after N min`. macOS does not remount a dropped share on its own, so mount it again in Finder.
+When the share disappears the watcher also logs `share not visible` and a `share probe:` line, and repeats the probe every 10 minutes until the share is back. The probe records whether this Mac reaches its router, whether the server name resolves and answers ping, whether its SMB port (445) is open, which interface carries the default route, and whether the mount still exists. Read it after a drop: the router failing points at this Mac's own network (asleep, off Wi-Fi, away from home); ping failing points at the network or the server; ping working with the port closed points at the server's file service; both working with the share gone points at the session or the Mac's mount. The server name is remembered between restarts, so a watcher started while the share is gone can still probe it.
+
+macOS does not remount a dropped share on its own. While the share is gone the watcher tries every `remount_seconds` (120): once the server's SMB port answers, it mounts the share again with the login saved in the keychain and logs `remounted smb://...`. If that fails it logs `remount failed:` and keeps trying. The share must have been mounted once with "Remember this password in my keychain" set. A closed lid or a sleeping Mac stops the watcher too, so the remount happens on the next wake on the home network.
+
+When the share returns it logs `share is back after N min`. After an outage of more than 10 minutes it also logs `catching up on clips since ...` and, for `catchup_hours`, picks up the clips that arrived while the share was gone, from 30 minutes before the drop, in today's and yesterday's folders. Watchlist alerts for those clips are sent as they are read, so they can arrive hours late; the alert gives the time the vehicle was seen.
 
 ## Running it unattended (macOS)
 

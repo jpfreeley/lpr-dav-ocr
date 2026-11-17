@@ -83,6 +83,9 @@ night_start = 21          # local hours; night_start = night_end switches the da
 night_end = 7
 night_workers = 2         # night: workers at normal priority, threads shared by the cores
 night_lookback_minutes = 840   # night: also catch up on clips this recent
+remount_seconds = 120     # share missing: remount it this often once its SMB port answers (keychain login); 0 = off
+catchup_hours = 24        # after an outage: also read the clips that arrived meanwhile, for this long; 0 = off
+max_batch = 60            # clips per batch at most, newest first; 0 = no limit
 
 [ntfy]
 enabled = true

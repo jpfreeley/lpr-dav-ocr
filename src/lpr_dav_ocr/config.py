@@ -89,6 +89,12 @@ DEFAULTS = {
         "night_end": 7,
         "night_workers": 2,
         "night_lookback_minutes": 840,
+        # Share drops. While the camera folder is missing, remount the share every remount_seconds once its SMB port answers
+        # (macOS keychain login, as Finder's Connect to Server; 0 switches it off). When it returns after an outage, also read the
+        # clips that arrived meanwhile (today and yesterday) for catchup_hours. A batch holds at most max_batch clips, newest first.
+        "remount_seconds": 120,
+        "catchup_hours": 24,
+        "max_batch": 60,
         # After each batch, merge duplicate sightings of one plate (same plate within dedupe_window seconds, or a
         # misread of it in the same clip): the clearer frame is kept, the others go to <data_root>/trash. See `lpr dedupe`.
         "dedupe": True,
