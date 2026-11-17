@@ -36,15 +36,51 @@ def log(*a):
 
 
 def share_host(mount_point):
-    """The server name of the SMB mount, read from `mount` while it is mounted (it is gone from the table once it drops)."""
+    """The server name of the SMB mount, read from `mount` while it is mounted (it is gone from the table once it drops).
+    While mounted it also saves the host and smb://host/share under <home>, so a watcher started while the share is gone can
+    still probe and remount it."""
+    saved_host, saved_url = W.HOME / "share_host", W.HOME / "share_url"
     try:
         out = subprocess.run(["mount"], capture_output=True, text=True, timeout=10).stdout
     except (OSError, subprocess.SubprocessError):
-        return None
-    m = re.search(r"//(?:[^@/]+@)?([^/ ]+)/\S+ on " + re.escape(str(mount_point)), out)
+        out = ""
+    m = re.search(r"//(?:[^@/]+@)?([^/ ]+)/(\S+) on " + re.escape(str(mount_point)) + r" ", out)
     if not m:
-        return None
-    return m[1].replace("._smb._tcp.local", ".local")       # the Bonjour service name is not a host name; NAME.local is
+        try:
+            return saved_host.read_text().strip() or None
+        except OSError:
+            return None
+    host = m[1].replace("._smb._tcp.local", ".local")       # the Bonjour service name is not a host name; NAME.local is
+    try:
+        W.HOME.mkdir(parents=True, exist_ok=True)
+        saved_host.write_text(host + "\n")
+        saved_url.write_text(f"smb://{host}/{m[2]}\n")
+    except OSError:
+        pass
+    return host
+
+
+def try_remount(host):
+    """Mount the share again once its server answers, with the login saved in the macOS keychain (as Finder's Connect to
+    Server does). Does nothing while the SMB port is closed, so it is cheap to call often. True when the mount worked."""
+    try:
+        url = (W.HOME / "share_url").read_text().strip()
+    except OSError:
+        return False
+    if not host or not url:
+        return False
+    try:
+        if subprocess.run(["nc", "-z", "-G", "3", host, "445"], capture_output=True, timeout=10).returncode:
+            return False
+        r = subprocess.run(["osascript", "-e", f'mount volume "{url}"'], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as ex:
+        log("remount failed:", repr(ex))
+        return False
+    if r.returncode:
+        log("remount failed:", (r.stderr or r.stdout).strip()[-200:])
+        return False
+    log("remounted", url)
+    return True
 
 
 def probe_share(host, mount_point):
@@ -56,8 +92,15 @@ def probe_share(host, mount_point):
         except (OSError, subprocess.SubprocessError):
             return None
     out = []
+    r = run(["route", "-n", "get", "default"])
+    gw = r and re.search(r"gateway: (\S+)", r.stdout)
+    if gw:
+        r = run(["ping", "-c", "1", "-t", "3", gw[1]])
+        out.append("router " + ("ok" if r and r.returncode == 0 else "FAIL"))      # FAIL: this Mac's own network is down
     if host:
         r = run(["ping", "-c", "2", "-t", "4", host])
+        if r and re.search(r"cannot resolve|unknown host", r.stderr or "", re.I):
+            out.append("name does NOT resolve")
         out.append("ping " + ("ok" if r and r.returncode == 0 else "FAIL"))
         r = run(["nc", "-z", "-G", "3", host, "445"])
         out.append("smb port " + ("open" if r and r.returncode == 0 else "CLOSED"))
@@ -233,6 +276,8 @@ def maybe_cleanup():
 def cycle(cam, a, state):
     now = datetime.now()
     lookback = max(a.lookback, WCFG["night_lookback_minutes"]) if night(now) else a.lookback     # at night, catch up on clips the gentle day pace left behind
+    if state.get("catchup_from"):       # after an outage, also read what arrived while the share was gone
+        lookback = max(lookback, (now - state["catchup_from"]).total_seconds() / 60)
     for day in (now.date(), now.date() - timedelta(days=1)):
         d = cam / day.isoformat()
         if not d.is_dir():
@@ -250,6 +295,8 @@ def cycle(cam, a, state):
             state["sizes"][c] = size
         if not batch:
             continue
+        if len(batch) > WCFG["max_batch"] > 0:       # newest first, so a backlog never holds up live clips; the rest come next cycle
+            batch = sorted(batch, key=lambda c: c.name, reverse=True)[:WCFG["max_batch"]]
         log(f"{day}: {len(batch)} new clip(s): " + ", ".join(c.name[:17] for c in batch[:6]) + (" ..." if len(batch) > 6 else ""))
         W.HOME.mkdir(parents=True, exist_ok=True)
         lst = W.HOME / "watch_batch.txt"
@@ -268,6 +315,16 @@ def cycle(cam, a, state):
 
 
 REJECT_ASPECT = CFG["review"]["reject_aspect"]
+
+
+def start_catchup(state, now):
+    """Called when the share returns. After an outage of more than 10 minutes, widen the window to cover it, from 30 minutes
+    before the drop, for catchup_hours. cycle() only looks at today and yesterday, so that bounds it too."""
+    if not state.get("down_since") or now - state["down_since"] <= 600 or WCFG["catchup_hours"] <= 0:
+        return
+    state["catchup_from"] = datetime.fromtimestamp(state["down_since"]) - timedelta(minutes=30)
+    state["catchup_end"] = now + WCFG["catchup_hours"] * 3600
+    log(f"catching up on clips since {state['catchup_from']:%m-%d %H:%M}")
 
 
 def main(argv=None):
@@ -310,12 +367,19 @@ def main(argv=None):
                 if state["down_since"]:
                     log(f"share is back after {round((time.time() - state['down_since']) / 60)} min")
                     state["host"] = share_host(cam.parent) or state["host"]
+                    start_catchup(state, time.time())
                 state["down_since"] = None
+                if state.get("catchup_end") and time.time() > state["catchup_end"]:
+                    state["catchup_from"] = state["catchup_end"] = None
                 cycle(cam, a, state)
                 maybe_refresh_vehicles()
                 maybe_cleanup()
             else:
                 state["down_since"] = state["down_since"] or time.time()
+                if WCFG["remount_seconds"] > 0 and time.time() - state.get("remount_try", 0) > WCFG["remount_seconds"] and not a.dry_run:
+                    state["remount_try"] = time.time()
+                    if try_remount(state["host"]) and cam.is_dir():
+                        continue
                 if time.time() - state["probed"] > 600 and not a.dry_run:
                     state["probed"] = time.time()
                     log("share not visible:", cam)

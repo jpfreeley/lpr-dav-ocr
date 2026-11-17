@@ -168,13 +168,55 @@ class CleanupScheduleTests(unittest.TestCase):
 
 
 class ShareProbeTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.real_home = W.HOME
+        W.HOME = Path(self.tmp.name)
+
+    def tearDown(self):
+        W.HOME = self.real_home
+        self.tmp.cleanup()
+
     def test_share_host_reads_the_mount_table(self):
         import subprocess
         from unittest import mock
         table = "//user@NAS-1._smb._tcp.local/camera-share on /Volumes/camera-share (smbfs, nodev)\n/dev/disk3s1 on / (apfs)\n"
         with mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, table, "")):
+            self.assertIsNone(WT.share_host("/Volumes/other"))       # nothing saved yet
             self.assertEqual(WT.share_host("/Volumes/camera-share"), "NAS-1.local")      # the Bonjour name becomes a host name
-            self.assertIsNone(WT.share_host("/Volumes/other"))
+            self.assertEqual((W.HOME / "share_url").read_text().strip(), "smb://NAS-1.local/camera-share")
+            self.assertEqual(WT.share_host("/Volumes/other"), "NAS-1.local")      # gone from the table: the saved host
+
+    def test_remount_waits_for_the_smb_port_then_mounts_the_saved_url(self):
+        import subprocess
+        from unittest import mock
+        self.assertFalse(WT.try_remount("NAS-1.local"))         # no saved URL: nothing to do
+        (W.HOME / "share_url").write_text("smb://NAS-1.local/camera-share\n")
+        calls = []
+
+        def fake(rc_port, rc_mount):
+            def run(cmd, **kw):
+                calls.append(cmd[0])
+                return subprocess.CompletedProcess(cmd, rc_port if cmd[0] == "nc" else rc_mount, "", "")
+            return run
+        with mock.patch.object(subprocess, "run", side_effect=fake(1, 0)):
+            self.assertFalse(WT.try_remount("NAS-1.local"))     # port closed: no mount attempt
+        self.assertEqual(calls, ["nc"])
+        with mock.patch.object(subprocess, "run", side_effect=fake(0, 0)):
+            self.assertTrue(WT.try_remount("NAS-1.local"))
+        self.assertEqual(calls[-1], "osascript")
+        with mock.patch.object(subprocess, "run", side_effect=fake(0, 1)):
+            self.assertFalse(WT.try_remount("NAS-1.local"))
+        with mock.patch.object(subprocess, "run", side_effect=OSError("boom")):
+            self.assertFalse(WT.try_remount("NAS-1.local"))     # never raises
+
+    def test_catchup_only_after_a_real_outage(self):
+        state = {"down_since": 1_000_000.0}
+        WT.start_catchup(state, 1_000_000.0 + 300)             # 5 minutes: no catch-up
+        self.assertNotIn("catchup_from", state)
+        WT.start_catchup(state, 1_000_000.0 + 7200)            # 2 hours
+        self.assertEqual(state["catchup_from"], datetime.fromtimestamp(1_000_000.0 - 1800))
+        self.assertEqual(state["catchup_end"], 1_000_000.0 + 7200 + WT.WCFG["catchup_hours"] * 3600)
 
     def test_probe_logs_one_line_and_never_raises(self):
         import contextlib
@@ -233,3 +275,44 @@ class HeartbeatTests(unittest.TestCase):
                 self.assertTrue((Path(d) / "watch_heartbeat").exists())             # touched while the helper ran
             finally:
                 W.HOME, WT.HEARTBEAT_S = old_home, old_beat
+
+
+class CycleWindowTests(unittest.TestCase):
+    """cycle(): after an outage the window widens to cover it, and a large batch is capped, newest first."""
+    def test_catchup_window_and_batch_cap(self):
+        from datetime import timedelta
+        from types import SimpleNamespace
+        from unittest import mock
+        now = datetime.now().replace(microsecond=0)
+        midnight = now.replace(hour=0, minute=0, second=0)
+        ends = [now - timedelta(hours=3, minutes=k) for k in range(80)]          # 80 clips that ended 3 to 4.3 hours ago
+        ends = [e for e in ends if e - timedelta(seconds=20) >= midnight]        # keep clips that start today
+        if len(ends) <= WT.WCFG["max_batch"]:
+            self.skipTest("too early in the day to lay out enough clips")
+        with tempfile.TemporaryDirectory() as t:
+            cam = Path(t) / "cam"
+            d = cam / now.date().isoformat()
+            d.mkdir(parents=True)
+            for e in ends:
+                (d / f"{e - timedelta(seconds=20):%H.%M.%S}-{e:%H.%M.%S}[M][0@0][0].dav").write_bytes(b"x")
+            names = sorted(p.name for p in d.glob("*.dav"))
+            a = SimpleNamespace(lookback=90, settle=45, dry_run=True)
+            state = {"sizes": {}}
+            batches = []
+
+            def fake_run(*args, **kw):
+                batches.append(Path(args[3]).read_text().split())
+                return SimpleNamespace(returncode=1, stderr="", stdout="")     # stop after reading the batch list
+            with mock.patch.object(WT, "night", return_value=False), \
+                 mock.patch.object(WT, "db_frames", return_value=Path(t) / "frames"), \
+                 mock.patch.object(WT, "run", side_effect=fake_run), \
+                 mock.patch.object(W, "HOME", Path(t) / "home"):
+                WT.cycle(cam, a, state)
+                WT.cycle(cam, a, state)
+                self.assertEqual(batches, [])                  # all older than the 90-minute window
+                state["catchup_from"] = now - timedelta(hours=6)
+                WT.cycle(cam, a, state)                        # first look at the sizes
+                WT.cycle(cam, a, state)                        # sizes unchanged: one batch
+            self.assertEqual(len(batches), 1)
+            got = sorted(Path(x).name for x in batches[0])
+            self.assertEqual(got, names[-WT.WCFG["max_batch"]:])      # the newest ones

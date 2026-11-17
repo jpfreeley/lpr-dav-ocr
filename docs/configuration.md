@@ -120,6 +120,9 @@ Every one of these is also a `lpr process` flag (`lpr process -h`).
 | `night_start`, `night_end` | 21, 7 | Local hours. Between them the watcher runs at full speed (see below). Equal values switch the schedule off, and the day settings apply all day. |
 | `night_workers` | 2 | Night: workers per batch, at normal priority, with the threads shared by the cores. |
 | `night_lookback_minutes` | 840 | Night: also pick up clips that ended this recently, so clips left behind by the gentle day pace are caught up. |
+| `remount_seconds` | 120 | While the camera folder is missing, try to mount the share again this often, once its SMB port answers. Uses the login saved in the macOS keychain. 0 switches it off. |
+| `catchup_hours` | 24 | After the share returns from an outage of more than 10 minutes, also pick up the clips that arrived while it was gone (today's and yesterday's folders), for this many hours. 0 switches it off. |
+| `max_batch` | 60 | Most clips in one batch, newest first, so a backlog never holds up new clips. The rest go in the next batches. 0 means no limit. |
 
 **Day and night.** By day the watcher keeps the laptop cool: `workers` worker, `day_threads` threads, low priority. From
 `night_start` to `night_end` it uses `night_workers` workers at normal priority and catches up on the day's backlog. The weekly

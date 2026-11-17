@@ -6,6 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 
 ### Added
 
+- Watcher: remounts a dropped share by itself. While the camera folder is missing it tries every `remount_seconds` (120), once the server's SMB port answers, with the login saved in the macOS keychain. The share address is remembered while mounted.
+- Watcher: catch-up after an outage. When the share returns after more than 10 minutes, the watcher also reads the clips that arrived while it was gone (today and yesterday) for `catchup_hours` (24). A batch holds at most `max_batch` (60) clips, newest first, so a backlog never holds up new clips.
+- Watcher: the share probe also pings the router (this Mac's own network) and says when the server name does not resolve. The server name is remembered, so a watcher started while the share is gone can still probe it.
 - Watcher: a day and night schedule. By day (07:00 to 21:00 by default) a batch and its second pass run one worker on 2 threads at low priority, so the laptop stays cool. At night they run 2 workers at normal priority and also catch up on clips from the last 14 hours. The weekly vehicle refresh waits for night. Settings: `day_threads`, `day_nice`, `night_start`, `night_end`, `night_workers`, `night_lookback_minutes`. `LPR_THREADS` caps the detector threads.
 - Operations page: a red banner and a critical "share not mounted" item when the camera folder is missing. A missing folder used to look like a day with no clips.
 - Watcher: a `share probe:` log line (ping, SMB port, default route, mount present) when the share disappears and every 10 minutes after, and `share is back after N min`.
